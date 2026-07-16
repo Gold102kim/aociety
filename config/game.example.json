@@ -1,0 +1,10 @@
+{
+  "contractVersion": "1.0",
+  "executablePath": "D:\\EchoVerseGame\\Windows\\EchoVerse.exe",
+  "workingDirectory": "D:\\EchoVerseGame\\Windows",
+  "channel": "development",
+  "authExchangeUrl": "https://api.example.com/v1/game-session/exchange",
+  "additionalArgs": [
+    "-log"
+  ]
+}
