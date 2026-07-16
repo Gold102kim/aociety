@@ -1,4 +1,4 @@
-# EchoVerse Launcher
+# aociety · EchoVerse Launcher
 
 EchoVerse 的 Windows 桌面启动器原型，包含账户注册、登录、保持会话、启动器主页以及版本化的 UE5 游戏启动接口。
 
