@@ -1,0 +1,8 @@
+node_modules/
+dist/
+dist-electron/
+.vite/
+.doc_review/
+*.log
+config/game.local.json
+config/ai.local.json

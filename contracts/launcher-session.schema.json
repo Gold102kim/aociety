@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echoverse.local/contracts/launcher-session-1.0.schema.json",
+  "title": "EchoVerse Launcher Session",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "launchId", "issuedAt", "expiresAt", "launcher", "account", "auth", "game"],
+  "properties": {
+    "contractVersion": { "const": "1.0" },
+    "launchId": { "type": "string", "format": "uuid" },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "launcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "platform", "locale"],
+      "properties": {
+        "version": { "type": "string" },
+        "platform": { "type": "string", "enum": ["win32", "darwin", "linux"] },
+        "locale": { "type": "string" }
+      }
+    },
+    "account": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accountId", "displayName"],
+      "properties": {
+        "accountId": { "type": "string", "minLength": 1 },
+        "displayName": { "type": "string", "minLength": 1 }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agentId", "status", "profileVersion", "baseModelId"],
+      "properties": {
+        "agentId": { "type": "string", "format": "uuid" },
+        "status": { "type": "string", "enum": ["WAITING_FOR_PROFILE", "READY"] },
+        "profileVersion": { "const": 1 },
+        "baseModelId": { "const": "echo-persona-v1" }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ticket", "ticketType", "exchangeUrl"],
+      "properties": {
+        "ticket": { "type": "string", "minLength": 1 },
+        "ticketType": { "type": "string", "enum": ["prototype-local", "one-time-game-ticket"] },
+        "exchangeUrl": { "type": ["string", "null"] }
+      }
+    },
+    "game": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel"],
+      "properties": {
+        "channel": { "type": "string" }
+      }
+    }
+  }
+}
