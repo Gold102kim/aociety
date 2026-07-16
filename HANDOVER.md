@@ -541,9 +541,9 @@ python -c "from services.tts_service import TTSService; ...
 
 ```ini
 # === 必填 (启动必需的) ===
-ANTHROPIC_API_KEY=mk_7DJ8D9XH4G9DNXRQKA279UPTZ72XG92W    # tokenhub.market 中转Key
-GLM_BASE_URL=https://api.tokenhub.market/v1                # GLM 5.2 API地址
-GLM_MODEL_ID=glm-5.2                                       # 模型名
+TOKENHUB_API_KEY=your_tokenhub_key                         # tokenhub.market 中转Key
+TOKENHUB_BASE_URL=https://api.tokenhub.market/v1           # GLM 5.2 API地址
+TOKENHUB_MODEL=glm-5.2                                     # 模型名
 
 # === 端口 ===
 AOCIETY_PORT=8000        # 主后端
@@ -554,9 +554,7 @@ AROUSAL_PORT=8002        # (备用) Arousal服务
 ENABLE_EMOTION=1         # 0 = 关闭情感计算 (只用世界引擎)
 WORLD_PULSE_SECONDS=60   # 世界AI脉冲间隔
 
-# === 可选备用Key (已过期但保留兼容) ===
-BIGMODEL_API_KEY=e07ee792c3fb4700aa41d512d8a236f6.a6PDKB9iKXfW5lzQ
-OPENAI_API_KEY=945afe0f198772dc74450c9b3c96dffcfb9222da2cf206e06cbacd882b64532a
+# 不要把真实密钥写进交接文档或提交到 Git。
 ```
 
 ---
@@ -687,7 +685,7 @@ Unable to open zip archive (pose_landmarker.task)
 
 # 情感分析一直返回 degraded=True
 → source_models 字段显示 local_expression_fallback → GLM API 不可用
-→ 检查 .env 的 ANTHROPIC_API_KEY
+→ 检查 .env 的 TOKENHUB_API_KEY 和套餐状态
 
 # NPC关怀没反应
 POST /emotion/care 返回 "":"none"
@@ -731,10 +729,10 @@ curl http://127.0.0.1:8000/world/state | python -m json.tool | head 20
 
 # GLM 5.2 API 直接测试
 python -c "
-import httpx
-r=httpx.post('https://api.tokenhub.market/v1/messages', 
-  json={'model':'glm-5.2','max_tokens':1024,'messages':[{'role':'user','content':'Say OK'}]},
-  headers={'x-api-key':'mk_7DJ8D9XH4G9DNXRQKA279UPTZ72XG92W','anthropic-version':'2023-06-01'},
+import httpx, os
+r=httpx.post('https://api.tokenhub.market/v1/chat/completions',
+  json={'model':'glm-5.2','max_tokens':128,'messages':[{'role':'user','content':'Say OK'}]},
+  headers={'Authorization':'Bearer '+os.environ['TOKENHUB_API_KEY']},
   timeout=30)
 print(r.json())
 "

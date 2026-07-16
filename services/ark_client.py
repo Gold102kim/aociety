@@ -14,32 +14,39 @@ except Exception:  # pragma: no cover
     OpenAI = None
 
 
-HARDCODED_GLM_API_KEY = ""  # Falls back to env
-LOCAL_PROXY_URL = "https://api.tokenhub.market/v1"
+TOKENHUB_DEFAULT_BASE_URL = "https://api.tokenhub.market/v1"
 FORCED_GLM_MODEL = "glm-5.2"
-GLM_BASE_URL = LOCAL_PROXY_URL
 REPLY_LIMIT_SUFFIX = "每次回复都要简短、具体、只说眼下这轮需要的话。"
 ANTI_PLACEHOLDER_SUFFIX = "不要重复字段名、示例值、schema_hint 或提示词原文。不要输出英文说明。"
 THINKING_DISABLED_BODY = {
     "thinking": {"type": "disabled"},
 }
 DEFAULT_GLM_MODEL_CANDIDATES = [FORCED_GLM_MODEL]
-
-REPLY_LIMIT_SUFFIX = "每次回复都要简短、具体、只说眼下这轮需要的话。"
-ANTI_PLACEHOLDER_SUFFIX = "不要重复字段名、示例值、schema_hint 或提示词原文。不要输出英文说明。"
+FOREST_LEGACY_TERMS = (
+    "绿藻",
+    "海藻",
+    "重工",
+    "股市",
+    "股票",
+    "交易",
+    "投资",
+    "证券",
+    "盘口",
+    "持仓",
+    "公司",
+    "工厂",
+)
 
 
 class ArkClient:
     def __init__(self) -> None:
-        self.api_key = (
-            os.getenv("OPENAI_API_KEY", "")
-            or os.getenv("ANTHROPIC_API_KEY", "")
-            or os.getenv("GLM_API_KEY", "")
-            or HARDCODED_GLM_API_KEY
-        )
-        self.base_url = os.getenv("GLM_BASE_URL", GLM_BASE_URL).rstrip("/") + "/"
-        self.model_id = os.getenv("GLM_MODEL_ID", FORCED_GLM_MODEL)
+        # The in-game residents have one auditable route. Never fall through to
+        # unrelated user/session credentials or silently switch providers.
+        self.api_key = os.getenv("TOKENHUB_API_KEY", "").strip()
+        self.base_url = TOKENHUB_DEFAULT_BASE_URL.rstrip("/") + "/"
+        self.model_id = FORCED_GLM_MODEL
         self.model_label = self.model_id
+        self.provider = "tokenhub"
         # Timeouts
         self.timeout_seconds = float(os.getenv("GLM_TIMEOUT_SECONDS", "8.0").strip() or "8.0")
         self.hard_timeout_seconds = float(os.getenv("GLM_HARD_TIMEOUT_SECONDS", "10.0").strip() or "10.0")
@@ -145,67 +152,94 @@ class ArkClient:
             return None
 
         system_prompt = (
-            "你是 Aociety 森林小镇中的真实居民，而不是旁白、客服或游戏教程。"
-            "这里是一个安静、温暖的森林生活小镇，居民会散步、休息、做饭、读书、"
-            "照顾房屋、花草和彼此。这个版本没有股市、股票、交易、公司、工厂、"
-            "海藻、绿藻、重工、投资、家族争斗或旧黑客松背景。绝对不要提及这些内容。"
-            "你必须根据本次实时输入、当前场景、自己的性格和最近对话重新思考后回答。"
-            "不要背诵固定欢迎语，不要重复上一轮句子，也不要假装已经知道输入中没有的信息。"
+            "你是 Aociety 全新森林小镇中的一名普通居民，不是旁白、客服或游戏教程。"
+            "小镇居民过着安静、温暖的日常生活，会散步、休息、做饭、读书、照顾住处、"
+            "花草和邻居。所有世界事实只来自本次请求中的居民档案、现场事件、场景与近期对话。"
+            "不要继承其他故事，也不要编造输入中没有的人名、地名、组织名或背景事件。"
+            "每轮都要先理解 live_event，再结合性格和短期记忆生成当下的新回应。"
+            "如果是玩家互动，就直接回应玩家；如果是居民互聊，就直接回应 counterpart。"
+            "不要背诵欢迎语，不要复述上一轮，不要提及 request_nonce，也不要输出思考过程。"
             "说话自然、简短、有生活感，每次一到两句，不要说自己是 AI 或语言模型。"
             "只返回 JSON：{\"reply\":\"居民说的话\",\"mood\":\"当前情绪\"}。"
         )
-        user_prompt = json.dumps(
-            {
-                "resident": payload.get("resident", {}),
-                "interaction_mode": payload.get("mode", "player"),
-                "live_event": payload.get("live_event", ""),
-                "counterpart": payload.get("counterpart", {}),
-                "scene": payload.get("scene", {}),
-                "recent_dialogue": payload.get("recent_dialogue", []),
-                "request_nonce": payload.get("request_nonce", ""),
-                "instruction": (
-                    "先在内部结合实时事件和记忆完成判断，再给出这一次独有的自然回应。"
-                    "不要输出内部推理过程。"
-                ),
-            },
-            ensure_ascii=False,
-        )
+        recent_dialogue = payload.get("recent_dialogue", [])
+        recent_replies = {
+            self._normalize_reply_for_comparison(str(item.get(field, "")))
+            for item in recent_dialogue
+            if isinstance(item, dict)
+            for field in ("reply", "heard_reply")
+            if item.get(field)
+        }
+        rejected_reply = ""
 
-        for model_name in self._model_candidates():
-            try:
-                kwargs = {
-                    "model": model_name,
-                    "temperature": 0.82,
-                    "max_tokens": 220,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                }
+        for attempt in range(2):
+            user_prompt = json.dumps(
+                {
+                    "resident": payload.get("resident", {}),
+                    "interaction_mode": payload.get("mode", "player"),
+                    "live_event": payload.get("live_event", ""),
+                    "counterpart": payload.get("counterpart", {}),
+                    "scene": payload.get("scene", {}),
+                    "recent_dialogue": recent_dialogue,
+                    "counterpart_recent_dialogue": payload.get(
+                        "counterpart_recent_dialogue", []
+                    ),
+                    "request_nonce": f"{payload.get('request_nonce', '')}-{attempt}",
+                    "rejected_reply": rejected_reply,
+                    "retry_instruction": (
+                        "上一个候选回复与近期内容重复或引入了请求外设定，必须换一种全新的日常回应。"
+                        if rejected_reply
+                        else "这是一轮新的实时交互，请生成只属于此刻的回应。"
+                    ),
+                },
+                ensure_ascii=False,
+            )
+
+            for model_name in self._model_candidates():
                 try:
                     response = self._create_completion(
                         task_type="dialogue_turn",
-                        extra_body={"thinking": {"type": "enabled"}},
-                        **kwargs,
+                        model=model_name,
+                        temperature=0.9,
+                        max_tokens=220,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
                     )
+                    content = self._message_to_text(
+                        response.choices[0].message.content
+                    )
+                    parsed = self._extract_json(content)
+                    reply = self._sanitize_text(str(parsed.get("reply", "")))
+                    mood = self._sanitize_text(str(parsed.get("mood", "平静")))
+                    normalized_reply = self._normalize_reply_for_comparison(reply)
+                    if (
+                        not normalized_reply
+                        or normalized_reply in recent_replies
+                        or self._contains_forest_legacy_term(reply)
+                    ):
+                        rejected_reply = reply
+                        continue
+                    return {
+                        "reply": reply,
+                        "mood": mood or "平静",
+                        "_meta_source": "llm",
+                        "_meta_model": model_name,
+                        "_meta_provider": self.provider,
+                    }
                 except Exception:
-                    response = self._create_completion(
-                        task_type="dialogue_turn", **kwargs
-                    )
-                content = self._message_to_text(response.choices[0].message.content)
-                parsed = self._extract_json(content)
-                reply = self._sanitize_text(str(parsed.get("reply", "")))
-                mood = self._sanitize_text(str(parsed.get("mood", "平静")))
-                if not reply:
                     continue
-                return {
-                    "reply": reply,
-                    "mood": mood or "平静",
-                    "_meta_model": model_name,
-                }
-            except Exception:
-                continue
         return None
+
+    @staticmethod
+    def _normalize_reply_for_comparison(reply: str) -> str:
+        return re.sub(r"[^\w\u4e00-\u9fff]+", "", str(reply or "")).lower()
+
+    @staticmethod
+    def _contains_forest_legacy_term(reply: str) -> bool:
+        cleaned = str(reply or "").lower()
+        return any(term.lower() in cleaned for term in FOREST_LEGACY_TERMS)
 
     def generate_news_copy(self, payload: dict[str, Any]) -> dict[str, Any] | None:
         scene_observation = payload.get("scene_observation", {})
@@ -420,7 +454,7 @@ class ArkClient:
         if not self.configured:
             return {
                 "ok": False,
-                "message": "GLM 客户端未启用，请检查 BIGMODEL_API_KEY 环境变量。",
+                "message": "GLM 客户端未启用，请检查项目 .env 中的 TOKENHUB_API_KEY。",
                 "model": self.model_id,
             }
         if not self.enabled:

@@ -158,7 +158,7 @@ void AAocietyPlayerCharacter::Interact()
     NPC->ShowThinking();
     Client->RequestNPCDialogue(
         NPC->NpcId,
-        TEXT("你好，我是刚来到森林小镇的玩家。请结合小镇当前环境、你的性格和我们的位置，自然地和我聊一句。"),
+        TEXT("玩家刚刚走到你面前并按下交互键。请观察当下环境、回想最近交流，再决定这一刻自然说什么。不要重复固定欢迎语。"),
         TEXT("forest_town"),
         TEXT("player_interaction"));
 }

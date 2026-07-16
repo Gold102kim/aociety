@@ -35,31 +35,53 @@ def find_track(tracks, *tokens):
     return None
 
 
+def find_sided_track(tracks, stem, side):
+    marker = f"_{side.lower()}_"
+    for track in tracks:
+        name = track.lower()
+        if stem.lower() in name and marker in name:
+            return track
+    return None
+
+
 def animation_delta(mode, frame, frame_count, selected):
     phase = 2.0 * math.pi * frame / max(1, frame_count - 1)
     wave = math.sin(phase)
     opposite = -wave
     if mode == "idle":
         values = {
-            selected["hips"]: ("z", wave * 1.5),
-            selected["spine"]: ("z", opposite * 1.0),
-            selected["left_arm"]: ("x", 2.0 + wave * 1.0),
-            selected["right_arm"]: ("x", -2.0 + opposite * 1.0),
+            selected["hips"]: ("z", wave * 0.8),
+            selected["spine"]: ("z", opposite * 0.55),
+            selected["left_arm"]: ("x", 1.0 + wave * 0.5),
+            selected["right_arm"]: ("x", -1.0 + opposite * 0.5),
         }
     else:
-        swing = wave * 27.0
+        # This glTF rig keeps local Y as the bone-length axis. Visual axis tests
+        # show local X produces the reported sideways high-step, while local Z
+        # is the sagittal flexion axis. Mirrored bone rolls mean both thighs use
+        # the same local-Z sign, while knee/ankle compensation must be mirrored.
+        swing = wave * 18.0
+        stride_velocity = math.cos(phase)
+        left_knee_flex = 4.0 + max(0.0, stride_velocity) * 24.0
+        right_knee_flex = 4.0 + max(0.0, -stride_velocity) * 24.0
         values = {
-            selected["hips"]: ("z", wave * 2.5),
-            selected["spine"]: ("z", opposite * 2.0),
-            selected["left_leg"]: ("x", swing),
-            selected["right_leg"]: ("x", -swing),
-            selected["left_knee"]: ("x", max(0.0, -swing) * 1.05),
-            selected["right_knee"]: ("x", max(0.0, swing) * 1.05),
-            selected["left_arm"]: ("x", -swing * 0.70),
-            selected["right_arm"]: ("x", swing * 0.70),
-            selected["left_forearm"]: ("x", -10.0),
-            selected["right_forearm"]: ("x", -10.0),
+            selected["hips"]: ("z", wave * 1.1),
+            selected["spine"]: ("z", opposite * 0.9),
+            selected["left_leg"]: ("z", -swing),
+            selected["right_leg"]: ("z", -swing),
+            selected["left_knee"]: ("z", left_knee_flex),
+            selected["right_knee"]: ("z", -right_knee_flex),
+            selected["left_foot"]: ("z", -left_knee_flex * 0.42),
+            selected["right_foot"]: ("z", right_knee_flex * 0.42),
+            selected["left_arm"]: ("x", -swing * 0.45),
+            selected["right_arm"]: ("x", swing * 0.45),
+            selected["left_forearm"]: ("x", -6.0),
+            selected["right_forearm"]: ("x", -6.0),
         }
+    if selected.get("left_skirt"):
+        values[selected["left_skirt"]] = ("z", wave * 2.0)
+    if selected.get("right_skirt"):
+        values[selected["right_skirt"]] = ("z", -wave * 2.0)
     return values
 
 
@@ -76,16 +98,24 @@ def rebuild(path, frame_count, mode):
     selected = {
         "hips": find_track(tracks, "hips"),
         "spine": find_track(tracks, "spine"),
-        "left_leg": find_track(tracks, "upper_leg", "l"),
-        "right_leg": find_track(tracks, "upper_leg", "r"),
-        "left_knee": find_track(tracks, "lower_leg", "l"),
-        "right_knee": find_track(tracks, "lower_leg", "r"),
-        "left_arm": find_track(tracks, "upper_arm", "l"),
-        "right_arm": find_track(tracks, "upper_arm", "r"),
-        "left_forearm": find_track(tracks, "lower_arm", "l"),
-        "right_forearm": find_track(tracks, "lower_arm", "r"),
+        "left_leg": find_sided_track(tracks, "upper_leg", "l"),
+        "right_leg": find_sided_track(tracks, "upper_leg", "r"),
+        "left_knee": find_sided_track(tracks, "lower_leg", "l"),
+        "right_knee": find_sided_track(tracks, "lower_leg", "r"),
+        "left_foot": find_sided_track(tracks, "foot", "l"),
+        "right_foot": find_sided_track(tracks, "foot", "r"),
+        "left_arm": find_sided_track(tracks, "upper_arm", "l"),
+        "right_arm": find_sided_track(tracks, "upper_arm", "r"),
+        "left_forearm": find_sided_track(tracks, "lower_arm", "l"),
+        "right_forearm": find_sided_track(tracks, "lower_arm", "r"),
+        "left_skirt": find_track(tracks, "sk_l_154"),
+        "right_skirt": find_track(tracks, "sk_r_169"),
     }
-    missing = [key for key, value in selected.items() if not value]
+    missing = [
+        key
+        for key, value in selected.items()
+        if key not in ("left_skirt", "right_skirt") and not value
+    ]
     if missing:
         raise RuntimeError(f"Missing Ecy tracks: {missing}")
 

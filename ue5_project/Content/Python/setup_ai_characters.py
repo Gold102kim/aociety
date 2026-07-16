@@ -77,6 +77,7 @@ def spawn_ai_npc(
         unreal.Rotator(pitch=0.0, yaw=yaw, roll=0.0),
     )
     actor.set_actor_label(f"{PREFIX}NPC_{npc_id}_{display_name}")
+    actor.set_actor_scale3d(unreal.Vector(1.0, 1.0, 1.0))
     actor.set_editor_property(
         "tags",
         [unreal.Name("AocietyResident"), unreal.Name(npc_id), unreal.Name("GLM_5_2")],
@@ -93,6 +94,7 @@ def spawn_ai_npc(
     component.set_animation_mode(unreal.AnimationMode.ANIMATION_SINGLE_NODE)
     component.set_animation(idle_animation)
     component.set_editor_property("relative_location", unreal.Vector(0.0, 0.0, -88.0))
+    component.set_editor_property("relative_scale3d", unreal.Vector(1.0, 1.0, 1.0))
     component.set_editor_property(
         "relative_rotation", unreal.Rotator(pitch=0.0, yaw=-90.0, roll=0.0)
     )
@@ -110,8 +112,13 @@ actors = actor_subsystem.get_all_level_actors()
 replace = [
     actor
     for actor in actors
-    if actor.get_actor_label().startswith(PREFIX)
+    if isinstance(actor, unreal.PlayerStart)
+    or actor.get_actor_label().startswith(PREFIX)
     or actor.get_actor_label().startswith("Aociety_TownRefine_Resident_")
+    or "AocietyResident"
+    in {str(tag) for tag in actor.get_editor_property("tags")}
+    or "AocietyDialogueTrigger"
+    in {str(tag) for tag in actor.get_editor_property("tags")}
 ]
 removed_lights = [
     actor for actor in actors
@@ -166,11 +173,39 @@ spawn_label(
     42.0,
 )
 
+final_actors = actor_subsystem.get_all_level_actors()
+final_npcs = [
+    actor
+    for actor in final_actors
+    if "AocietyResident"
+    in {str(tag) for tag in actor.get_editor_property("tags")}
+]
+final_triggers = [
+    actor
+    for actor in final_actors
+    if "AocietyDialogueTrigger"
+    in {str(tag) for tag in actor.get_editor_property("tags")}
+]
+final_player_starts = [
+    actor for actor in final_actors if isinstance(actor, unreal.PlayerStart)
+]
+if (
+    len(final_npcs) != 2
+    or len(final_triggers) != 2
+    or len(final_player_starts) != 1
+):
+    raise RuntimeError(
+        f"Expected 2 NPCs, 2 dialogue triggers, and 1 PlayerStart; got "
+        f"npcs={len(final_npcs)} triggers={len(final_triggers)} "
+        f"player_starts={len(final_player_starts)}"
+    )
+
 level_subsystem.save_current_level()
 unreal.EditorAssetLibrary.save_directory(
     "/Game/Aociety", only_if_is_dirty=False, recursive=True
 )
 print(
-    "[AocietyAISetup] player=Ecy npcs=2 triggers=2 removed_warm_lights=%d"
-    % len(removed_lights)
+    "[AocietyAISetup] player=Ecy npcs=2 triggers=2 "
+    "removed_legacy_ai=%d removed_warm_lights=%d"
+    % (len(replace), len(removed_lights))
 )

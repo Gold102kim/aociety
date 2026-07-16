@@ -9,10 +9,12 @@
 #include "JsonUtilities.h"
 #include "TimerManager.h"
 #include "Misc/Base64.h"
+#include "Misc/DateTime.h"
 #include "Misc/Guid.h"
 #include "IWebSocket.h"
 #include "WebSocketsModule.h"
 #include "Sound/SoundWave.h"
+#include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
 
@@ -48,6 +50,16 @@ bool UAocietyClientSubsystem::Connect()
 {
     if (bIsConnected) return true;
 
+    if (WS.IsValid())
+    {
+        WS->OnConnected().Clear();
+        WS->OnMessage().Clear();
+        WS->OnConnectionError().Clear();
+        WS->OnClosed().Clear();
+        WS->Close();
+        WS.Reset();
+    }
+
     FString WSURL = BackendURL.Replace(TEXT("http://"), TEXT("ws://")).Replace(TEXT("https://"), TEXT("wss://"));
     WSURL += TEXT("/ws/emotion");
 
@@ -65,31 +77,53 @@ bool UAocietyClientSubsystem::Connect()
         return false;
     }
 
-    WS->OnConnected().AddLambda([this]()
+    const TWeakObjectPtr<UAocietyClientSubsystem> WeakThis(this);
+
+    WS->OnConnected().AddLambda([WeakThis]()
     {
-        bIsConnected = true;
+        UAocietyClientSubsystem* Self = WeakThis.Get();
+        if (!Self) return;
+        Self->bIsConnected = true;
         UE_LOG(LogAociety, Log, TEXT("[Aociety] WebSocket 连接成功"));
-        StartTimer();
+        Self->StartTimer();
     });
 
-    WS->OnMessage().AddLambda([this](const FString& Msg) { OnWSMessage(Msg); });
-
-    WS->OnConnectionError().AddLambda([this](const FString& Err)
+    WS->OnMessage().AddLambda([WeakThis](const FString& Msg)
     {
-        bIsConnected = false;
-        UE_LOG(LogAociety, Warning, TEXT("[Aociety] WS 错误: %s"), *Err);
-        // 重连
-        if (UWorld* World = GetWorld())
+        if (UAocietyClientSubsystem* Self = WeakThis.Get())
         {
-            World->GetTimerManager().SetTimer(
-                Timer_Reconnect, [this]() { Connect(); }, 5.0f, false);
+            Self->OnWSMessage(Msg);
         }
     });
 
-    WS->OnClosed().AddLambda([this](int32 Code, const FString& Reason, bool bClean)
+    WS->OnConnectionError().AddLambda([WeakThis](const FString& Err)
     {
-        bIsConnected = false;
-        StopTimer();
+        UAocietyClientSubsystem* Self = WeakThis.Get();
+        if (!Self) return;
+        Self->bIsConnected = false;
+        UE_LOG(LogAociety, Warning, TEXT("[Aociety] WS 错误: %s"), *Err);
+        if (UWorld* World = Self->GetWorld())
+        {
+            World->GetTimerManager().SetTimer(
+                Self->Timer_Reconnect,
+                [WeakThis]()
+                {
+                    if (UAocietyClientSubsystem* RetrySelf = WeakThis.Get())
+                    {
+                        RetrySelf->Connect();
+                    }
+                },
+                5.0f, false);
+        }
+    });
+
+    WS->OnClosed().AddLambda([WeakThis](int32 Code, const FString& Reason, bool bClean)
+    {
+        if (UAocietyClientSubsystem* Self = WeakThis.Get())
+        {
+            Self->bIsConnected = false;
+            Self->StopTimer();
+        }
     });
 
     WS->Connect();
@@ -99,7 +133,18 @@ bool UAocietyClientSubsystem::Connect()
 void UAocietyClientSubsystem::Disconnect()
 {
     StopTimer();
-    if (WS.IsValid()) WS->Close();
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(Timer_Reconnect);
+    }
+    if (WS.IsValid())
+    {
+        WS->OnConnected().Clear();
+        WS->OnMessage().Clear();
+        WS->OnConnectionError().Clear();
+        WS->OnClosed().Clear();
+        WS->Close();
+    }
     WS.Reset();
     bIsConnected = false;
 }
@@ -230,15 +275,31 @@ void UAocietyClientSubsystem::RequestNPCDialogue(const FString& NpcId,
     const FString EscInput = PlayerInput.Replace(TEXT("\\"), TEXT("\\\\")).Replace(TEXT("\""), TEXT("\\\""));
     const FString EscDistrict = District.Replace(TEXT("\\"), TEXT("\\\\")).Replace(TEXT("\""), TEXT("\\\""));
     const FString EscTopic = TopicId.Replace(TEXT("\\"), TEXT("\\\\")).Replace(TEXT("\""), TEXT("\\\""));
+    const bool bAmbient = TopicId == TEXT("ambient_resident_chat");
+    const FString Mode = bAmbient ? TEXT("ambient") : TEXT("player");
+    const FString CounterpartId = bAmbient
+        ? (NpcId == TEXT("npc_01") ? TEXT("npc_02") : TEXT("npc_01"))
+        : TEXT("");
+    FVector PlayerLocation = FVector::ZeroVector;
+    if (const APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0))
+    {
+        PlayerLocation = PlayerPawn->GetActorLocation();
+    }
+    const int64 EventTimestamp = FDateTime::UtcNow().ToUnixTimestamp();
 
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
-    Req->SetURL(BackendURL + TEXT("/npc/player_talk"));
+    Req->SetURL(BackendURL + TEXT("/forest/resident_chat"));
     Req->SetVerb(TEXT("POST"));
     Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
     Req->SetContentAsString(FString::Printf(
-        TEXT("{\"npc_id\":\"%s\",\"district\":\"%s\",\"topic_id\":\"%s\",\"player_input\":\"%s\",\"approach\":\"friendly\"}"),
-        *EscNpc, *EscDistrict, *EscTopic, *EscInput));
-    Req->OnProcessRequestComplete().BindUObject(this, &UAocietyClientSubsystem::OnHttpDone, FName("dialogue"));
+        TEXT("{\"npc_id\":\"%s\",\"player_input\":\"%s\",\"mode\":\"%s\",\"counterpart_id\":\"%s\",\"scene_context\":{\"location\":\"forest_town\",\"interaction\":\"%s\",\"activity\":\"%s\",\"nearby_landmark\":\"%s\",\"event_timestamp\":%lld,\"player_position\":{\"x\":%.1f,\"y\":%.1f,\"z\":%.1f}}}"),
+        *EscNpc, *EscInput, *Mode, *CounterpartId, *Mode, *EscTopic,
+        *EscDistrict,
+        static_cast<long long>(EventTimestamp), PlayerLocation.X,
+        PlayerLocation.Y, PlayerLocation.Z));
+    Req->OnProcessRequestComplete().BindUObject(
+        this, &UAocietyClientSubsystem::OnDialogueHttpDone,
+        NpcId, Mode, CounterpartId);
     Req->ProcessRequest();
 }
 
@@ -379,6 +440,124 @@ bool UAocietyClientSubsystem::ShouldTriggerCare() const
 // 内部辅助
 // ════════════════════════════════════════════════════════════════
 
+void UAocietyClientSubsystem::OnDialogueHttpDone(
+    FHttpRequestPtr Req,
+    FHttpResponsePtr Resp,
+    bool bOK,
+    FString RequestedNpcId,
+    FString RequestedMode,
+    FString RequestedCounterpartId)
+{
+    FAocietyNPCDialogue Dialogue;
+    Dialogue.NpcId = RequestedNpcId;
+    Dialogue.Source = TEXT("error");
+    Dialogue.Model = TEXT("glm-5.2");
+    Dialogue.Provider = TEXT("tokenhub");
+    Dialogue.Mode = RequestedMode;
+    Dialogue.CounterpartId = RequestedCounterpartId;
+
+    auto Broadcast = [this, &Dialogue]()
+    {
+        OnNPCDialogue.Broadcast(Dialogue);
+        if (!Dialogue.Message.IsEmpty())
+        {
+            OnTranscript.Broadcast(Dialogue.Message, TEXT("NPC对话(GLM)"));
+        }
+    };
+
+    const int32 ResponseCode = Resp.IsValid() ? Resp->GetResponseCode() : 0;
+    if (!bOK || !Resp.IsValid() || ResponseCode != 200)
+    {
+        Dialogue.Message = FString::Printf(
+            TEXT("GLM 5.2 实时连接失败（HTTP %d）。"), ResponseCode);
+        Dialogue.Mood = TEXT("请求失败");
+        Dialogue.ErrorCode = TEXT("http_error");
+        UE_LOG(LogAociety, Warning,
+            TEXT("[Aociety][ForestAI] request failed: npc=%s HTTP=%d"),
+            *RequestedNpcId, ResponseCode);
+        Broadcast();
+        return;
+    }
+
+    TSharedPtr<FJsonObject> Json;
+    const FString Body = Resp->GetContentAsString();
+    const auto Reader = TJsonReaderFactory<>::Create(Body);
+    if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+    {
+        Dialogue.Message = TEXT("GLM 5.2 返回了无法解析的响应。");
+        Dialogue.Mood = TEXT("请求失败");
+        Dialogue.ErrorCode = TEXT("invalid_json");
+        Broadcast();
+        return;
+    }
+
+    auto ApplyFields = [&Dialogue](const TSharedPtr<FJsonObject>& Object)
+    {
+        if (!Object.IsValid()) return;
+        if (Object->HasField(TEXT("npc_id"))) Dialogue.NpcId = Object->GetStringField(TEXT("npc_id"));
+        if (Object->HasField(TEXT("message"))) Dialogue.Message = Object->GetStringField(TEXT("message"));
+        if (Object->HasField(TEXT("mood"))) Dialogue.Mood = Object->GetStringField(TEXT("mood"));
+        if (Object->HasField(TEXT("source"))) Dialogue.Source = Object->GetStringField(TEXT("source"));
+        if (Object->HasField(TEXT("model"))) Dialogue.Model = Object->GetStringField(TEXT("model"));
+        if (Object->HasField(TEXT("provider"))) Dialogue.Provider = Object->GetStringField(TEXT("provider"));
+        if (Object->HasField(TEXT("mode"))) Dialogue.Mode = Object->GetStringField(TEXT("mode"));
+        if (Object->HasField(TEXT("counterpart_id"))) Dialogue.CounterpartId = Object->GetStringField(TEXT("counterpart_id"));
+        if (Object->HasField(TEXT("request_id"))) Dialogue.RequestId = Object->GetStringField(TEXT("request_id"));
+        if (Object->HasField(TEXT("error_code"))) Dialogue.ErrorCode = Object->GetStringField(TEXT("error_code"));
+    };
+
+    ApplyFields(Json);
+    if (Json->HasField(TEXT("dialogue")))
+    {
+        ApplyFields(Json->GetObjectField(TEXT("dialogue")));
+    }
+
+    if (!Dialogue.NpcId.Equals(RequestedNpcId, ESearchCase::CaseSensitive) ||
+        !Dialogue.Mode.Equals(RequestedMode, ESearchCase::IgnoreCase) ||
+        !Dialogue.CounterpartId.Equals(
+            RequestedCounterpartId, ESearchCase::CaseSensitive))
+    {
+        UE_LOG(LogAociety, Warning,
+            TEXT("[Aociety][ForestAI] response routing mismatch: requested=%s/%s/%s returned=%s/%s/%s"),
+            *RequestedNpcId, *RequestedMode, *RequestedCounterpartId,
+            *Dialogue.NpcId, *Dialogue.Mode, *Dialogue.CounterpartId);
+    }
+    Dialogue.NpcId = RequestedNpcId;
+    Dialogue.Mode = RequestedMode;
+    Dialogue.CounterpartId = RequestedCounterpartId;
+
+    const bool bVerifiedLLM =
+        Dialogue.Source.Equals(TEXT("llm"), ESearchCase::IgnoreCase) &&
+        Dialogue.Model.Equals(TEXT("glm-5.2"), ESearchCase::IgnoreCase) &&
+        Dialogue.Provider.Equals(TEXT("tokenhub"), ESearchCase::IgnoreCase) &&
+        !Dialogue.Message.IsEmpty();
+    if (Dialogue.Source.Equals(TEXT("llm"), ESearchCase::IgnoreCase) && !bVerifiedLLM)
+    {
+        Dialogue.Source = TEXT("error");
+        Dialogue.Message = TEXT("响应来源校验失败，未显示非 GLM 5.2 内容。");
+        Dialogue.Mood = TEXT("请求失败");
+        Dialogue.ErrorCode = TEXT("unverified_llm_response");
+    }
+    else if (!bVerifiedLLM)
+    {
+        Dialogue.Source = TEXT("error");
+        if (Dialogue.Message.IsEmpty())
+        {
+            Dialogue.Message = TEXT("GLM 5.2 实时思考请求失败。");
+        }
+        if (Dialogue.ErrorCode.IsEmpty())
+        {
+            Dialogue.ErrorCode = TEXT("llm_unavailable");
+        }
+    }
+
+    UE_LOG(LogAociety, Log,
+        TEXT("[Aociety][ForestAI] npc=%s source=%s provider=%s model=%s request=%s"),
+        *Dialogue.NpcId, *Dialogue.Source, *Dialogue.Provider,
+        *Dialogue.Model, *Dialogue.RequestId);
+    Broadcast();
+}
+
 void UAocietyClientSubsystem::OnHttpDone(FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bOK, FName Endpoint)
 {
     if (!bOK || !Resp.IsValid() || Resp->GetResponseCode() != 200)
@@ -417,39 +596,6 @@ void UAocietyClientSubsystem::OnHttpDone(FHttpRequestPtr Req, FHttpResponsePtr R
     else if (Endpoint == FName("care") || Endpoint == FName("tts"))
     {
         EmitCareFromJson(Json);
-    }
-    else if (Endpoint == FName("dialogue"))
-    {
-        FAocietyNPCDialogue D;
-        D.NpcId = Json->HasField(TEXT("npc_id")) ? Json->GetStringField(TEXT("npc_id")) : TEXT("");
-        D.Message = Json->HasField(TEXT("message")) ? Json->GetStringField(TEXT("message")) : TEXT("");
-        D.Source = Json->HasField(TEXT("source")) ? Json->GetStringField(TEXT("source")) : TEXT("");
-        D.Model = Json->HasField(TEXT("model")) ? Json->GetStringField(TEXT("model")) : TEXT("");
-        if (Json->HasField(TEXT("dialogue")))
-        {
-            const TSharedPtr<FJsonObject> Obj = Json->GetObjectField(TEXT("dialogue"));
-            if (Obj.IsValid())
-            {
-                D.NpcId = Obj->HasField(TEXT("npc_id")) ? Obj->GetStringField(TEXT("npc_id")) : D.NpcId;
-                D.Message = Obj->HasField(TEXT("message")) ? Obj->GetStringField(TEXT("message")) : D.Message;
-                const TArray<TSharedPtr<FJsonValue>>* Lines = nullptr;
-                if (Obj->TryGetArrayField(TEXT("lines"), Lines) && Lines && Lines->Num() > 1)
-                {
-                    FString NpcLine;
-                    if ((*Lines)[1].IsValid() && (*Lines)[1]->TryGetString(NpcLine) && !NpcLine.IsEmpty())
-                    {
-                        D.Message = NpcLine;
-                    }
-                }
-                D.TopicId = Obj->HasField(TEXT("topic_id")) ? Obj->GetStringField(TEXT("topic_id")) : TEXT("");
-                D.Mood = Obj->HasField(TEXT("mood")) ? Obj->GetStringField(TEXT("mood")) : TEXT("");
-                D.Action = Obj->HasField(TEXT("action")) ? Obj->GetStringField(TEXT("action")) : TEXT("");
-                D.Source = Obj->HasField(TEXT("source")) ? Obj->GetStringField(TEXT("source")) : D.Source;
-                D.Model = Obj->HasField(TEXT("model")) ? Obj->GetStringField(TEXT("model")) : D.Model;
-            }
-        }
-        OnNPCDialogue.Broadcast(D);
-        if (!D.Message.IsEmpty()) OnTranscript.Broadcast(D.Message, TEXT("NPC对话(GLM)"));
     }
     else if (Endpoint == FName("world"))
     {

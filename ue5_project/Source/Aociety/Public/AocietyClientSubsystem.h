@@ -73,6 +73,11 @@ struct FAocietyNPCDialogue
     UPROPERTY(BlueprintReadOnly, Category="Aociety|NPC") FString Action;
     UPROPERTY(BlueprintReadOnly, Category="Aociety|NPC") FString Source;
     UPROPERTY(BlueprintReadOnly, Category="Aociety|NPC") FString Model;
+    UPROPERTY(BlueprintReadOnly, Category="Aociety|NPC") FString Provider;
+    UPROPERTY(BlueprintReadOnly, Category="Aociety|NPC") FString Mode;
+    UPROPERTY(BlueprintReadOnly, Category="Aociety|NPC") FString CounterpartId;
+    UPROPERTY(BlueprintReadOnly, Category="Aociety|NPC") FString RequestId;
+    UPROPERTY(BlueprintReadOnly, Category="Aociety|NPC") FString ErrorCode;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAocietyEmotion, FAocietyEmotion, Emotion);
@@ -205,6 +210,9 @@ private:
 
     void EnsureConnection();
     void OnHttpDone(FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bOK, FName Endpoint);
+    void OnDialogueHttpDone(FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bOK,
+                            FString RequestedNpcId, FString RequestedMode,
+                            FString RequestedCounterpartId);
     void OnWSMessage(const FString& Msg);
     void EmitEmotionIfChanged(const FAocietyEmotion& New);
     void EmitCareFromJson(const TSharedPtr<class FJsonObject>& Json);

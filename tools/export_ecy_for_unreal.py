@@ -3,6 +3,7 @@ import shutil
 import sys
 
 import bpy
+from mathutils import Matrix
 
 
 if "--" not in sys.argv:
@@ -27,6 +28,18 @@ for obj in bpy.data.objects:
 
 if not skinned_meshes:
     raise RuntimeError("No meshes are skinned to the character armature")
+
+# The source glTF character is authored in metres. Blender's FBX exporter can
+# convert mesh vertices for UE while leaving armature translations 100x too
+# small, producing a correct-looking reference mesh but exploding skinning as
+# soon as an animation rotates a bone. Bake both geometry and rest bones into
+# centimetre-sized data, then declare one Blender unit as one centimetre.
+centimetre_scale = Matrix.Scale(100.0, 4)
+armature.data.transform(centimetre_scale)
+for mesh in skinned_meshes:
+    mesh.data.transform(centimetre_scale, shape_keys=True)
+bpy.context.scene.unit_settings.system = "METRIC"
+bpy.context.scene.unit_settings.scale_length = 0.01
 
 armature.name = "SK_Ecy_Armature"
 armature.data.name = "SK_Ecy_Skeleton"
@@ -60,6 +73,7 @@ bpy.ops.export_scene.fbx(
     object_types={"ARMATURE", "MESH"},
     apply_unit_scale=True,
     apply_scale_options="FBX_SCALE_UNITS",
+    global_scale=1.0,
     axis_forward="-Z",
     axis_up="Y",
     use_space_transform=True,

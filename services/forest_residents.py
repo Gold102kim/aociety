@@ -6,7 +6,7 @@ import time
 import uuid
 from typing import Any
 
-from .ark_client import ArkClient
+from .ark_client import ArkClient, FOREST_LEGACY_TERMS
 
 
 RESIDENTS: dict[str, dict[str, str]] = {
@@ -22,6 +22,18 @@ RESIDENTS: dict[str, dict[str, str]] = {
         "personality": "亲切活泼，有一点好奇心，表达轻快，但不会过度卖萌。",
         "daily_life": "住在森林小镇，喜欢料理、照顾花草，并常在小路附近散步。",
     },
+}
+
+SAFE_SCENE_KEYS = {
+    "location",
+    "time",
+    "weather",
+    "interaction",
+    "player_position",
+    "npc_position",
+    "nearby_landmark",
+    "activity",
+    "event_timestamp",
 }
 
 
@@ -42,43 +54,73 @@ class ForestResidentService:
     ) -> dict[str, Any]:
         resident = RESIDENTS.get(npc_id)
         if not resident:
-            return {
+            dialogue = {
                 "npc_id": npc_id,
                 "message": "这名居民暂时不在小镇中。",
+                "mood": "请求失败",
                 "source": "error",
-                "model": "",
+                "model": "glm-5.2",
+                "provider": "tokenhub",
+                "error_code": "resident_not_found",
+                "mode": "player",
+                "counterpart_id": "",
             }
+            return {**dialogue, "dialogue": dialogue}
 
-        counterpart = RESIDENTS.get(counterpart_id, {})
+        normalized_mode = "ambient" if mode == "ambient" else "player"
+        valid_counterpart_id = (
+            counterpart_id
+            if normalized_mode == "ambient"
+            and counterpart_id != npc_id
+            and counterpart_id in RESIDENTS
+            else ""
+        )
+        counterpart = RESIDENTS.get(valid_counterpart_id, {})
+        safe_scene = self._sanitize_scene(scene)
         with self._lock:
-            recent = list(self._history[npc_id][-6:])
+            recent = list(self._history[npc_id][-8:])
+            counterpart_recent = (
+                list(self._history[valid_counterpart_id][-4:])
+                if counterpart
+                else []
+            )
 
         request_id = uuid.uuid4().hex[:12]
         generated = self.ark.generate_forest_resident_reply(
             {
                 "resident": resident,
-                "mode": "ambient_resident_chat" if mode == "ambient" else "player_interaction",
+                "mode": (
+                    "ambient_resident_chat"
+                    if normalized_mode == "ambient"
+                    else "player_interaction"
+                ),
                 "live_event": live_event,
                 "counterpart": counterpart,
                 "scene": {
                     "location": "森林小镇的住宅与林间小路",
                     "time": "白天",
                     "weather": "清朗，偶尔会有轻微天气变化",
-                    **(scene or {}),
+                    **safe_scene,
                 },
                 "recent_dialogue": recent,
+                "counterpart_recent_dialogue": counterpart_recent,
                 "request_nonce": f"{request_id}-{time.time_ns()}",
             }
         )
-        if not generated:
-            return {
+        if not self._is_verified_llm_result(generated):
+            dialogue = {
                 "npc_id": npc_id,
-                "message": "我刚才走神了一下，等我重新想想。",
-                "mood": "短暂走神",
+                "message": "GLM 5.2 实时思考请求失败，请检查 TokenHub 模型权限或额度。",
+                "mood": "请求失败",
                 "source": "error",
                 "model": getattr(self.ark, "model_id", "glm-5.2"),
+                "provider": "tokenhub",
+                "error_code": "llm_unavailable",
                 "request_id": request_id,
+                "mode": normalized_mode,
+                "counterpart_id": valid_counterpart_id,
             }
+            return {**dialogue, "dialogue": dialogue}
 
         reply = str(generated.get("reply", "")).strip()
         mood = str(generated.get("mood", "平静")).strip() or "平静"
@@ -86,6 +128,7 @@ class ForestResidentService:
         with self._lock:
             self._history[npc_id].append(
                 {
+                    "kind": "spoken_turn",
                     "event": live_event,
                     "reply": reply,
                     "mood": mood,
@@ -93,13 +136,69 @@ class ForestResidentService:
                 }
             )
             self._history[npc_id] = self._history[npc_id][-12:]
+            if counterpart:
+                self._history[valid_counterpart_id].append(
+                    {
+                        "kind": "heard_turn",
+                        "speaker": str(resident.get("name", npc_id)),
+                        "event": live_event,
+                        "heard_reply": reply,
+                        "mood": mood,
+                    }
+                )
+                self._history[valid_counterpart_id] = self._history[
+                    valid_counterpart_id
+                ][-12:]
 
         dialogue = {
             "npc_id": npc_id,
             "message": reply,
             "mood": mood,
             "source": "llm",
-            "model": model,
+            "model": model or "glm-5.2",
+            "provider": str(generated.get("_meta_provider", "tokenhub")),
             "request_id": request_id,
+            "mode": normalized_mode,
+            "counterpart_id": valid_counterpart_id,
         }
         return {**dialogue, "dialogue": dialogue}
+
+    @staticmethod
+    def _is_verified_llm_result(generated: dict[str, Any] | None) -> bool:
+        if not generated:
+            return False
+        reply = str(generated.get("reply", "")).strip()
+        if not reply or any(term in reply for term in FOREST_LEGACY_TERMS):
+            return False
+        return (
+            generated.get("_meta_source") == "llm"
+            and generated.get("_meta_provider") == "tokenhub"
+            and generated.get("_meta_model") == "glm-5.2"
+        )
+
+    @staticmethod
+    def _sanitize_scene(scene: dict[str, Any] | None) -> dict[str, Any]:
+        if not isinstance(scene, dict):
+            return {}
+        sanitized: dict[str, Any] = {}
+        for key, value in scene.items():
+            if key not in SAFE_SCENE_KEYS:
+                continue
+            if key == "location":
+                sanitized[key] = "森林小镇的住宅与林间小路"
+            elif key in {"player_position", "npc_position"} and isinstance(
+                value, dict
+            ):
+                sanitized[key] = {
+                    axis: number
+                    for axis, number in value.items()
+                    if axis in {"x", "y", "z"}
+                    and isinstance(number, (int, float))
+                }
+            elif key == "event_timestamp" and isinstance(value, (int, float)):
+                sanitized[key] = value
+            elif isinstance(value, str):
+                clipped = value.strip()[:160]
+                if clipped and not any(term in clipped for term in FOREST_LEGACY_TERMS):
+                    sanitized[key] = clipped
+        return sanitized

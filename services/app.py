@@ -11,7 +11,9 @@ from typing import Any
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
+from .ark_client import ArkClient
 from .engine import WorldEngine
+from .forest_residents import RESIDENTS, ForestResidentService
 
 
 def load_dotenv_file() -> None:
@@ -27,14 +29,7 @@ def load_dotenv_file() -> None:
         value = value.strip()
         # Keep the game backend deterministic: stale user/session credentials
         # must not override the project-local GLM endpoint and model settings.
-        if key in {
-            "OPENAI_API_KEY",
-            "ANTHROPIC_API_KEY",
-            "GLM_API_KEY",
-            "GLM_BASE_URL",
-            "GLM_MODEL_ID",
-            "GLM_OMNI_MODEL",
-        }:
+        if key in {"TOKENHUB_API_KEY", "TOKENHUB_BASE_URL", "TOKENHUB_MODEL"}:
             os.environ[key] = value
         else:
             os.environ.setdefault(key, value)
@@ -77,6 +72,14 @@ class PlayerTalkRequest(BaseModel):
     scene_context: dict[str, Any] = Field(default_factory=dict)
 
 
+class ForestResidentRequest(BaseModel):
+    npc_id: str
+    player_input: str = ""
+    mode: str = "player"
+    counterpart_id: str = ""
+    scene_context: dict[str, Any] = Field(default_factory=dict)
+
+
 class AIPulseRequest(BaseModel):
     trigger: str = "manual"
     current_district: str = ""
@@ -87,6 +90,10 @@ class AIPulseRequest(BaseModel):
 
 PULSE_INTERVAL_SECONDS = int(os.getenv("SHELL_MARKET_PULSE_SECONDS", "60"))
 engine = WorldEngine(pulse_interval_seconds=PULSE_INTERVAL_SECONDS)
+# The forest demo has its own client/cooldown. Legacy simulation requests must
+# not block or inject state into real-time resident dialogue.
+forest_ark = ArkClient()
+forest_residents = ForestResidentService(forest_ark)
 
 
 async def pulse_loop() -> None:
@@ -111,7 +118,7 @@ async def lifespan(_app: FastAPI):
             await task
 
 
-app = FastAPI(title="Shell And Market Service", lifespan=lifespan)
+app = FastAPI(title="Aociety Forest Town Service", lifespan=lifespan)
 
 
 @app.get("/health")
@@ -119,8 +126,13 @@ def health() -> dict[str, Any]:
     return {
         "status": "ok",
         "pulse_interval_seconds": engine.pulse_interval_seconds,
-        "glm_enabled": engine.ark.enabled,
-        "glm_model": getattr(engine.ark, 'model_id', 'glm-5.2'),
+        "glm_enabled": forest_ark.enabled,
+        "glm_configured": forest_ark.configured,
+        "glm_model": getattr(forest_ark, "model_id", "glm-5.2"),
+        "glm_provider": getattr(forest_ark, "provider", "tokenhub"),
+        "glm_base_url": getattr(
+            forest_ark, "base_url", "https://api.tokenhub.market/v1/"
+        ).rstrip("/"),
     }
 
 
@@ -175,6 +187,19 @@ def ai_probe() -> dict[str, Any]:
 
 @app.post("/npc/conversation")
 def npc_conversation(payload: ConversationRequest) -> dict[str, Any]:
+    if payload.speaker_id in RESIDENTS:
+        return forest_residents.chat(
+            npc_id=payload.speaker_id,
+            live_event=payload.trigger.strip()
+            or "你在林间小路遇到了另一名居民，请自然回应此刻的相遇。",
+            mode="ambient",
+            counterpart_id=payload.listener_id,
+            scene={
+                "current_district": payload.current_district,
+                "player_position": payload.player_position,
+                **payload.scene_context,
+            },
+        )
     result = engine.conversation(
         payload.speaker_id,
         payload.listener_id,
@@ -192,6 +217,16 @@ def npc_conversation(payload: ConversationRequest) -> dict[str, Any]:
     return {"message": result.message, "world_state": result.world_state}
 
 
+@app.post("/forest/probe")
+def forest_probe() -> dict[str, Any]:
+    result = forest_ark.probe()
+    return {
+        **result,
+        "provider": "tokenhub",
+        "base_url": forest_ark.base_url.rstrip("/"),
+    }
+
+
 @app.get("/npc/list")
 def npc_list() -> dict[str, Any]:
     snapshot = engine.snapshot_cached()
@@ -206,6 +241,20 @@ def npc_hearing(payload: HearingRequest) -> dict[str, Any]:
 
 @app.post("/npc/player_talk")
 def npc_player_talk(payload: PlayerTalkRequest) -> dict[str, Any]:
+    if payload.npc_id in RESIDENTS:
+        live_event = payload.player_input.strip() or payload.intent.strip()
+        if not live_event:
+            live_event = "玩家刚刚走近并主动与你交互，请根据此刻的场景自然开口。"
+        return forest_residents.chat(
+            npc_id=payload.npc_id,
+            live_event=live_event,
+            mode="player",
+            scene={
+                "current_district": payload.district,
+                "player_position": payload.player_position,
+                **payload.scene_context,
+            },
+        )
     result = engine.player_talk(
         payload.npc_id,
         payload.district,
@@ -225,3 +274,22 @@ def npc_player_talk(payload: PlayerTalkRequest) -> dict[str, Any]:
         "world_state": result.world_state,
         "dialogue": result.world_state.get("last_dialogue", {}),
     }
+
+
+@app.post("/forest/resident_chat")
+def forest_resident_chat(payload: ForestResidentRequest) -> dict[str, Any]:
+    mode = "ambient" if payload.mode == "ambient" else "player"
+    live_event = payload.player_input.strip()
+    if not live_event:
+        live_event = (
+            "你在小镇散步时遇到了另一名居民，请根据当下心情自然说一句话。"
+            if mode == "ambient"
+            else "玩家刚刚走近并主动与你交互，请实时判断后自然开口。"
+        )
+    return forest_residents.chat(
+        npc_id=payload.npc_id,
+        live_event=live_event,
+        mode=mode,
+        counterpart_id=payload.counterpart_id,
+        scene=payload.scene_context,
+    )

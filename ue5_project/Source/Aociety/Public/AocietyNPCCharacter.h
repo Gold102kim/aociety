@@ -42,13 +42,25 @@ public:
     TObjectPtr<class UAnimSequence> WalkAnimation;
 
     UFUNCTION(BlueprintCallable, Category="Aociety|NPC")
-    void ShowDialogue(const FString& Line, float Duration = 10.0f);
+    void ShowDialogue(
+        const FString& Line,
+        const FString& Source,
+        const FString& Model,
+        float Duration);
 
     UFUNCTION(BlueprintCallable, Category="Aociety|NPC")
     void ShowThinking();
 
+    UFUNCTION(BlueprintCallable, Category="Aociety|NPC")
+    void ShowListening(const FString& SpeakerName, float Duration = 30.0f);
+
+    UFUNCTION(BlueprintCallable, Category="Aociety|NPC")
+    void FocusOnActor(AActor* OtherActor, float Duration = 30.0f);
+
 private:
     void PickWanderTarget();
+    void BeginWanderPause();
+    void PlayLocomotionAnimation(bool bMoving);
     void ClearDialogue();
 
     UPROPERTY(VisibleAnywhere, Category="Aociety|NPC")
@@ -65,4 +77,10 @@ private:
     float TimeUntilNextTarget = 0.0f;
     FTimerHandle DialogueTimer;
     bool bWasMoving = false;
+    bool bWaitingAtTarget = true;
+    double FocusEndTime = 0.0;
+    TWeakObjectPtr<AActor> FocusActor;
+
+    UPROPERTY(Transient)
+    TObjectPtr<class UAnimSequence> ActiveAnimation;
 };

@@ -9,6 +9,50 @@
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 
+namespace
+{
+AAocietyNPCCharacter* FindResidentNPC(
+    const UObject* WorldContext,
+    const FString& NpcId)
+{
+    if (!WorldContext || NpcId.IsEmpty())
+    {
+        return nullptr;
+    }
+
+    TArray<AActor*> MatchingActors;
+    UGameplayStatics::GetAllActorsWithTag(
+        WorldContext, FName(*NpcId), MatchingActors);
+    for (AActor* Actor : MatchingActors)
+    {
+        if (AAocietyNPCCharacter* NPC = Cast<AAocietyNPCCharacter>(Actor))
+        {
+            return NPC;
+        }
+    }
+    return nullptr;
+}
+
+FString GetResidentDisplayName(
+    const UObject* WorldContext,
+    const FString& NpcId)
+{
+    if (const AAocietyNPCCharacter* NPC = FindResidentNPC(WorldContext, NpcId))
+    {
+        return NPC->DisplayName;
+    }
+    if (NpcId == TEXT("npc_01"))
+    {
+        return TEXT("林汐");
+    }
+    if (NpcId == TEXT("npc_02"))
+    {
+        return TEXT("小樱");
+    }
+    return TEXT("小镇居民");
+}
+}
+
 AAocietyGameMode::AAocietyGameMode()
 {
     DefaultPawnClass = AAocietyPlayerCharacter::StaticClass();
@@ -49,7 +93,7 @@ void AAocietyGameMode::BeginPlay()
     GetWorldTimerManager().SetTimer(
         AmbientConversationTimer, this,
         &AAocietyGameMode::StartAmbientNPCConversation,
-        24.0f, true, 14.0f);
+        32.0f, true, 14.0f);
 }
 
 void AAocietyGameMode::HandleDialogueTrigger(AActor* TriggerActor, AActor* OtherActor)
@@ -117,6 +161,10 @@ void AAocietyGameMode::HandleDialogueTriggerEnd(
 
 void AAocietyGameMode::HandleNPCDialogue(FAocietyNPCDialogue Dialogue)
 {
+    AAocietyNPCCharacter* Speaker = FindResidentNPC(this, Dialogue.NpcId);
+    const FString SpeakerName = Speaker
+        ? Speaker->DisplayName
+        : GetResidentDisplayName(this, Dialogue.NpcId);
     const FString Attribution = Dialogue.Model.IsEmpty()
         ? Dialogue.Source
         : FString::Printf(TEXT("%s / %s"), *Dialogue.Source, *Dialogue.Model);
@@ -129,24 +177,43 @@ void AAocietyGameMode::HandleNPCDialogue(FAocietyNPCDialogue Dialogue)
         GEngine->AddOnScreenDebugMessage(
             -1, 12.0f, FColor(160, 235, 255),
             FString::Printf(TEXT("%s：%s\n[%s]"),
-                *Dialogue.NpcId, *Dialogue.Message, *Attribution));
+                *SpeakerName, *Dialogue.Message, *Attribution));
     }
 
-    TArray<AActor*> MatchingNPCs;
-    UGameplayStatics::GetAllActorsWithTag(
-        this, FName(*Dialogue.NpcId), MatchingNPCs);
-    for (AActor* Actor : MatchingNPCs)
+    if (!Speaker)
     {
-        if (AAocietyNPCCharacter* NPC = Cast<AAocietyNPCCharacter>(Actor))
-        {
-            const FString VisibleLine = AmbientListenerId.IsEmpty()
-                ? Dialogue.Message
-                : FString::Printf(TEXT("对 %s：%s"),
-                    *AmbientListenerId, *Dialogue.Message);
-            NPC->ShowDialogue(VisibleLine, 12.0f);
-        }
+        UE_LOG(LogTemp, Warning,
+            TEXT("[Aociety][NPC] No world actor found for %s"),
+            *Dialogue.NpcId);
+        return;
     }
-    AmbientListenerId.Reset();
+
+    const bool bAmbient = Dialogue.Mode.Equals(
+        TEXT("ambient"), ESearchCase::IgnoreCase) &&
+        !Dialogue.CounterpartId.IsEmpty();
+    AAocietyNPCCharacter* Listener = bAmbient
+        ? FindResidentNPC(this, Dialogue.CounterpartId)
+        : nullptr;
+    const FString ListenerName = bAmbient
+        ? GetResidentDisplayName(this, Dialogue.CounterpartId)
+        : FString();
+    const FString VisibleLine = bAmbient
+        ? FString::Printf(TEXT("对 %s：%s"),
+            *ListenerName, *Dialogue.Message)
+        : Dialogue.Message;
+
+    Speaker->ShowDialogue(
+        VisibleLine,
+        Dialogue.Source.IsEmpty() ? TEXT("error") : Dialogue.Source,
+        Dialogue.Model.IsEmpty() ? TEXT("unavailable") : Dialogue.Model,
+        12.0f);
+
+    if (Listener)
+    {
+        Speaker->FocusOnActor(Listener, 12.0f);
+        Listener->FocusOnActor(Speaker, 12.0f);
+        Listener->ShowListening(SpeakerName, 12.0f);
+    }
 }
 
 void AAocietyGameMode::StartAmbientNPCConversation()
@@ -161,24 +228,33 @@ void AAocietyGameMode::StartAmbientNPCConversation()
     }
 
     const FString SpeakerId = bAmbientSpeakerIsNpc01 ? TEXT("npc_01") : TEXT("npc_02");
-    AmbientListenerId = bAmbientSpeakerIsNpc01 ? TEXT("npc_02") : TEXT("npc_01");
+    const FString ListenerId = bAmbientSpeakerIsNpc01 ? TEXT("npc_02") : TEXT("npc_01");
     bAmbientSpeakerIsNpc01 = !bAmbientSpeakerIsNpc01;
 
-    TArray<AActor*> MatchingNPCs;
-    UGameplayStatics::GetAllActorsWithTag(this, FName(*SpeakerId), MatchingNPCs);
-    for (AActor* Actor : MatchingNPCs)
+    AAocietyNPCCharacter* Speaker = FindResidentNPC(this, SpeakerId);
+    AAocietyNPCCharacter* Listener = FindResidentNPC(this, ListenerId);
+    const FString ListenerName = GetResidentDisplayName(this, ListenerId);
+    if (Speaker)
     {
-        if (AAocietyNPCCharacter* NPC = Cast<AAocietyNPCCharacter>(Actor))
-        {
-            NPC->ShowThinking();
-        }
+        Speaker->ShowThinking();
+    }
+    if (Listener)
+    {
+        Listener->ShowListening(
+            Speaker ? Speaker->DisplayName : GetResidentDisplayName(this, SpeakerId),
+            12.0f);
+    }
+    if (Speaker && Listener)
+    {
+        Speaker->FocusOnActor(Listener, 12.0f);
+        Listener->FocusOnActor(Speaker, 12.0f);
     }
 
     Client->RequestNPCDialogue(
         SpeakerId,
         FString::Printf(
             TEXT("你正在森林小镇里散步，并遇到了居民 %s。请结合当前环境和你自己的性格，对对方自然说一句简短的话，不要提到你是AI。"),
-            *AmbientListenerId),
+            *ListenerName),
         TEXT("forest_town"),
         TEXT("ambient_resident_chat"));
 }

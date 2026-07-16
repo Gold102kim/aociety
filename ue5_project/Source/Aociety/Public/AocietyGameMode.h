@@ -33,5 +33,4 @@ private:
     TMap<TWeakObjectPtr<AActor>, double> LastTriggerTimes;
     FTimerHandle AmbientConversationTimer;
     bool bAmbientSpeakerIsNpc01 = true;
-    FString AmbientListenerId;
 };

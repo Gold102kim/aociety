@@ -199,10 +199,9 @@ E:/Aociety-NEW/
 ## 📝 关键环境变量 (.env)
 
 ```
-ANTHROPIC_API_KEY=mk_7DJ8D9XH4G9DNXRQKA279UPTZ72XG92W
-OPENAI_API_KEY=...
-GLM_BASE_URL=https://api.tokenhub.market/v1
-GLM_MODEL_ID=glm-5.2
+TOKENHUB_API_KEY=your_tokenhub_key
+TOKENHUB_BASE_URL=https://api.tokenhub.market/v1
+TOKENHUB_MODEL=glm-5.2
 TTS_VOICE=xiaoxiao
 AOCIETY_PORT=8000
 ENABLE_EMOTION=1
