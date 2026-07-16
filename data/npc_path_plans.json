@@ -1,0 +1,1938 @@
+{
+  "npc_01": {
+    "NPC_ID": 1,
+    "Name": "Victor",
+    "Identity": "海藻资本 CEO",
+    "Faction": "Elite",
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "08:00-12:00",
+          "TargetTag": "HQ_Victor_Desk",
+          "Action": "LOOK_DOWN_WINDOW",
+          "Detail": "在证券交易所顶层办公室俯瞰小镇，关注AMB价格波动。"
+        },
+        {
+          "Time": "13:00-17:00",
+          "TargetTag": "Villa_Golf_Hole_18",
+          "Action": "GOLF_SWING_AND_TALK",
+          "Sync_With_NPC": 14,
+          "Detail": "在富人区高尔夫球场与镇长温斯顿秘密会谈。"
+        },
+        {
+          "Time": "20:00-24:00",
+          "TargetTag": "Club_VIP_Booth",
+          "Action": "SOCIALIZE_ELEGANTLY",
+          "Detail": "出席高端派对，维持温文尔雅的慈善家假象。"
+        }
+      ],
+      "Day_3": [
+        {
+          "Time": "00:00-24:00",
+          "TargetTag": "HQ_Victor_Desk_Locked",
+          "Action": "WAIT_FOR_END",
+          "Detail": "起义爆发，留在顶层等待最终的结算与清算。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 1,
+        "Time": "10:00",
+        "Event": "Drafting_Takeover",
+        "Action": "指示伊芙琳(ID:6)起草市政设施移交草案。"
+      },
+      {
+        "Day": 2,
+        "Time": "21:00",
+        "Event": "Silas_Assassination",
+        "Action": "指示刀疤(ID:12)去抹除塞拉斯(ID:5)以解决账目危机。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "Golf_Invitation",
+          "Condition": "AMB 价格 > 80 且精英玩家资产达标",
+          "Reaction": "维持仁慈面具，主动邀请精英玩家参加高尔夫球会。"
+        },
+        {
+          "Trigger": "Margin_Call_Hunt",
+          "Condition": "玩家操作导致 SWC 股价暴跌 30% 以上",
+          "Reaction": "进入“清理态”，指令刀疤去抹除相关的知情者（包括玩家）。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "AMB < 40",
+        "Priority": 200,
+        "ForcedAction": "ACCELERATE_TAKEOVER",
+        "Detail": "判定政府即将崩溃，指令伊丽丝加快暴力驱逐，指令伊芙琳签署强行收购协议。"
+      }
+    ]
+  },
+  "npc_02": {
+    "NPC_ID": 2,
+    "Name": "Graves",
+    "Faction": "Elite_Manager",
+    "Base_Speed": 1.0,
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "08:00-18:00",
+          "TargetTag": "FC_Manager_Balcony",
+          "Action": "OVERSEE_WORKERS_WHIP",
+          "Detail": "站在工厂二楼环形阳台上，监督流水线，偶尔播放敲击栏杆的辱骂动画。"
+        },
+        {
+          "Time": "18:00-20:00",
+          "TargetTag": "FC_Office_Desk",
+          "Action": "COUNT_MONEY",
+          "Detail": "在厂长办公室核算克扣的工人工资。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "15:00",
+        "Event": "Call_Police",
+        "Condition": "$S-WWI > 50",
+        "Action": "察觉到工人怠工，拨打电话给里奥(ID:16)，要求警察入驻工厂。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Infiltrate_Office",
+          "Condition": "玩家消耗 30点 FC声望 获得内线钥匙",
+          "Reaction": "在 18:00-20:00 期间潜入其办公室，窃取工厂爆炸物的分布图（Day 3 炸毁工厂的前置条件）。"
+        },
+        {
+          "Trigger": "Assassinate_Graves",
+          "Condition": "Day 3 工厂暴动",
+          "Reaction": "莎拉带领工人冲破办公室，格雷夫斯跪地求饶，玩家可选择处决或放逐（影响最终真结局的道德判定）。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "Event.Strike_Started == true",
+        "Priority": 200,
+        "ForcedTarget": "FC_Office_Safe_Room",
+        "ForcedAction": "HIDE_WITH_GUN",
+        "Detail": "罢工爆发时，躲进办公室的安全屋。"
+      }
+    ]
+  },
+  "npc_03": {
+    "NPC_ID": 3,
+    "Name": "Elise",
+    "Identity": "房产经纪人",
+    "Faction": "Elite_Agent",
+    "Daily_Schedules": {
+      "Day_1": [
+        {
+          "Time": "08:00-09:30",
+          "TargetTag": "Apt_Hudson_Door",
+          "Action": "EVICT_TENANT",
+          "Sync_With_NPC": 12,
+          "Detail": "带着刀疤在贫民窟公寓走廊暴力驱逐哈德森太太。"
+        }
+      ]
+    },
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Defend_Hudson",
+          "Condition": "平民玩家冲上去阻挡刀疤",
+          "Reaction": "伊丽丝嘲笑玩家自身难保，随后带着刀疤扬长而去。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "AMB < 40",
+        "Priority": 150,
+        "ForcedAction": "ACCELERATE_EVICTION",
+        "Detail": "收到维克多指令，加快在全镇的暴力驱逐进度。"
+      }
+    ]
+  },
+  "npc_04": {
+    "NPC_ID": 4,
+    "Name": "Silas",
+    "Identity": "首席操盘手",
+    "Faction": "Elite",
+    "Daily_Schedules": {
+      "Day_1": [
+        {
+          "Time": "08:00-08:05",
+          "TargetTag": "HQ_DarkPool_Terminal_A",
+          "Action": "SEND_MESSAGE",
+          "Detail": "向精英玩家发送PDA短信，告知其账户被正式标记为‘涉嫌洗钱’并永久冻结。"
+        },
+        {
+          "Time": "08:05-16:00",
+          "TargetTag": "HQ_DarkPool_Terminals",
+          "Action": "TYPE_KEYBOARD_FRANTIC",
+          "Detail": "在交易终端进行高频操作。"
+        }
+      ],
+      "Day_2": [
+        {
+          "Time": "22:00-24:00",
+          "TargetTag": "HQ_Garage_Shadow",
+          "Action": "LOOK_AROUND_PARANOID",
+          "Detail": "准备携带资金从车库逃亡。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "22:30",
+        "Event": "Assassinated_By_Scar",
+        "Action": "在车库逃跑时被刀疤物理清除。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "Nina_Leak",
+          "Condition": "玩家从妮娜(33号)处获得情报",
+          "Reaction": "玩家可在车库提前截住塞拉斯，触发对话或夺取离岸资金。"
+        }
+      ]
+    },
+    "System_Overrides": []
+  },
+  "npc_05": {
+    "NPC_ID": 5,
+    "Name": "Evelyn",
+    "Faction": "Elite",
+    "Base_Speed": 1.2,
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "09:00-11:00",
+          "TargetTag": "HQ_Legal_Desk",
+          "Action": "ORGANIZE_DOCUMENTS_COLD",
+          "Detail": "起草霸王条款"
+        },
+        {
+          "Time": "11:00-14:00",
+          "TargetTag": "TH_Mayor_Office_Guest",
+          "Action": "STAND_DICTATE",
+          "Sync_With_NPC": 14,
+          "Detail": "向镇长温斯顿施压，逼迫签字"
+        },
+        {
+          "Time": "15:00-19:00",
+          "TargetTag": "Comm_Cafe_Window",
+          "Action": "SIP_COFFEE_READ",
+          "Detail": "公开场合展示精英的从容"
+        }
+      ],
+      "Day_3": [
+        {
+          "Time": "08:00-24:00",
+          "TargetTag": "HQ_Lobby_Safe_Room",
+          "Action": "SHRED_DOCUMENTS",
+          "Detail": "暴动发生时，在安全屋疯狂销毁账本。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "14:00",
+        "Event": "Legalize_Takeover",
+        "Action": "宣告海藻资本合法接管市政管网，触发全镇物价上涨。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "Marcus_Bribe_Exposed",
+          "Condition": "Day 2 玩家向马库斯行贿 A$5,000 且未执行【PR洗白】",
+          "Reaction": "伊芙琳获取监控，前往警局 `TH_Police_Desk` 提交证据，触发玩家账户二次冻结或直接 Game Over（资产被合规没收）。"
+        },
+        {
+          "Trigger": "PR_Wash_Success",
+          "Condition": "玩家花费 A$8,000 执行公关洗白",
+          "Reaction": "伊芙琳在办公室怒撕文件，放弃起诉玩家。"
+        }
+      ]
+    },
+    "System_Overrides": []
+  },
+  "npc_06": {
+    "NPC_ID": 6,
+    "Name": "Smoker",
+    "Identity": "煤烟处理主管（环境掠夺者）",
+    "Faction": "Elite_Manager",
+    "Daily_Schedules": {
+      "Day_1_to_Day_3": [
+        {
+          "Time": "08:00-14:00",
+          "TargetTag": "FC_Pollution_Outlet",
+          "Action": "INSPECT_VALVES",
+          "Detail": "在工厂排污口假装检查，实则操控污染指数。"
+        },
+        {
+          "Time": "14:00-19:00",
+          "TargetTag": [
+            "SN_Bob_Store_Door",
+            "Comm_Tavern_Door"
+          ],
+          "Loop": true,
+          "Action": "INTIMIDATE_AND_EXTORT",
+          "Detail": "在鲍勃便利店、露丝酒吧等家庭作坊门前徘徊，以“环保检查”为由进行敲诈。"
+        },
+        {
+          "Time": "19:00-24:00",
+          "TargetTag": "Comm_Bar_VIP",
+          "Action": "COUNT_DIRTY_MONEY",
+          "Detail": "在高档酒吧清点敲诈来的赃款。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "15:00",
+        "Event": "Increase_Pollution",
+        "Condition": "SWC 股价上涨",
+        "Action": "大幅调高排污阀门，海滨区域（老咸鱼所在地）的污染数值飙升。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "Long_SWC",
+          "Condition": "精英玩家在暗池做多 SWC (海藻重工)",
+          "Reaction": "接收到产能提高指令，斯摩格无视环保限制全功率排污。触发后台逻辑：平民路线玩家遭遇“因病致贫”事件的概率剧增。"
+        }
+      ],
+      "Commoner_Route": [
+        {
+          "Trigger": "Sabotage_Pollution",
+          "Condition": "平民玩家持有 FC声望，破坏排污阀门",
+          "Reaction": "斯摩格失去敲诈筹码，工厂面临环保罚款停工，SWC 股价下跌。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "Event.Strike_Started == true",
+        "Priority": 200,
+        "ForcedTarget": "FC_Office_Safe_Room",
+        "ForcedAction": "HIDE_IN_FEAR",
+        "Detail": "罢工爆发时，害怕被受尽污染折磨的工人清算，躲入安全屋。"
+      }
+    ]
+  },
+  "npc_07": {
+    "NPC_ID": 7,
+    "Name": "Turtle Grandpa",
+    "Identity": "家族创始人/最后的家主",
+    "Faction": "Turtle_Family",
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "08:00-18:00",
+          "TargetTag": "FB_Dock_Command_Center",
+          "Action": "STAND_AUTHORITATIVE",
+          "Detail": "在码头指挥中心不怒自威地站立，维持家族最后的体面。"
+        },
+        {
+          "Time": "18:00-24:00",
+          "TargetTag": "Family_Mansion_Study",
+          "Action": "STARE_AT_STOCK_TICKER",
+          "Detail": "在书房极其焦虑地盯着 TSL (龟甲物流) 的股价走势。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "18:00",
+        "Event": "Desperate_Stand",
+        "Condition": "TSL 股价被维克多打压",
+        "Action": "召集家族残党，试图在码头建立最后的防线，拒绝被资本吞并。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "Crash_TSL",
+          "Condition": "精英玩家参与做空 TSL 导致跌破防守线",
+          "Reaction": "触发【绝地反击】逻辑，龟爷宣告破产但拒绝交出码头，爆发局部武装冲突。"
+        }
+      ],
+      "Commoner_Route": [
+        {
+          "Trigger": "Alliance_With_Old_Money",
+          "Condition": "平民玩家在码头协助抵抗海藻资本",
+          "Reaction": "龟爷为了保住家族成员不饿死，同意开放码头走私网络（大幅增加 FB 势力实力）。"
+        }
+      ]
+    },
+    "System_Overrides": []
+  },
+  "npc_08": {
+    "NPC_ID": 8,
+    "Name": "Ahab",
+    "Identity": "退伍老兵/走私者",
+    "Faction": "Docker",
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "08:00-17:00",
+          "TargetTag": [
+            "FB_Cargo_Start_01",
+            "FB_Cargo_End_01"
+          ],
+          "Loop": true,
+          "Action": "WORK_CARRY",
+          "Detail": "白天在码头搬运货物。"
+        },
+        {
+          "Time": "22:00-03:00",
+          "TargetTag": "FB_Smuggle_Alley",
+          "Action": "WAIT_FOR_TRADE",
+          "Detail": "夜间在黑市盲区等待走私交易。"
+        }
+      ],
+      "Day_3": [
+        {
+          "Time": "20:00-24:00",
+          "TargetTag": "HQ_Lobby_Gate_Outside_Flank",
+          "Action": "FIRE_HEAVY_WEAPON",
+          "Detail": "暴乱时提供火力支援。"
+        }
+      ]
+    },
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Provide_Armor",
+          "Condition": "玩家消耗 30 FB声望",
+          "Reaction": "提供防暴护甲。"
+        }
+      ],
+      "Elite_Route": [
+        {
+          "Trigger": "Upgrade_Weapon",
+          "Condition": "萨姆的革命税资金池达标",
+          "Reaction": "模型自动升级为持有单兵火箭筒，WL 升至 3。"
+        }
+      ]
+    },
+    "System_Overrides": []
+  },
+  "npc_09": {
+    "NPC_ID": 9,
+    "Name": "Brutus",
+    "Identity": "码头工头",
+    "Faction": "Docker",
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "08:00-17:00",
+          "TargetTag": "FB_Dock_Command",
+          "Action": "OVERSEE_WORKERS",
+          "Detail": "指挥码头搬运。"
+        },
+        {
+          "Time": "18:00-22:00",
+          "TargetTag": "Comm_Bar_Counter",
+          "Action": "DRINK_BEER",
+          "Detail": "在酒吧饮酒，接受玩家交互。"
+        }
+      ]
+    },
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Blockade_Logistics",
+          "Condition": "平民玩家消耗 50 FB声望",
+          "Reaction": "伏击警察运输车，拦截物资，或锁死码头阻断海藻资本物流。"
+        }
+      ]
+    },
+    "System_Overrides": []
+  },
+  "npc_10": {
+    "NPC_ID": 10,
+    "Name": "Old Salt Fish",
+    "Identity": "渔民领袖 / 环境牺牲者",
+    "Faction": "Commoner_Victim",
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "05:00-10:00",
+          "TargetTag": "Beach_Polluted_Edge",
+          "Action": "GATHER_DEAD_FISH",
+          "Detail": "在被工厂废水严重污染的海滩打捞死鱼，收集排污证据。"
+        },
+        {
+          "Time": "11:00-16:00",
+          "TargetTag": "TH_Gate_Steps",
+          "Action": "SIT_SILENTLY_PROTEST",
+          "Detail": "带着死鱼在镇政府门口静坐，祈求镇长主持公道。"
+        },
+        {
+          "Time": "17:00-20:00",
+          "TargetTag": "Clinic_Triage_Desk",
+          "Action": "BEG_FOR_MEDICINE",
+          "Sync_With_NPC": 19,
+          "Detail": "前往克拉拉的地下诊所，试图用死鱼换取死去的孙子曾经欠下的医药费，或获取起义情报。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 3,
+        "Time": "08:00",
+        "Event": "Suicidal_Protest",
+        "TargetTag": "TH_Gate_Steps",
+        "Action": "由于诉求无门且孙子惨死，在镇政府门前进行“自杀式抗议”（绝望自尽），引爆全镇平民的悲愤。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Expose_Pollution",
+          "Condition": "平民玩家协助其收集污染样本并交由调查记者",
+          "Reaction": "触发【舆论炸弹】事件。海藻重工 (SWC) 的丑闻见报，SWC 股价进入长达 2 个 AP 的持续性阴跌（不受维克多常规护盘影响）。"
+        },
+        {
+          "Trigger": "Save_The_Old_Man",
+          "Condition": "玩家在 Day 3 早晨介入并消耗 30点 SN声望",
+          "Reaction": "阻止其自杀，老咸鱼将带领剩余渔民加入晚上的暴动（起义军 TOP 战力小幅提升）。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "Event.Smoker_Increased_Pollution == true",
+        "Priority": 150,
+        "ForcedAction": "COUGH_BLOOD",
+        "Detail": "当斯摩格(6号)为了推高股价而加大排污时，老咸鱼的生命值会持续流失，并播放咳血动画。"
+      }
+    ]
+  },
+  "npc_11": {
+    "NPC_ID": 11,
+    "Name": "Madame Ruth",
+    "Identity": "酒吧老板 / 信息情报枢纽",
+    "Faction": "Neutral_Broker",
+    "Daily_Schedules": {
+      "Day_1_to_Day_3": [
+        {
+          "Time": "14:00-18:00",
+          "TargetTag": "Comm_Tavern_Backroom",
+          "Action": "ORGANIZE_INTEL",
+          "Detail": "在酒吧后场整理白天收集到的小镇各方秘密。"
+        },
+        {
+          "Time": "18:00-04:00",
+          "TargetTag": "Comm_Tavern_Bar",
+          "Action": "TEND_BAR_AND_LISTEN",
+          "Detail": "在吧台擦拭酒杯，招待码头工人、黑警和落魄贵族，暗中窃听一切对话。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "22:00",
+        "Event": "Sell_Rebel_Intel",
+        "Condition": "未受玩家干预",
+        "Action": "向海藻资本的线人高价出售防空洞的部分人员名单。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "Buy_Riot_Time",
+          "Condition": "精英玩家支付 A$ 8,000",
+          "Reaction": "露丝交出准确的起义爆发倒计时，允许精英玩家提前部署安保或平仓撤离。"
+        }
+      ],
+      "Commoner_Route": [
+        {
+          "Trigger": "Buy_Guard_Patrols",
+          "Condition": "平民玩家消耗 40点 FB声望 或 相应物资",
+          "Reaction": "露丝交出大厦安保队长凯尔的换防时间表，大幅降低平民潜入大厦的难度。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "SUI >= 90 || Event.Gunfire_Heard == true",
+        "Priority": 250,
+        "ForcedTarget": "Comm_Tavern_Vault",
+        "ForcedAction": "LOCKDOWN_WITH_CASH",
+        "Detail": "小镇一旦陷入火海，立刻带着所有现金和账本锁死在酒吧的地下金库里。"
+      }
+    ]
+  },
+  "npc_12": {
+    "NPC_ID": 12,
+    "Name": "Scar",
+    "Identity": "黑帮打手",
+    "Faction": "Enforcer_Thug",
+    "Daily_Schedules": {
+      "Day_1": [
+        {
+          "Time": "08:00-09:30",
+          "TargetTag": "Apt_Hudson_Door",
+          "Action": "ASSIST_EVICTION",
+          "Sync_With_NPC": 3,
+          "Detail": "随同伊丽丝进行物理威慑。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "22:30",
+        "Event": "Assassinate_Silas",
+        "Action": "执行维克多的指令，在车库抹除塞拉斯。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Defend_Hudson",
+          "Condition": "平民玩家冲上去阻挡",
+          "Reaction": "毫无悬念地一拳将玩家打倒，并狠狠踹几脚。"
+        }
+      ],
+      "Elite_Route": [
+        {
+          "Trigger": "Margin_Call_Hunt",
+          "Condition": "精英玩家账户爆仓",
+          "Reaction": "收到暗池指令去清算玩家，玩家需缴纳补缴金或面临 Game Over。"
+        }
+      ]
+    },
+    "System_Overrides": []
+  },
+  "npc_13": {
+    "NPC_ID": 13,
+    "Name": "Viper",
+    "Identity": "走私接头人 / 内奸",
+    "Faction": "Underworld_Mole",
+    "Base_Speed": 1.1,
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "08:00-12:00",
+          "TargetTag": "Comm_Phone_Booth_01",
+          "Action": "WHISPER_IN_PHONE",
+          "Detail": "在商业中心电话亭不断拨打电话，交换情报。"
+        },
+        {
+          "Time": "13:00-18:00",
+          "TargetTag": "Dock_Entrance_Shadow",
+          "Action": "LEAN_AND_WATCH",
+          "Detail": "在码头阴影处游走，观察物流与查账进度。"
+        },
+        {
+          "Time": "19:00-24:00",
+          "TargetTag": "Club_Back_Alley",
+          "Action": "DEAL_SMUGGLE",
+          "Detail": "在俱乐部后巷处理非法物品或与内应碰头。"
+        }
+      ],
+      "Day_3": [
+        {
+          "Time": "08:00-18:00",
+          "TargetTag": "Comm_Center_Hideout",
+          "Action": "CHECK_PDA_ANXIOUS",
+          "Detail": "随着局势失控，躲在避难点疯狂操作暗池，试图在最后关头变现。"
+        },
+        {
+          "Time": "19:00-24:00",
+          "TargetTag": "Dock_Escape_Point",
+          "Action": "READY_TO_RUN",
+          "Detail": "如果资产变现成功，出现在码头撤离点。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "14:00",
+        "Event": "Snitch_On_Arthur",
+        "Action": "向伊芙琳(ID:6)举报亚瑟查账进度，导致亚瑟死亡剧情触发。"
+      },
+      {
+        "Day": 2,
+        "Time": "20:00",
+        "Event": "Short_TSL",
+        "Action": "利用暗池终端大规模做空 TSL 股价。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "Death_Shorting",
+          "Condition": "玩家表现出对金钱的极度渴望",
+          "Reaction": "诱导玩家加入高杠杆的“死亡做空”计划，试图收割玩家本金。"
+        },
+        {
+          "Trigger": "Expose_Viper",
+          "Condition": "玩家截获其暗池交易记录并交给龟爷(ID:7)",
+          "Reaction": "毒蛇将被龟爷的人物理抹除，其做空单据变为玩家可回收资产。"
+        }
+      ]
+    },
+    "System_Overrides": []
+  },
+  "npc_14": {
+    "NPC_ID": 14,
+    "Name": "Winston",
+    "Identity": "镇长",
+    "Faction": "Civic",
+    "Daily_Schedules": {
+      "Day_1_to_Day_3": [
+        {
+          "Time": "09:00-13:00",
+          "TargetTag": "TH_Mayor_Office_Chair",
+          "Action": "SIT_FATIGUED",
+          "Detail": "在市政厅办公桌前处理堆积如山的赤字账单。"
+        },
+        {
+          "Time": "13:00-17:00",
+          "TargetTag": "Villa_Golf_Hole_18",
+          "Action": "NOD_OBSEQUIOUSLY",
+          "Sync_With_NPC": 1,
+          "Detail": "前往高尔夫球场与维克多会面，承受资本的施压。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "14:00",
+        "Event": "Sign_Takeover_Agreement",
+        "Action": "迫于 AMB 违约压力，签署将市政管网移交海藻资本的协议。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "Policy_Shield_Bribe",
+          "Condition": "精英玩家支付 A$ 20,000",
+          "Reaction": "签署【紧急治安法案】，警察镇压力度增加，$SUI$ 自然增长速率减半。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "AMB < 40",
+        "Priority": 150,
+        "ForcedTarget": "TH_Window_Pace",
+        "ForcedAction": "PACE_ANXIOUSLY",
+        "Detail": "市政债崩盘，陷入焦躁状态，彻底停止常规政务办公。"
+      }
+    ]
+  },
+  "npc_15": {
+    "NPC_ID": 15,
+    "Name": "Gordon",
+    "Identity": "警察局长",
+    "Faction": "Police",
+    "Base_Speed": 0.9,
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "08:00-17:00",
+          "TargetTag": "Police_HQ_Office",
+          "Action": "SMOKE_STARE_MAP",
+          "Detail": "在办公室盯着小镇监控，显得极度疲惫。"
+        },
+        {
+          "Time": "18:00-22:00",
+          "TargetTag": "Ruth_Bar_Corner",
+          "Action": "DRINK_SOLITARY",
+          "Detail": "在露丝酒吧角落一个人喝酒，拒绝社交。"
+        }
+      ],
+      "Day_3": [
+        {
+          "Time": "08:00-19:00",
+          "TargetTag": "Police_Briefing_Room",
+          "Action": "ARGUE_WITH_OFFICERS",
+          "Detail": "与里奥和巴恩斯争吵，试图压制警局内部的分裂。"
+        },
+        {
+          "Time": "20:00-24:00",
+          "TargetTag": "Police_HQ_Window",
+          "Action": "PASSIVE_STANDBY",
+          "Detail": "若条件触发，指令警察部队在暴乱中按兵不动。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 3,
+        "Time": "20:00",
+        "Event": "Police_Neutrality",
+        "Condition": "ST > 2.0 且 AMB < 40",
+        "Action": "由于发不出工资且社会张力过大，正式签署“不干预指令”。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Safety_Insurance",
+          "Condition": "玩家声望达标且与戈登对话",
+          "Reaction": "向玩家透露“今晚码头会有突袭”，作为自己的保命符。"
+        }
+      ],
+      "Elite_Route": [
+        {
+          "Trigger": "Bribery_Refusal",
+          "Condition": "玩家试图现金行贿但 AMB 价格过高",
+          "Reaction": "表现出正直的假象，实则是因为维克多的“捐赠”更多。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "AMB > 100",
+        "Priority": 150,
+        "ForcedAction": "FULL_REPRESSION",
+        "Detail": "由于维克多提供了超额津贴，戈登下令全镇暴力宵禁。"
+      }
+    ]
+  },
+  "npc_16": {
+    "NPC_ID": 16,
+    "Name": "Leo",
+    "Identity": "巡警",
+    "Faction": "Enforcer",
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "08:00-18:00",
+          "TargetTag": [
+            "TH_Gate",
+            "Comm_Street",
+            "Monument_Base",
+            "Slum_Entrance"
+          ],
+          "Loop": true,
+          "Action": "PATROL_WALK",
+          "Detail": "执行跨区域治安巡逻。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "18:00",
+        "Event": "Factory_Riot_Control",
+        "Condition": "ST > 2.0",
+        "TargetTag": "FC_Gate_Police_Slot",
+        "Action": "被紧急调往海藻重工大门，组成防暴人墙。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Arrest_Player",
+          "Condition": "平民玩家存在犯罪度且进入其视野",
+          "Reaction": "立即改变路线追捕玩家。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "AMB < 30 || (Current_Day == 3 && SUI >= 90)",
+        "Priority": 250,
+        "ForcedTarget": "Despawn_Point",
+        "ForcedAction": "FLEE",
+        "Detail": "政府破产停发工资或暴乱失控，直接逃离小镇（模型移除）。"
+      }
+    ]
+  },
+  "npc_17": {
+    "NPC_ID": 17,
+    "Name": "Barnes",
+    "Identity": "老油条警员 / 资本黑手",
+    "Faction": "Enforcer_Corrupt",
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "09:00-14:00",
+          "TargetTag": "TH_Police_Desk_Hidden",
+          "Action": "SLEEP_ON_JOB",
+          "Detail": "在警局角落摸鱼睡觉，无视平民的任何报案。"
+        },
+        {
+          "Time": "14:00-18:00",
+          "TargetTag": "Comm_Tavern_Gambling",
+          "Action": "GAMBLE",
+          "Detail": "在露丝的酒馆里赌博，这是玩家可以接触他的常驻点。"
+        },
+        {
+          "Time": "19:00-02:00",
+          "TargetTag": [
+            "FC_Manager_Office",
+            "Villa_Evelyn_Apt"
+          ],
+          "Loop": true,
+          "Action": "SECRET_MEETING",
+          "Detail": "夜间出入工厂区找格雷夫斯领赏，或去伊芙琳的公寓交接脏活报告。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "21:00",
+        "Event": "Intercept_Rebel",
+        "Action": "根据萨姆/内鬼截获的情报，带队去抓捕外围的起义军成员。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "Bribe_For_Coordinates",
+          "Condition": "精英玩家支付 A$ 3,000",
+          "Reaction": "巴恩斯利用警局系统，向玩家出卖任何指定 NPC 的实时物理坐标（包括塞拉斯的逃跑路线）。"
+        }
+      ],
+      "Commoner_Route": [
+        {
+          "Trigger": "Confiscate_Evidence",
+          "Condition": "平民玩家在调查汤姆事故现场时遇到他",
+          "Reaction": "巴恩斯会强制触发剧情，强行收缴玩家找到的工厂违规证据，并威胁玩家闭嘴。若玩家不从，直接触发战斗或通缉。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "Distance(NPC, '12号刀疤') < 5",
+        "Priority": 100,
+        "ForcedAction": "EXCHANGE_BRIEFCASE",
+        "Detail": "两人若在地图上相遇，会播放交接皮箱/处理尸体的隐秘动画。"
+      }
+    ]
+  },
+  "npc_18": {
+    "NPC_ID": 18,
+    "Name": "Vance",
+    "Faction": "Civic_Corrupt",
+    "Base_Speed": 0.8,
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "09:00-17:00",
+          "TargetTag": "TH_Hospital_Director_Room",
+          "Action": "SIGN_PAPERS",
+          "Detail": "在豪华的办公室内签署医疗配给文件。拒绝对贫民窟开放医疗资源。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "10:00",
+        "Event": "Deny_Meds",
+        "Action": "下令停止向克拉拉的地下诊所走私抗生素，导致平民伤亡率自然上升。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "Execute_Lockdown",
+          "Condition": "精英玩家支付 A$ 12,000 执行指令",
+          "Reaction": "万斯院长宣布小镇进入“防疫状态”。他派遣医疗纠察队查封克拉拉的诊所（S-NAC 暴跌 30，平民无法回血）。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "$SUI >= 80",
+        "Priority": 250,
+        "ForcedTarget": "TH_Helipad",
+        "ForcedAction": "WAIT_FOR_RESCUE",
+        "Detail": "暴动时，抛弃所有病人，逃往市政厅停机坪等待撤离。"
+      }
+    ]
+  },
+  "npc_19": {
+    "NPC_ID": 19,
+    "Name": "Clara",
+    "Faction": "Neutral_Medical",
+    "Base_Speed": 0.9,
+    "Daily_Schedules": {
+      "Day_1_to_Day_3": [
+        {
+          "Time": "00:00-24:00",
+          "TargetTag": "Clinic_Triage_Desk",
+          "Action": "MIX_MEDICINE",
+          "Detail": "绝不离开诊所。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "18:00",
+        "Event": "Treat_Rioters",
+        "Condition": "ST > 2.0",
+        "Action": "诊所的 3 张病床开始被受伤的无名劳工填满。克拉拉在病床间来回奔波。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Emergency_Heal",
+          "Condition": "玩家 Health < 30 且持有 20点 SN 或 现金",
+          "Reaction": "克拉拉为玩家注射急救针，恢复 50 Health。若玩家无钱无声望，克拉拉会摇头触发对话：“抱歉，药品太贵了。”"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "Elite_Player.Executed('Emergency_Health_Lockdown') == true",
+        "Priority": 200,
+        "ForcedTarget": "Clinic_Closed_Door",
+        "ForcedAction": "LOCKED_OUT",
+        "Detail": "精英玩家花费 A$ 12,000 执行【紧急公共卫生限制】。克拉拉的诊所被强制贴上封条查封 1 个 AP。此期间平民玩家无法回血，影子街坊声望 S-NAC -30。"
+      }
+    ]
+  },
+  "npc_20": {
+    "NPC_ID": 20,
+    "Name": "Arthur",
+    "Faction": "Turtle_Family",
+    "Base_Speed": 0.9,
+    "Daily_Schedules": {
+      "Day_1": [
+        {
+          "Time": "09:00-14:00",
+          "TargetTag": "TH_Mayor_Office_Corridor",
+          "Action": "ARGUE_ANGRILY",
+          "Detail": "在市政厅走廊与镇长争吵，试图阻止海藻资本的收购。"
+        },
+        {
+          "Time": "15:00-24:00",
+          "TargetTag": "Comm_Tavern_VIP",
+          "Action": "DRINK_HEAVILY_DEPRESSED",
+          "Detail": "在老派酒馆喝闷酒，眼看家族产业被一点点蚕食。"
+        }
+      ],
+      "Day_2": [
+        {
+          "Time": "10:00-12:00",
+          "TargetTag": "Monument_Base",
+          "Action": "STARE_AT_HQ",
+          "Detail": "绝望地盯着海藻大厦。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "14:00",
+        "Event": "Intimidated_By_Scar",
+        "TargetTag": "Comm_Tavern_Alley",
+        "Action": "刀疤在酒馆后巷对亚瑟进行暴力恐吓，亚瑟彻底崩溃，低价抛售手中最后的 AMB 债券。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "Ally_With_Old_Money",
+          "Condition": "玩家在 Day 1 持有 A$ 30,000 并在酒馆找到亚瑟",
+          "Reaction": "联合亚瑟在暗池做多 AMB，形成对维克多的逼空（Short Squeeze）。成功后亚瑟会提供龟甲家族的私人金库密码作为回报。"
+        },
+        {
+          "Trigger": "Betray_Arthur",
+          "Condition": "玩家联合亚瑟后反手做空",
+          "Reaction": "亚瑟在 Day 2 晚上从灯塔跳海自杀（视觉事件），AMB 彻底崩盘跌破 30。"
+        }
+      ]
+    },
+    "System_Overrides": []
+  },
+  "npc_21": {
+    "NPC_ID": 21,
+    "Name": "Fiona",
+    "Identity": "政务秘书 / 隐藏的引导者",
+    "Faction": "Civic_Secret",
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "08:00-14:00",
+          "TargetTag": "TH_Mayor_Office_Desk",
+          "Action": "TYPE_SILENTLY",
+          "Sync_With_NPC": 14,
+          "Detail": "作为镇长温斯顿的影子，沉默地记录着所有的腐败会议和协议签署。"
+        },
+        {
+          "Time": "14:00-18:00",
+          "TargetTag": "TH_Archive_Room",
+          "Action": "COPY_DOCUMENTS",
+          "Detail": "躲在市政厅无人问津的档案室，偷偷复印海藻资本的霸王条款。"
+        },
+        {
+          "Time": "19:00-22:00",
+          "TargetTag": "Monument_Base_Shadow",
+          "Action": "OBSERVE_CROWD",
+          "Detail": "站在中心广场的阴影处，冷眼旁观底层的愤怒，寻找可以托付真相的“破局者”。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 3,
+        "Time": "17:00",
+        "Event": "Hide_The_Truth",
+        "Condition": "未找到值得托付的人",
+        "Action": "将装满证据的硬盘锁进市政厅地下室的隐藏保险柜，随后在暴乱前黯然离开小镇。真相彻底被掩盖。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Entrust_Truth",
+          "Condition": "平民玩家道德声望极高（帮助老咸鱼、保护哈德森太太），并在广场阴影处与她对话",
+          "Reaction": "菲奥娜会流下眼泪，将【海藻资本完整罪证录】交给你。这是在 Day 3 真结局审判中，彻底在法理上钉死维克多、防止资本卷土重来的绝对关键道具。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "AMB < 30",
+        "Priority": 200,
+        "ForcedTarget": "TH_Archive_Room",
+        "ForcedAction": "SHRED_OFFICIAL_RECORDS",
+        "Detail": "政府彻底破产时，她会销毁明面上的市政记录，以保护那些曾经反抗过的普通人名单不落入资本手中。"
+      }
+    ]
+  },
+  "npc_22": {
+    "NPC_ID": 22,
+    "Name": "JJ",
+    "Identity": "报社主编",
+    "Faction": "Neutral_Media",
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "08:00-16:00",
+          "TargetTag": "Comm_News_Office",
+          "Action": "TYPE_TYPEWRITER",
+          "Detail": "撰写新闻稿件。"
+        },
+        {
+          "Time": "16:00-17:00",
+          "TargetTag": "Monument_Notice_Board",
+          "Action": "PASTE_NEWSPAPER",
+          "Detail": "前往中心广场张贴《杰杰特刊》。"
+        }
+      ],
+      "Day_3": [
+        {
+          "Time": "08:00-12:00",
+          "TargetTag": "Monument_Notice_Board",
+          "Action": "PASTE_RED_NEWSPAPER",
+          "Detail": "张贴揭露资本真相的最终版特刊。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 3,
+        "Time": "08:00",
+        "Event": "Publish_Expose",
+        "Action": "发布真相报道，直接导致 $ST$ 上升 1.0，引爆底层怒火。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "PR_Wash_Command",
+          "Condition": "精英玩家消耗 A$ 6,000 执行公关",
+          "Reaction": "撰写虚假利好新闻，导致 SWC 股价强弹 8%，$ST$ 下降 10。"
+        }
+      ],
+      "Commoner_Route": [
+        {
+          "Trigger": "Submit_Corruption_Evidence",
+          "Condition": "平民玩家提交马库斯的受贿证据",
+          "Reaction": "次日发布贪腐头条，解除玩家通缉状态。"
+        }
+      ]
+    },
+    "System_Overrides": []
+  },
+  "npc_23": {
+    "NPC_ID": 23,
+    "Name": "Louise",
+    "Identity": "调查记者",
+    "Faction": "Rebel_Intel",
+    "Base_Speed": 1.2,
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "08:00-17:00",
+          "TargetTag": "Slum_Sewer_Outlet",
+          "Action": "TAKE_PHOTO_SECRET",
+          "Detail": "在贫民窟排污口偷拍海藻重工的违规证据。"
+        },
+        {
+          "Time": "18:00-24:00",
+          "TargetTag": "Louise_Rent_Room",
+          "Action": "WRITE_URGENT",
+          "Detail": "在简陋出租屋内整理证据，或与菲奥娜秘密碰头。"
+        }
+      ],
+      "Day_3": [
+        {
+          "Time": "08:00-18:00",
+          "TargetTag": "Secret_Radio_Station",
+          "Action": "PREPARE_BROADCAST",
+          "Detail": "在黑基站调试设备，准备最后的真相播报。"
+        },
+        {
+          "Time": "19:00-24:00",
+          "TargetTag": "Secret_Radio_Station",
+          "Action": "TRUTH_BROADCAST",
+          "Detail": "若未被捕，向全镇播报海藻资本的真实罪行。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "22:00",
+        "Event": "Fiona_Meeting",
+        "Action": "与菲奥娜在后巷碰头，交换关于 AMB 违约的内部机密。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Arthur_Ledger",
+          "Condition": "玩家将亚瑟的公文包交给她",
+          "Reaction": "开启“真相调查”任务链，并解锁平民路线真结局。"
+        },
+        {
+          "Trigger": "Rescue_Louise",
+          "Condition": "ST 过高导致黑警巴恩斯搜查出租屋",
+          "Reaction": "玩家需消耗 AP 掩护其撤离，否则后续广播剧情将静默。"
+        }
+      ]
+    },
+    "System_Overrides": []
+  },
+  "npc_24": {
+    "NPC_ID": 24,
+    "Name": "Marcus",
+    "Identity": "商业区协管员",
+    "Faction": "Civic_Corrupt",
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "08:00-12:00",
+          "TargetTag": [
+            "Comm_Street_Node1",
+            "Comm_Street_Node2"
+          ],
+          "Loop": true,
+          "Action": "PATROL_WALK",
+          "Detail": "在商业区巡逻。"
+        },
+        {
+          "Time": "13:00-18:00",
+          "TargetTag": "Comm_Dark_Alley_Bribe",
+          "Action": "WAIT_FOR_BRIBE",
+          "Detail": "在暗巷停留，预留受贿交互槽位。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "13:00",
+        "Event": "Record_Bribe",
+        "Action": "胸口摄像头自动记录与精英玩家的受贿过程，上传至伊芙琳处。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "Accept_Bribe",
+          "Condition": "精英玩家支付 A$ 5,000",
+          "Reaction": "收下贿赂并提供【维克多情人名单/弱点情报】。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "Event.Evelyn_Prosecute == true",
+        "Priority": 200,
+        "ForcedTarget": "TH_Police_Cell",
+        "ForcedAction": "SIT_DEPRESSED",
+        "Detail": "被当作弃子起诉，关入警局牢房。"
+      }
+    ]
+  },
+  "npc_25": {
+    "NPC_ID": 25,
+    "Name": "Bob",
+    "Faction": "Neutral_Merchant",
+    "Base_Speed": 0.0,
+    "Daily_Schedules": {
+      "Day_1_to_Day_3": [
+        {
+          "Time": "00:00-24:00",
+          "TargetTag": "SN_Bob_Register",
+          "Action": "STORE_CLERK",
+          "Detail": "绝对静止在收银台后方。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "14:00",
+        "Event": "Inflation_Hit",
+        "Condition": "伊芙琳宣布接管管网",
+        "Action": "鲍勃更换门外的招牌，所有食物价格上调 50%，排队的NPC增加绝望动作。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Barter_For_Food",
+          "Condition": "玩家请求食物",
+          "Reaction": "引擎内部执行概率计算：(SN_Rep / 100) * (1 / ST)。若成功，递给玩家面包；若失败（如 ST>1.5），摇头拒绝并说“我也要活命”。"
+        }
+      ],
+      "Elite_Route": [
+        {
+          "Trigger": "Buyout_Stock",
+          "Condition": "精英玩家恶意买断物资",
+          "Reaction": "鲍勃店面挂出“售罄”牌子，导致 S-NAC 瞬间飙升，穷人玩家将面临双倍饥饿扣血。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "$SUI > 90",
+        "Priority": 250,
+        "ForcedTarget": "SN_Bob_Register_Hidden",
+        "ForcedAction": "HIDE_WITH_GUN",
+        "Detail": "暴动发生时，拉下卷帘门，持枪躲在柜台下，停止一切交易。"
+      }
+    ]
+  },
+  "npc_26": {
+    "NPC_ID": 26,
+    "Name": "Sam",
+    "Identity": "暗网黑客",
+    "Faction": "Neutral_Hacker",
+    "Daily_Schedules": {
+      "Day_1_to_Day_3": [
+        {
+          "Time": "00:00-24:00",
+          "TargetTag": "Slum_Hidden_Server_Room",
+          "Action": "HACKING_TERMINAL",
+          "Detail": "全天隐藏在机房操作暗池终端，无地表物理位移。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 1,
+        "Time": "08:00",
+        "Event": "Unlock_DarkPool",
+        "Action": "向精英玩家发送暗池破译密码。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "Collect_Revolution_Tax",
+          "Condition": "精英玩家在暗池盈利结算",
+          "Reaction": "静默扣除 5%-12% 手续费，并将其转化为起义军的武装资金 (WL 提升)。"
+        },
+        {
+          "Trigger": "Margin_Call_Trigger",
+          "Condition": "玩家账户净值 <= 维持保证金",
+          "Reaction": "关闭玩家交易权限，将坐标发送给刀疤(ID:12)。"
+        }
+      ],
+      "Commoner_Route": [
+        {
+          "Trigger": "Provide_Blueprint",
+          "Condition": "平民玩家提供 FC 与 FB 声望",
+          "Reaction": "交出大厦安保蓝图，降低 TDP。"
+        }
+      ]
+    },
+    "System_Overrides": []
+  },
+  "npc_27": {
+    "NPC_ID": 27,
+    "Name": "Ignis",
+    "Faction": "Worker_Radical",
+    "Base_Speed": 1.3,
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "08:00-18:00",
+          "TargetTag": "FC_AssemblyLine_Slot_02",
+          "Action": "WORK_ERRATIC",
+          "Detail": "暴躁地工作，经常砸机器",
+          "Sync_With_NPC": 28
+        },
+        {
+          "Time": "19:00-24:00",
+          "TargetTag": "Slum_Alley_Shadow",
+          "Action": "CRAFT_MOLOTOV",
+          "Detail": "在暗巷制作燃烧瓶"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 3,
+        "Time": "19:00",
+        "Event": "Start_Riot",
+        "Action": "第一个向警察防线投掷燃烧瓶，拉开大暴动序幕。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Stop_Ignis",
+          "Condition": "Day 2 玩家使用 20点 FC声望 劝阻他提前暴动",
+          "Reaction": "保存了起义军实力，TOP 结算时额外 +20。"
+        },
+        {
+          "Trigger": "Supply_Ignis",
+          "Condition": "玩家向他提供化学废料",
+          "Reaction": "S-WWI（影子怨气）暴增，ST 提前突破 2.5，导致里奥提前镇压。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "$ST > 2.0",
+        "Priority": 150,
+        "ForcedTarget": "Monument_Outer_Ring",
+        "ForcedAction": "INCITE_RIOT",
+        "Detail": "当社会张力极高时，他会游走在广场外围煽动路人加入暴动。"
+      }
+    ]
+  },
+  "npc_28": {
+    "NPC_ID": 28,
+    "Name": "Sarah",
+    "Identity": "工厂女工/起义军领袖",
+    "Faction": "Worker",
+    "Daily_Schedules": {
+      "Day_1": [
+        {
+          "Time": "08:00-18:00",
+          "TargetTag": "FC_AssemblyLine_Slot_01",
+          "Action": "WORK_HAMMER",
+          "Detail": "在压铸车间流水线工作。"
+        },
+        {
+          "Time": "21:00-24:00",
+          "TargetTag": "Slum_Bunker_Podium",
+          "Action": "SPEECH_UNDERGROUND",
+          "Detail": "在防空洞进行初步集会演讲。"
+        }
+      ],
+      "Day_2": [
+        {
+          "Time": "08:00-18:00",
+          "TargetTag": "FC_AssemblyLine_Slot_01",
+          "Action": "WORK_SLOWDOWN",
+          "Detail": "带领工人怠工。"
+        }
+      ],
+      "Day_3": [
+        {
+          "Time": "08:00-15:00",
+          "TargetTag": "FC_Gate_Strike_Center",
+          "Action": "LEAD_PROTEST",
+          "Detail": "罢工堵门。"
+        },
+        {
+          "Time": "20:00-24:00",
+          "TargetTag": "HQ_Lobby_Gate_Outside",
+          "Action": "ASSAULT_BUILDING",
+          "Detail": "率领起义军冲击海藻大厦。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "20:00",
+        "Event": "Burn_Flag",
+        "Condition": "S-WWI == 80",
+        "Action": "在工厂外焚烧海藻资本旗帜。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Grant_Access",
+          "Condition": "平民玩家消耗 30 FC声望",
+          "Reaction": "交出格雷夫斯办公室的后门钥匙。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "S-WWI >= 80",
+        "Priority": 200,
+        "ForcedTarget": "FC_Gate_Strike_Center",
+        "ForcedAction": "PROTEST_HOLD",
+        "Detail": "影子意愿达标，强制提前罢工。"
+      }
+    ]
+  },
+  "npc_29": {
+    "NPC_ID": 29,
+    "Name": "Tom",
+    "Identity": "绝望的失业工人/火种",
+    "Faction": "Worker",
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "08:00-12:00",
+          "TargetTag": "HQ_Lobby_Gate_Outside",
+          "Action": "SIT_SILENTLY_PROTEST",
+          "Detail": "在证券交易所大楼门口静坐抗议。"
+        },
+        {
+          "Time": "13:00-18:00",
+          "TargetTag": "TH_Hospital_Corridor",
+          "Action": "BEG_FOR_MEDICINE",
+          "Detail": "在医院走廊苦苦哀求医生，渴望获得被切断的药物。"
+        },
+        {
+          "Time": "19:00-06:00",
+          "TargetTag": "Slum_Apt_Hudson_Room",
+          "Action": "COUGH_SEVERELY",
+          "Sync_With_NPC": "哈德森太太的真实ID",
+          "Detail": "回到贫民窟漏风的隔间，由哈德森太太照顾，剧烈咳嗽。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 3,
+        "Time": "18:00",
+        "Event": "Self_Immolation",
+        "Condition": "SUI 或 ST 达到临界值",
+        "TargetTag": "HQ_Lobby_Gate_Outside",
+        "Action": "在证券交易所门口自焚，化为起义的熊熊烈火（触发全镇规模的大暴动）。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "Witness_Spark",
+          "Condition": "精英玩家在第三天傍晚离开大厦",
+          "Reaction": "强制目击汤姆的自焚事件，随之而来的是铺天盖地的暴民（SUI 锁定为极度危险状态）。"
+        }
+      ],
+      "Commoner_Route": [
+        {
+          "Trigger": "Failed_Rescue",
+          "Condition": "玩家试图挽救",
+          "Reaction": "剧情杀。玩家的任何施救都无法阻止，汤姆的死将转化为起义军不可阻挡的士气（TOP 战力剧增）。"
+        }
+      ]
+    },
+    "System_Overrides": []
+  },
+  "npc_30": {
+    "NPC_ID": 30,
+    "Name": "Mrs. Hudson",
+    "Faction": "Slum_Elder",
+    "Base_Speed": 0.7,
+    "Daily_Schedules": {
+      "Day_1": [
+        {
+          "Time": "08:00-09:30",
+          "TargetTag": "Apt_Hudson_Door",
+          "Action": "CRY_EVICTED",
+          "Sync_With_NPC": 3,
+          "Detail": "被伊丽丝驱逐，坐在地上哭泣"
+        },
+        {
+          "Time": "10:00-24:00",
+          "TargetTag": "Slum_Alley_Corner",
+          "Action": "SIT_HOMELESS",
+          "Detail": "无家可归，流落街头"
+        }
+      ],
+      "Day_2_to_Day_3": [
+        {
+          "Time": "09:00-18:00",
+          "TargetTag": "Slum_Corridor_Slot",
+          "Action": "SWEEP_ANIM",
+          "Detail": "如果被玩家救下，恢复扫地日常"
+        },
+        {
+          "Time": "18:00-24:00",
+          "TargetTag": "Slum_Apt_302",
+          "Action": "COOK_SOUP",
+          "Detail": "在屋内熬制救济汤"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 1,
+        "Time": "10:00",
+        "Event": "Eviction_Result",
+        "Action": "失去住所，流落街头，S-NAC（影子街坊声望）开始极速累积怨气。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Defend_Hudson",
+          "Condition": "Day 1 玩家挡住刀疤",
+          "Reaction": "她保住了房子。授予玩家 20点 SN声望，并开放自己的房间作为玩家的【绝对安全屋】。"
+        },
+        {
+          "Trigger": "Clear_Wanted",
+          "Condition": "玩家被通缉且靠近她，消耗 15点 SN声望",
+          "Reaction": "强制打断她的日常，她将玩家拉进屋子掩护，玩家通缉星级清零。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "Player.WantedLevel > 0 && Distance(Player, NPC) < 5",
+        "Priority": 150,
+        "ForcedTarget": "Slum_Apt_302",
+        "ForcedAction": "BECKON_PLAYER",
+        "Detail": "优先掩护被追捕的玩家。"
+      },
+      {
+        "Condition": "$ST >= 2.5",
+        "Priority": 200,
+        "ForcedTarget": "Slum_Bunker_Corner",
+        "ForcedAction": "PRAY",
+        "Detail": "社会临界崩溃，老太太躲入防空洞祈祷。"
+      }
+    ]
+  },
+  "npc_31": {
+    "NPC_ID": 31,
+    "Name": "Dave",
+    "Identity": "失业愤青/炸弹制造者",
+    "Faction": "Worker_Radical",
+    "Daily_Schedules": {
+      "Day_1_to_Day_3": [
+        {
+          "Time": "00:00-24:00",
+          "TargetTag": "Slum_Deep_Basement",
+          "Action": "CRAFT_EXPLOSIVES",
+          "Detail": "全天缩在贫民窟最深处的废弃地下室，利用从萨姆处讨要的报废电池倒腾炸药。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 3,
+        "Time": "19:00",
+        "Event": "Uncontrollable_Bombing",
+        "Condition": "ST (社会张力) 爆表",
+        "Action": "自发行动，提前引爆炸弹炸毁工厂的核心服务器或电力中枢，导致无差别伤亡。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Unlock_Heavy_Arms",
+          "Condition": "平民玩家 FB(码头) 声望 > 50",
+          "Reaction": "向玩家提供“土制炸弹”（暴力起义路线的标配物资）。"
+        },
+        {
+          "Trigger": "Accidental_Casualty",
+          "Condition": "未有效控制张力导致提前引爆",
+          "Reaction": "平民伤亡导致玩家的 SN(街坊) 声望遭受巨大扣除。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "Distance(NPC, '刀疤ID 12') < 10",
+        "Priority": 200,
+        "ForcedAction": "PREPARE_TO_ATTACK",
+        "Detail": "曾被刀疤打过，一旦发现刀疤的踪迹，极大概率放弃原有计划，试图炸死刀疤。"
+      }
+    ]
+  },
+  "npc_32": {
+    "NPC_ID": 32,
+    "Name": "Jerry",
+    "Identity": "企业财务/社畜",
+    "Faction": "Elite_Worker",
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "08:00-24:00",
+          "TargetTag": "HQ_Finance_Desk",
+          "Action": "WORK_EXHAUSTED",
+          "Sync_With_NPC": 4,
+          "Detail": "在塞拉斯(4号)手下严重超负荷工作，常年加班，处于极度脱水和精神衰弱状态。"
+        }
+      ],
+      "Day_3": [
+        {
+          "Time": "08:00-20:00",
+          "TargetTag": "HQ_Finance_Desk",
+          "Action": "SLEEP_ON_DESK",
+          "Detail": "由于连轴转，彻底崩溃在办公桌上睡着。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "16:00",
+        "Event": "Process_Fake_Ledger",
+        "Action": "处理塞拉斯交办的暗池假账目，体力值降至冰点。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "Steal_Evidence",
+          "Condition": "精英玩家潜入财务部",
+          "Reaction": "杰瑞处于深度疲劳的恍惚状态，玩家可以轻易从他桌上窃取塞拉斯的财务漏洞证据。"
+        }
+      ],
+      "Commoner_Route": [
+        {
+          "Trigger": "Awaken_Worker",
+          "Condition": "玩家向他展示底层的惨状",
+          "Reaction": "长期的社畜压迫可能让他产生倒戈的同理心，在最后关头替起义军解锁大厦的电子门锁。"
+        }
+      ]
+    },
+    "System_Overrides": []
+  },
+  "npc_33": {
+    "NPC_ID": 33,
+    "Name": "Nina",
+    "Identity": "社交名媛/模特",
+    "Faction": "Elite_Socialite",
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "10:00-14:00",
+          "TargetTag": "Comm_Center",
+          "Action": "SHOPPING_AND_MODELING",
+          "Detail": "出入商业中心，作为杰杰报纸头版的常客被拍照。"
+        },
+        {
+          "Time": "15:00-19:00",
+          "TargetTag": "HQ_Guest_Room",
+          "Action": "REST_BORED",
+          "Detail": "在海藻资本的招待所休息，表现出对资本挂件身份的厌倦。"
+        },
+        {
+          "Time": "20:00-24:00",
+          "TargetTag": "Club_VIP_Booth",
+          "Action": "EAVESDROP_HIGH_LEVEL",
+          "Detail": "频繁出入高端派对，利用美貌暗中从高管口中套取保命秘密。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "21:00",
+        "Event": "Eavesdrop_Silas",
+        "Action": "在派对上成功窃听到塞拉斯(ID:5)准备逃亡的具体路线。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "Reveal_Escape_Route",
+          "Condition": "精英玩家表现出极高的社交威望",
+          "Reaction": "妮娜会主动向玩家透露塞拉斯正准备逃亡的具体路线。"
+        }
+      ],
+      "Commoner_Route": [
+        {
+          "Trigger": "Empathy_Resonance",
+          "Condition": "平民玩家曾帮助过贫民窟的女工（妮娜的出身地）",
+          "Reaction": "妮娜会在第三天晚上故意将大楼的撤离密码泄露给起义军。"
+        }
+      ]
+    },
+    "System_Overrides": []
+  },
+  "npc_34": {
+    "NPC_ID": 34,
+    "Name": "Isabella",
+    "Identity": "别墅区名媛/社交钥匙",
+    "Faction": "Elite_Socialite",
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "12:00-18:00",
+          "TargetTag": "Villa_Umbrella_Seat",
+          "Action": "ENJOY_LUXURY",
+          "Detail": "在别墅区享受奢靡生活，从高处将贫民窟视作必要的景观进行观赏。"
+        },
+        {
+          "Time": "19:00-24:00",
+          "TargetTag": "Club_Hostess",
+          "Action": "HOST_PARTY",
+          "Detail": "主持上流社会的派对，维持自己的社交统治力。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [],
+    "Player_Intervention_Events": {
+      "Elite_Route": [
+        {
+          "Trigger": "Betrayal_Interest",
+          "Condition": "精英玩家触发针对海藻资本的高阶背叛或敌意收购",
+          "Reaction": "基于对“上流社会背叛”的病态兴趣，她可能会为玩家提供维克多的隐秘把柄（股权代持协议等）。"
+        }
+      ]
+    },
+    "System_Overrides": []
+  },
+  "npc_35": {
+    "NPC_ID": 35,
+    "Name": "Old Pete",
+    "Faction": "Slum_Outcast",
+    "Base_Speed": 0.6,
+    "Daily_Schedules": {
+      "Day_1_to_Day_3": [
+        {
+          "Time": "06:00-18:00",
+          "TargetTag": "Slum_Sewer_Grate_01",
+          "Action": "CLEAN_GRATE_ANIM",
+          "Detail": "在贫民窟各个下水道口缓慢移动清理。"
+        },
+        {
+          "Time": "18:00-06:00",
+          "TargetTag": "Slum_Sewer_Deep",
+          "Action": "SLEEP_ON_CARDBOARD",
+          "Detail": "睡在下水道深处。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 3,
+        "Time": "23:00",
+        "Event": "Failed_Rebellion_Cleanup",
+        "Condition": "TDP > TOP",
+        "Action": "起义失败，老皮特在下水道口静静看着满地尸体，不作干预。平民玩家 Game Over。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Unlock_Escape_Route",
+          "Condition": "玩家在 Day 1/2 累计施舍食物给老皮特 3 次",
+          "Reaction": "老皮特交给玩家一把生锈的钥匙（下水道逃生口）。"
+        },
+        {
+          "Trigger": "Survive_Pyrrhic_Ash",
+          "Condition": "Day 3 起义失败 (TDP > TOP) 且 玩家持有下水道钥匙",
+          "Reaction": "强行触发【败寇的生门】结局，老皮特打开井盖将玩家拉入地下，逃过安保的屠杀。"
+        }
+      ]
+    },
+    "System_Overrides": [
+      {
+        "Condition": "$SUI >= 90",
+        "Priority": 150,
+        "ForcedTarget": "Slum_Sewer_Deep",
+        "ForcedAction": "HIDE_IN_FEAR",
+        "Detail": "暴动时绝对不出井盖。"
+      }
+    ]
+  },
+  "npc_36": {
+    "NPC_ID": 36,
+    "Name": "Bard",
+    "Identity": "流浪吉他手",
+    "Faction": "Neutral_Rebel",
+    "Base_Speed": 1.0,
+    "Daily_Schedules": {
+      "Day_1_to_Day_2": [
+        {
+          "Time": "09:00-16:00",
+          "TargetTag": "HQ_Square_Center",
+          "Action": "PLAY_GUITAR_METAPHOR",
+          "Detail": "在证券交易所广场弹奏带有隐喻的乐曲。"
+        },
+        {
+          "Time": "17:00-24:00",
+          "TargetTag": "Ruth_Bar_Stage",
+          "Action": "SING_STORY",
+          "Detail": "在酒吧弹唱关于小镇秘密的歌谣，增加玩家声望。"
+        }
+      ],
+      "Day_3": [
+        {
+          "Time": "00:00-24:00",
+          "TargetTag": "Slum_Alley_Entrance",
+          "Action": "SIGNAL_RELAY",
+          "Detail": "若露易丝被捕，通过特定的曲调向起义者传递撤离指令。"
+        }
+      ]
+    },
+    "Default_Plot_Evolution": [
+      {
+        "Day": 2,
+        "Time": "18:00",
+        "Event": "Sam_Code_Sync",
+        "Action": "将萨姆(ID:11)截获的加密信息编入晚上的曲谱中。"
+      }
+    ],
+    "Player_Intervention_Events": {
+      "Commoner_Route": [
+        {
+          "Trigger": "Reputation_Buff",
+          "Condition": "玩家声望 > 50 且在广场互动",
+          "Reaction": "在大众面前歌颂玩家，使特定区域声望获取速度翻倍。"
+        }
+      ],
+      "Elite_Route": [
+        {
+          "Trigger": "Isabella_Secret",
+          "Condition": "精英玩家试图通过巴德调查伊莎贝拉(34)",
+          "Reaction": "巴德会以隐喻形式暗示伊莎贝拉最私密的恐惧。"
+        }
+      ]
+    },
+    "System_Overrides": []
+  }
+}
