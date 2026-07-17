@@ -160,6 +160,13 @@ form input::placeholder { color: #505969; }
 .questionnaire-footer > span { color: #626d7b; font-size: 9px; }
 .questionnaire-submit { width: auto; min-width: 190px; margin: 0; padding-left: 28px; padding-right: 28px; }
 
+.page-tabs { max-width: 1220px; height: 48px; margin: -6px auto 22px; display: flex; align-items: stretch; gap: 4px; padding: 4px; background: #0d1219; border: 1px solid #202833; border-radius: 6px; }
+.profile-content .page-tabs { max-width: 1180px; }
+.page-tabs button { min-width: 105px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 18px; color: #778291; background: transparent; border: 0; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; }
+.page-tabs button:hover { color: #d4dbe3; background: #141a23; }
+.page-tabs button.active { color: #eef3f7; background: var(--accent-soft); box-shadow: inset 0 -2px var(--accent); }
+.page-tabs button small { min-width: 18px; height: 18px; display: grid; place-items: center; color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent-border); border-radius: 9px; font-size: 9px; }
+
 .launcher-shell { height: calc(100vh - 42px); display: grid; grid-template-columns: 215px 1fr; }
 .sidebar { background: #0c0f16; border-right: 1px solid #1b202a; padding: 20px 12px 14px; display: flex; flex-direction: column; justify-content: space-between; }
 .nav-item { width: 100%; border: 0; background: transparent; display: flex; align-items: center; gap: 13px; color: #747d8d; padding: 12px 14px; border-radius: 5px; cursor: pointer; font-size: 12px; margin-bottom: 4px; position: relative; }
@@ -221,6 +228,16 @@ form input::placeholder { color: #505969; }
 .logout-card p { color: #677281; font-size: 9px; line-height: 1.65; margin: 0; }
 .logout-button { grid-column: 1 / -1; width: 100%; margin-top: 20px; padding: 11px; color: #e19a9e; background: rgba(204,65,76,.07); border: 1px solid rgba(204,65,76,.28); border-radius: 4px; font-size: 10px; cursor: pointer; }
 .logout-button:hover { color: white; background: #bf3f49; border-color: #bf3f49; }
+
+.profile-section-personal, .profile-section-preferences, .profile-section-ai, .profile-section-security { grid-template-columns: 1fr; }
+.profile-section-personal .profile-side-column, .profile-section-preferences .profile-side-column { display: none; }
+.profile-section-personal .preference-field { display: none; }
+.profile-section-preferences .personal-field { display: none; }
+.profile-section-ai .profile-details-card, .profile-section-ai .logout-card, .profile-section-security .profile-details-card { display: none; }
+.profile-section-ai .profile-side-column, .profile-section-security .profile-side-column { display: grid; grid-template-columns: 1fr; }
+.profile-section-ai .account-card dl > :not(.ai-field) { display: none; }
+.profile-section-security .account-card dl > :not(.security-field) { display: none; }
+.profile-section-ai .account-card, .profile-section-security .account-card, .profile-section-security .logout-card { max-width: 760px; width: 100%; }
 
 .world-content { overflow-y: auto; padding: 38px 4vw 50px; background: radial-gradient(circle at 70% 6%, rgba(83,219,193,.08), transparent 23%), #090c12; }
 .world-page-header { max-width: 1220px; margin: 0 auto 20px; display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 20px; border-bottom: 1px solid #222a34; }
@@ -306,6 +323,16 @@ form input::placeholder { color: #505969; }
 .world-region-card.coast { background-color: #101820; }
 .world-region-card.cafe { background-color: #181614; }
 
+.world-section-map .world-metrics, .world-section-map .world-side-column { display: none; }
+.world-section-map .world-layout { grid-template-columns: 1fr; }
+.world-section-events .world-metrics, .world-section-events .world-map-card, .world-section-events .world-travel-card, .world-section-events .world-region-section { display: none; }
+.world-section-travel .world-metrics, .world-section-travel .world-map-card, .world-section-travel .world-event-card, .world-section-travel .world-region-section { display: none; }
+.world-section-events .world-layout, .world-section-travel .world-layout { grid-template-columns: 1fr; }
+.world-section-events .world-side-column, .world-section-travel .world-side-column { grid-template-rows: auto; }
+.world-section-events .world-event-card, .world-section-travel .world-travel-card { min-height: 480px; }
+.world-section-events .world-event-list, .world-section-travel .world-travel-list { max-width: 900px; width: 100%; padding: 18px 24px 28px; }
+.world-section-events .world-event-list article, .world-section-travel .world-travel-list article { padding: 20px 0; }
+
 .avatar-content { overflow-y: auto; padding: 38px 4vw 48px; background: radial-gradient(circle at 72% 18%, rgba(81,222,195,.08), transparent 25%), #090c12; }
 .avatar-page-header { max-width: 1220px; margin: 0 auto 25px; display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 1px solid #222a34; padding-bottom: 21px; }
 .avatar-page-header > div > span, .avatar-info-heading > span { color: #66dfc8; font-size: 8px; letter-spacing: 2px; }
@@ -367,6 +394,13 @@ form input::placeholder { color: #505969; }
 .avatar-creation-roadmap li span { font-size: 8px; }
 .avatar-creation-roadmap li.current > i { color: var(--accent-contrast); background: var(--accent); border-color: var(--accent); }
 .avatar-creation-roadmap li.current strong { color: #dce2e9; }
+
+.avatar-section-appearance .avatar-page-layout, .avatar-section-personality .avatar-page-layout, .avatar-section-roadmap .avatar-page-layout { grid-template-columns: 1fr; }
+.avatar-section-appearance .avatar-info-column { display: none; }
+.avatar-section-personality .avatar-preview-card, .avatar-section-personality .avatar-creation-roadmap { display: none; }
+.avatar-section-roadmap .avatar-preview-card, .avatar-section-roadmap .avatar-info-card:first-child { display: none; }
+.avatar-section-personality .avatar-info-column, .avatar-section-roadmap .avatar-info-column { grid-template-columns: 1fr; }
+.avatar-section-personality .avatar-info-card, .avatar-section-roadmap .avatar-info-card { max-width: 820px; width: 100%; }
 
 .chat-content { overflow-y: auto; padding: 32px 4vw 45px; background: radial-gradient(circle at 77% 4%, rgba(82,220,194,.08), transparent 24%), #090c12; }
 .chat-page-header { max-width: 1220px; margin: 0 auto 18px; display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 17px; border-bottom: 1px solid #222a34; }
@@ -502,6 +536,19 @@ form input::placeholder { color: #505969; }
 .social-agent-state span { color: #626d7b; font-size: 8px; }
 .social-agent-state strong { color: var(--accent); font-size: 10px; }
 
+.social-section-inbox .social-metrics, .social-section-inbox .social-side-column, .social-section-inbox .social-preference-card { display: none; }
+.social-section-inbox .social-layout { grid-template-columns: 1fr; }
+.social-section-inbox .social-inbox { min-height: 560px; }
+.social-section-friends .social-metrics, .social-section-friends .social-inbox, .social-section-friends .social-search-card, .social-section-friends .social-preference-card { display: none; }
+.social-section-friends .social-layout, .social-section-discover .social-layout { grid-template-columns: 1fr; }
+.social-section-friends .social-side-column, .social-section-discover .social-side-column { grid-template-rows: auto; }
+.social-section-friends .friend-list-card { min-height: 520px; }
+.social-section-friends .friend-preview-list { max-width: 820px; width: 100%; padding: 20px 0; }
+.social-section-friends .friend-preview-list article { padding: 18px 0; }
+.social-section-discover .social-metrics, .social-section-discover .social-inbox, .social-section-discover .friend-list-card { display: none; }
+.social-section-discover .social-search-card { min-height: 240px; }
+.social-section-discover .social-preference-card { margin-top: 17px; }
+
 .hero-game { min-height: 550px; height: 67vh; position: relative; overflow: hidden; background: radial-gradient(circle at 73% 32%, rgba(104, 223, 202, .19), transparent 14%), radial-gradient(circle at 70% 38%, #34404b, #161b25 29%, #090c12 67%); }
 .hero-game::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, #090c12 0%, rgba(9,12,18,.25) 52%, rgba(9,12,18,.15)), linear-gradient(0deg, #090c12 0%, transparent 38%); }
 .hero-noise { position: absolute; inset: 0; opacity: .12; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E"); }
@@ -545,7 +592,122 @@ form input::placeholder { color: #505969; }
 .home-activity-feed strong { color: #aeb8c3; font-size: 8px; font-weight: 600; }
 .activity-card .home-activity-feed span { color: #596572; font-size: 7px; }
 .home-activity-feed time { color: #46515d; font-size: 7px; }
-.toast { position: fixed; right: 22px; bottom: 22px; z-index: 50; max-width: 420px; padding: 13px 16px; background: #161c26; border: 1px solid #384451; border-left: 3px solid var(--accent); border-radius: 4px; color: #d5dbe3; font-size: 11px; box-shadow: 0 12px 35px rgba(0,0,0,.35); }
+
+/* Readability pass: body copy stays at 12px or above on primary product pages. */
+.nav-item { font-size: 14px; padding-top: 14px; padding-bottom: 14px; }
+.profile-copy strong { font-size: 12px; }
+.profile-copy small { font-size: 10px; }
+.world-page-header h1, .avatar-page-header h1, .social-page-header h1 { font-size: 34px; }
+.world-page-header p, .avatar-page-header p, .social-page-header p { font-size: 13px; line-height: 1.6; }
+.world-page-header > div > span, .avatar-page-header > div > span, .social-page-header > div > span { font-size: 10px; }
+.world-server-state, .avatar-state-badge, .social-connection { font-size: 11px; }
+.world-metrics span, .social-metrics span { font-size: 11px; }
+.world-metrics strong { font-size: 22px; }
+.world-metrics small, .social-metrics small { font-size: 10px; }
+.world-panel-heading h2, .world-region-heading h2, .social-panel-heading h2, .social-preference-card h2, .avatar-info-heading h2 { font-size: 18px; }
+.world-panel-heading span, .world-region-heading span, .social-panel-heading span, .social-preference-card > div:first-child > span, .avatar-info-heading > span { font-size: 10px; }
+.world-panel-heading small, .social-panel-heading small { font-size: 10px; }
+.world-event-list strong, .world-travel-list strong, .social-feed strong, .friend-preview-list strong { font-size: 12px; }
+.world-event-list p, .world-travel-list p, .social-feed p, .social-preference-card p { font-size: 11px; }
+.world-event-list time, .world-travel-list small, .social-feed time, .social-feed small, .friend-preview-list small { font-size: 10px; }
+.avatar-info-heading p, .avatar-not-created span { font-size: 11px; }
+.avatar-info-card dt, .avatar-interest-summary > span { font-size: 11px; }
+.avatar-info-card dd { font-size: 13px; }
+.avatar-interest-summary i, .avatar-creation-roadmap li strong { font-size: 11px; }
+.avatar-creation-roadmap li span { font-size: 10px; }
+.profile-card-heading h2 { font-size: 18px; }
+.profile-card-heading span, .profile-card-heading small { font-size: 10px; }
+.profile-definition-grid span, .account-card dt { font-size: 11px; }
+.profile-definition-grid strong, .account-card dd { font-size: 13px; }
+.profile-interests > span, .profile-interests i { font-size: 11px; }
+.logout-card h3 { font-size: 14px; }
+.logout-card p { font-size: 11px; }
+.social-search-card form input, .social-search-card form button { font-size: 12px; }
+.social-search-card > p { font-size: 11px; }
+.social-interest-tags i { font-size: 11px; }
+.social-agent-state span { font-size: 10px; }
+.social-agent-state strong { font-size: 12px; }
+
+/* Final legibility standard. Only decorative English markers may remain below 11px. */
+.brand-mini { font-size: 12px; }
+.companion-name { font-size: 11px; }
+.companion-root > p { font-size: 10px; }
+form label, .interest-fields legend, .color-preference legend { font-size: 13px; }
+.form-message { font-size: 12px; }
+.legal, .prototype-note { font-size: 11px; }
+.questionnaire-header button, .questionnaire-note, .questionnaire-footer > span { font-size: 12px; }
+.onboarding-account small { font-size: 11px; }
+.interest-fields legend span, .color-preference legend span { font-size: 11px; }
+.color-options button, .color-preview, .color-preview button { font-size: 11px; }
+.page-tabs button small { font-size: 10px; }
+.profile strong { font-size: 12px; }
+.profile small { font-size: 12px; }
+.profile-back { font-size: 12px; }
+.profile-identity p, .profile-status { font-size: 12px; }
+.profile-definition-grid span, .profile-interests > span, .account-card dt { font-size: 12px; }
+.profile-definition-grid strong, .account-card dd { font-size: 14px; }
+.account-card .account-id { font-size: 12px; }
+.profile-interests i, .profile-interests em { font-size: 12px; }
+.logout-card p, .logout-button { font-size: 12px; }
+.world-node strong { font-size: 12px; }
+.world-node span { font-size: 12px; }
+.world-map-legend { font-size: 10px; }
+.world-map-footer span { font-size: 11px; }
+.world-map-footer strong { font-size: 13px; }
+.world-map-footer .play-button { font-size: 12px; }
+.world-event-list strong, .world-travel-list strong { font-size: 13px; }
+.world-event-list p, .world-travel-list p { font-size: 12px; }
+.world-event-list time, .world-travel-list small { font-size: 12px; }
+.world-region-heading p { font-size: 11px; }
+.world-region-card h3 { font-size: 13px; }
+.world-region-card p { font-size: 11px; }
+.world-region-card small { font-size: 10px; }
+.avatar-preview-toolbar span, .avatar-preview-toolbar small { font-size: 10px; }
+.avatar-not-created span { font-size: 12px; }
+.avatar-q-preview > span, .avatar-q-preview small { font-size: 10px; }
+.avatar-preview-footer > div:first-child span { font-size: 11px; }
+.avatar-preview-footer .play-button, .avatar-chat-button { font-size: 12px; }
+.avatar-info-heading p { font-size: 12px; }
+.avatar-info-card dt, .avatar-interest-summary > span { font-size: 12px; }
+.avatar-info-card dd { font-size: 14px; }
+.avatar-interest-summary i, .avatar-interest-summary em { font-size: 12px; }
+.avatar-creation-roadmap li > i { font-size: 11px; }
+.avatar-creation-roadmap li strong { font-size: 13px; }
+.avatar-creation-roadmap li span { font-size: 11px; }
+.chat-page-header button { font-size: 12px; }
+.chat-page-header p { font-size: 13px; }
+.chat-model-status { font-size: 11px; }
+.chat-agent-bar strong { font-size: 13px; }
+.chat-agent-bar small, .chat-agent-bar button { font-size: 12px; }
+.chat-message > span { font-size: 10px; }
+.chat-message small { font-size: 12px; }
+.chat-message p { font-size: 13px; }
+.chat-error { font-size: 12px; }
+.chat-composer textarea { font-size: 13px; }
+.chat-composer span { font-size: 12px; }
+.chat-composer button { font-size: 12px; }
+.chat-side-card dt { font-size: 12px; }
+.chat-side-card dd { font-size: 12px; }
+.chat-config-card p, .chat-suggestions button { font-size: 12px; }
+.social-feed strong { font-size: 13px; }
+.social-feed p { font-size: 12px; }
+.social-feed time, .social-feed small { font-size: 12px; }
+.social-inbox-footer { font-size: 12px; }
+.social-search-card form input, .social-search-card form button, .social-search-card > p { font-size: 12px; }
+.friend-preview-list strong { font-size: 12px; }
+.friend-preview-list small { font-size: 12px; }
+.social-preference-card p, .social-interest-tags i, .social-interest-tags em { font-size: 12px; }
+.social-agent-state span { font-size: 12px; }
+.status-pill { font-size: 10px; }
+.game-meta { font-size: 11px; }
+.card-tag { font-size: 10px; }
+.news-card p, .activity-card p { font-size: 12px; }
+.news-card span, .activity-head span { font-size: 11px; }
+.home-activity-feed strong { font-size: 12px; }
+.activity-card .home-activity-feed span { font-size: 11px; }
+.home-activity-feed time { font-size: 10px; }
+.toast { font-size: 12px; }
+.toast { position: fixed; right: 22px; bottom: 22px; z-index: 50; max-width: 420px; padding: 13px 16px; background: #161c26; border: 1px solid #384451; border-left: 3px solid var(--accent); border-radius: 4px; color: #d5dbe3; font-size: 12px; box-shadow: 0 12px 35px rgba(0,0,0,.35); }
 
 @media (max-width: 1400px) {
   .chat-layout { height: auto; grid-template-columns: 1fr; }
@@ -554,6 +716,8 @@ form input::placeholder { color: #505969; }
 }
 
 @media (max-width: 1200px) {
+  .page-tabs { overflow-x: auto; justify-content: flex-start; }
+  .page-tabs button { flex: 0 0 auto; }
   .auth-story { left: 6%; }
   .onboarding-intro { padding-left: 4vw; padding-right: 4vw; }
   .questionnaire-panel { padding-left: 4vw; padding-right: 4vw; }

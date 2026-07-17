@@ -19,6 +19,10 @@ const Icon = ({ name }: { name: 'home' | 'world' | 'avatar' | 'friends' | 'setti
   return <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
 };
 
+function PageTabs<T extends string>({ items, active, onChange }: { items: Array<{ value: T; label: string; badge?: string }>; active: T; onChange: (value: T) => void }) {
+  return <nav className="page-tabs" aria-label="页面分类">{items.map((item) => <button key={item.value} className={active === item.value ? 'active' : ''} onClick={() => onChange(item.value)}><span>{item.label}</span>{item.badge && <small>{item.badge}</small>}</button>)}</nav>;
+}
+
 function TitleBar({ canEnterCompanion }: { canEnterCompanion: boolean }) {
   return (
     <header className="titlebar">
@@ -275,6 +279,7 @@ function formatProfileDate(value: string) {
 function ProfilePage({ user, onBack, onLogout }: { user: LauncherUser; onBack: () => void; onLogout: () => void }) {
   const profile = user.basicQuestionnaire;
   const valueOrEmpty = (value?: string) => value || '未填写';
+  const [section, setSection] = useState<'personal' | 'preferences' | 'ai' | 'security'>('personal');
 
   return (
     <section className="profile-content">
@@ -291,24 +296,31 @@ function ProfilePage({ user, onBack, onLogout }: { user: LauncherUser; onBack: (
         </div>
       </header>
 
-      <div className="profile-layout">
+      <PageTabs active={section} onChange={setSection} items={[
+        { value: 'personal', label: '个人资料' },
+        { value: 'preferences', label: '偏好' },
+        { value: 'ai', label: 'AI 档案' },
+        { value: 'security', label: '账户安全' },
+      ]}/>
+
+      <div className={`profile-layout profile-section-${section}`}>
         <article className="profile-card profile-details-card">
           <div className="profile-card-heading">
-            <div><span>ACCOUNT ARCHIVE</span><h2>玩家基础档案</h2></div>
+            <div><span>{section === 'preferences' ? 'PREFERENCES' : 'ACCOUNT ARCHIVE'}</span><h2>{section === 'preferences' ? '偏好档案' : '玩家基础档案'}</h2></div>
             <small>首次基础问卷 · 已保存</small>
           </div>
           <div className="profile-definition-grid">
-            <div><span>姓名或称呼</span><strong>{valueOrEmpty(profile?.fullName)}</strong></div>
-            <div><span>性别</span><strong>{valueOrEmpty(profile?.gender)}</strong></div>
-            <div><span>出生年月日</span><strong>{valueOrEmpty(profile?.birthDate)}</strong></div>
-            <div><span>居住地</span><strong>{valueOrEmpty(profile?.residence)}</strong></div>
-            <div><span>职业</span><strong>{valueOrEmpty(profile?.occupation)}</strong></div>
-            <div><span>MBTI</span><strong>{valueOrEmpty(profile?.mbti)}</strong></div>
-            <div><span>喜欢的颜色</span><strong>{valueOrEmpty(profile?.favoriteColor)}</strong></div>
-            <div><span>音乐类型</span><strong>{valueOrEmpty(profile?.favoriteMusic)}</strong></div>
-            <div className="profile-definition-wide"><span>信奉的主义或宗教</span><strong>{valueOrEmpty(profile?.belief)}</strong></div>
+            <div className="personal-field"><span>姓名或称呼</span><strong>{valueOrEmpty(profile?.fullName)}</strong></div>
+            <div className="personal-field"><span>性别</span><strong>{valueOrEmpty(profile?.gender)}</strong></div>
+            <div className="personal-field"><span>出生年月日</span><strong>{valueOrEmpty(profile?.birthDate)}</strong></div>
+            <div className="personal-field"><span>居住地</span><strong>{valueOrEmpty(profile?.residence)}</strong></div>
+            <div className="personal-field"><span>职业</span><strong>{valueOrEmpty(profile?.occupation)}</strong></div>
+            <div className="preference-field"><span>MBTI</span><strong>{valueOrEmpty(profile?.mbti)}</strong></div>
+            <div className="preference-field"><span>喜欢的颜色</span><strong>{valueOrEmpty(profile?.favoriteColor)}</strong></div>
+            <div className="preference-field"><span>音乐类型</span><strong>{valueOrEmpty(profile?.favoriteMusic)}</strong></div>
+            <div className="profile-definition-wide preference-field"><span>信奉的主义或宗教</span><strong>{valueOrEmpty(profile?.belief)}</strong></div>
           </div>
-          <div className="profile-interests">
+          <div className="profile-interests preference-field">
             <span>核心爱好</span>
             <div>{profile?.interests?.length ? profile.interests.map((interest) => <i key={interest}>{interest}</i>) : <em>未填写</em>}</div>
           </div>
@@ -316,14 +328,14 @@ function ProfilePage({ user, onBack, onLogout }: { user: LauncherUser; onBack: (
 
         <aside className="profile-side-column">
           <article className="profile-card account-card">
-            <div className="profile-card-heading compact"><div><span>ACCOUNT</span><h2>账户信息</h2></div></div>
+            <div className="profile-card-heading compact"><div><span>{section === 'ai' ? 'AI ARCHIVE' : section === 'security' ? 'SECURITY' : 'ACCOUNT'}</span><h2>{section === 'ai' ? 'AI 档案' : section === 'security' ? '账户安全' : '账户信息'}</h2></div></div>
             <dl>
-              <div><dt>玩家昵称</dt><dd>{user.displayName}</dd></div>
-              <div><dt>邮箱地址</dt><dd>{user.email}</dd></div>
-              <div><dt>注册日期</dt><dd>{formatProfileDate(user.createdAt)}</dd></div>
-              <div><dt>账户 ID</dt><dd className="account-id">{user.id}</dd></div>
-              <div><dt>专属 AI 状态</dt><dd>{user.aiAgent.status === 'READY' ? '档案已就绪' : '等待基础问卷'}</dd></div>
-              <div><dt>AI Agent ID</dt><dd className="account-id">{user.aiAgent.agentId}</dd></div>
+              <div className="account-field"><dt>玩家昵称</dt><dd>{user.displayName}</dd></div>
+              <div className="security-field"><dt>邮箱地址</dt><dd>{user.email}</dd></div>
+              <div className="account-field"><dt>注册日期</dt><dd>{formatProfileDate(user.createdAt)}</dd></div>
+              <div className="security-field"><dt>账户 ID</dt><dd className="account-id">{user.id}</dd></div>
+              <div className="ai-field"><dt>专属 AI 状态</dt><dd>{user.aiAgent.status === 'READY' ? '档案已就绪' : '等待基础问卷'}</dd></div>
+              <div className="ai-field"><dt>AI Agent ID</dt><dd className="account-id">{user.aiAgent.agentId}</dd></div>
             </dl>
           </article>
 
@@ -339,6 +351,7 @@ function ProfilePage({ user, onBack, onLogout }: { user: LauncherUser; onBack: (
 }
 
 function WorldPage({ user, onLaunch }: { user: LauncherUser; onLaunch: () => void }) {
+  const [section, setSection] = useState<'map' | 'events' | 'travel'>('map');
   const regions = [
     { name: '中央小镇', type: '核心社交区域', status: '原型开发中', className: 'central' },
     { name: '霓虹街区', type: '夜间娱乐区域', status: '尚未开放', className: 'neon' },
@@ -347,11 +360,17 @@ function WorldPage({ user, onLaunch }: { user: LauncherUser; onLaunch: () => voi
   ];
 
   return (
-    <section className="world-content">
+    <section className={`world-content world-section-${section}`}>
       <header className="world-page-header">
         <div><span>WORLD EXPLORER</span><h1>EchoVerse 世界</h1><p>查看世界状态、主题区域、公共事件以及虚拟分身的探索记录。</p></div>
         <span className="world-server-state demo"><i/>本地世界预览 · 模拟数据</span>
       </header>
+
+      <PageTabs active={section} onChange={setSection} items={[
+        { value: 'map', label: '区域地图' },
+        { value: 'events', label: '世界事件', badge: '3' },
+        { value: 'travel', label: '旅行记录', badge: '2' },
+      ]}/>
 
       <section className="world-metrics">
         <article><span>当前阶段</span><strong>PRE-ALPHA</strong><small>世界原型构建中</small></article>
@@ -417,13 +436,21 @@ function AvatarPage({
 }) {
   const profile = user.basicQuestionnaire;
   const interests = profile?.interests.filter(Boolean) ?? [];
+  const [section, setSection] = useState<'appearance' | 'personality' | 'roadmap' | 'chat'>('appearance');
 
   return (
-    <section className="avatar-content">
+    <section className={`avatar-content avatar-section-${section}`}>
       <header className="avatar-page-header">
         <div><span>DIGITAL AVATAR</span><h1>我的虚拟分身</h1><p>查看分身状态、个性来源和未来的外观档案。</p></div>
         <span className="avatar-state-badge"><i/>尚未创建</span>
       </header>
+
+      <PageTabs active={section} onChange={(value) => value === 'chat' ? onChat() : setSection(value)} items={[
+        { value: 'appearance', label: '外观' },
+        { value: 'personality', label: '人格' },
+        { value: 'roadmap', label: '分身档案' },
+        { value: 'chat', label: 'AI 对话' },
+      ]}/>
 
       <div className="avatar-page-layout">
         <article className="avatar-preview-card">
@@ -574,6 +601,7 @@ function AiChatPage({ user, onBack }: { user: LauncherUser; onBack: () => void }
 function SocialPage({ user, onLaunch }: { user: LauncherUser; onLaunch: () => void }) {
   const [search, setSearch] = useState('');
   const [searched, setSearched] = useState(false);
+  const [section, setSection] = useState<'inbox' | 'friends' | 'discover'>('inbox');
   const interests = user.aiAgent.preferences.interests.filter(Boolean);
 
   const submitSearch = (event: FormEvent) => {
@@ -582,11 +610,17 @@ function SocialPage({ user, onLaunch }: { user: LauncherUser; onLaunch: () => vo
   };
 
   return (
-    <section className="social-content">
+    <section className={`social-content social-section-${section}`}>
       <header className="social-page-header">
         <div><span>SOCIAL NETWORK</span><h1>社交中心</h1><p>管理好友、查看分身带回的社交线索，并决定哪些关系值得继续。</p></div>
         <span className="social-connection"><i/>社交原型 · 模拟内容</span>
       </header>
+
+      <PageTabs active={section} onChange={setSection} items={[
+        { value: 'inbox', label: '消息', badge: '3' },
+        { value: 'friends', label: '好友', badge: '3' },
+        { value: 'discover', label: '探索玩家' },
+      ]}/>
 
       <section className="social-metrics">
         <article><span>演示好友</span><strong>3</strong><small>原型界面模拟关系</small></article>
@@ -644,7 +678,7 @@ function SocialPage({ user, onLaunch }: { user: LauncherUser; onLaunch: () => vo
 function LauncherHome({ user, onLogout }: { user: LauncherUser; onLogout: () => void }) {
   const [page, setPage] = useState<LauncherPage>(() => {
     const preview = new URLSearchParams(window.location.search).get('preview');
-    return import.meta.env.DEV && (preview === 'world' || preview === 'avatar' || preview === 'chat' || preview === 'social') ? preview : 'home';
+    return import.meta.env.DEV && (preview === 'world' || preview === 'avatar' || preview === 'chat' || preview === 'social' || preview === 'profile') ? preview : 'home';
   });
   const [launchState, setLaunchState] = useState<'idle' | 'launching'>('idle');
   const [toast, setToast] = useState('');
