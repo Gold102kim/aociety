@@ -1,0 +1,54 @@
+# Local secrets and runtime logs
+.env
+*.log
+*.pid
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local backups and generated artifacts
+backups/
+build_temp/
+artifacts/
+models/
+nul
+
+# Unreal generated output
+ue5_project/Binaries/
+ue5_project/DerivedDataCache/
+ue5_project/Intermediate/
+ue5_project/Saved/
+ue5_project/.vs/
+
+# Third-party environment packs are local dependencies. Track only Aociety
+# authored assets and automation scripts.
+ue5_project/Content/*
+!ue5_project/Content/Aociety/
+!ue5_project/Content/Aociety/**
+!ue5_project/Content/Python/
+!ue5_project/Content/Python/**
+ue5_project/Content/Python/__pycache__/
+
+# Editor and IDE state
+.vs/
+.idea/
+.vscode/
+*.sln
+*.suo
+*.opensdf
+*.sdf
+
+# Temporary MCP request captures
+mcp_headers.txt
+mcp_init.json
+
+# Superseded character experiments and generated test media
+SourceAssets/Characters/NPC_VRoid/
+SourceAssets/Characters/Player_Ecy/AxisTests/
+SourceAssets/Characters/Player_Ecy/ExportFixedTest/
+ue5_project/Content/Aociety/Characters/EcyFixedTest/
+ue5_project/Content/Aociety/Characters/**/*_ImportedBackup.uasset
+ue5_project/Content/Aociety/Characters/GeneratedMaterials/MF3_Ecy_OutlineHidden.uasset
+ue5_project/Content/Python/import_ecy_fixed_test.py
+tools/render_ecy_*.py
+data/test_*

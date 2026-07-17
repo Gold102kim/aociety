@@ -1,0 +1,50 @@
+[
+  {
+    "id": "swc",
+    "ticker": "SWC",
+    "name": "海藻重工",
+    "display_name": "SWC 海藻重工及地产",
+    "legacy_names": ["海藻食业"],
+    "industry": "重工 / 地产",
+    "base_price": 150,
+    "volatility": 0.18,
+    "family_owner": "海藻资本",
+    "event_sensitivity": "工厂事故、污染丑闻、罢工、裁员",
+    "macro_sensitivity": "社会张力、产能与地产掠夺",
+    "media_sensitivity": 0.82,
+    "issued_shares": 120000,
+    "free_float": 68000
+  },
+  {
+    "id": "amb",
+    "ticker": "AMB",
+    "name": "市政债券",
+    "display_name": "AMB 小镇市政高收益债券",
+    "legacy_names": ["珊瑚金控"],
+    "industry": "市政 / 信用",
+    "base_price": 80,
+    "volatility": 0.14,
+    "family_owner": "镇政府",
+    "event_sensitivity": "审计、暗杀、财政危机、临时法案",
+    "macro_sensitivity": "行政信用、警察工资与财政缺口",
+    "media_sensitivity": 0.74,
+    "issued_shares": 90000,
+    "free_float": 52000
+  },
+  {
+    "id": "tsl",
+    "ticker": "TSL",
+    "name": "龟甲物流",
+    "display_name": "TSL 龟甲远洋物流",
+    "legacy_names": ["龟甲船运"],
+    "industry": "物流 / 走私",
+    "base_price": 45,
+    "volatility": 0.16,
+    "family_owner": "龟甲家族",
+    "event_sensitivity": "港口封锁、走私、查封、武装升级",
+    "macro_sensitivity": "治安、武装等级与港口控制",
+    "media_sensitivity": 0.58,
+    "issued_shares": 100000,
+    "free_float": 56000
+  }
+]

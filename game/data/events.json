@@ -1,0 +1,170 @@
+[
+  {
+    "id": "port_strike",
+    "name": "码头慢工",
+    "district": "港口",
+    "description": "码头工人与船员故意放慢装卸节奏，运力先从表面稳定里漏出去。",
+    "trigger_conditions": ["worker_unrest > 55"],
+    "macro_effect": {"economy_heat": -6, "housing_heat": 1, "media_sentiment": -2, "worker_unrest": 8},
+    "goods_effect": {"面包": 0.12, "煤": 0.09, "罐头": 0.15},
+    "stock_effect": {"海藻食业": -0.05, "珊瑚金控": 0.03, "龟甲船运": -0.11},
+    "district_effect": {"港口": "unrest", "贫民街": "tense"},
+    "family_effect": {
+      "海藻家族": ["担心保供断档", "要求优先放粮"],
+      "珊瑚银行": ["放大流动性担忧"],
+      "龟甲船坞": ["强压码头情绪", "盯住闹事工头"]
+    },
+    "news_template": {
+      "title": "码头的绳索没断，节奏先断了",
+      "body": "{district} 的人把每一次装卸都拖长了一拍，整座镇先从账面上感到发紧。",
+      "tags": ["港口", "慢工", "物流"]
+    }
+  },
+  {
+    "id": "mine_rumor",
+    "name": "船坞事故传闻",
+    "district": "工厂区",
+    "description": "船坞里流出工伤和设备故障的风声，但管理层还在压着不让人抬头看。",
+    "trigger_conditions": ["economy_heat > 40"],
+    "macro_effect": {"economy_heat": -3, "housing_heat": 0, "media_sentiment": -1, "worker_unrest": 7},
+    "goods_effect": {"面包": 0.04, "煤": 0.13, "罐头": 0.05},
+    "stock_effect": {"海藻食业": -0.02, "珊瑚金控": 0.02, "龟甲船运": -0.12},
+    "district_effect": {"工厂区": "tense", "港口": "normal"},
+    "family_effect": {
+      "海藻家族": ["催问出货时点"],
+      "珊瑚银行": ["拿事故做融资砝码"],
+      "龟甲船坞": ["压下坏消息", "把锅甩给设备老化"]
+    },
+    "news_template": {
+      "title": "船坞里的火星，好像在替谁说话",
+      "body": "{district} 的人都说只是误会，但工人的手和煤价都先把话露了出来。",
+      "tags": ["船坞", "传闻", "工人"]
+    }
+  },
+  {
+    "id": "media_expose",
+    "name": "账本爆料",
+    "district": "交易所",
+    "description": "一份匿名账本被塞进了交易所附近的小报摊，放贷链条和操盘痕迹都露了头。",
+    "trigger_conditions": ["media_sentiment > 45"],
+    "macro_effect": {"economy_heat": -2, "housing_heat": -1, "media_sentiment": 9, "worker_unrest": 2},
+    "goods_effect": {"面包": 0.01, "煤": 0.02, "罐头": 0.05},
+    "stock_effect": {"海藻食业": -0.03, "珊瑚金控": -0.12, "龟甲船运": -0.04},
+    "district_effect": {"交易所": "tense", "港口": "tense"},
+    "family_effect": {
+      "海藻家族": ["趁机强调实物与库存"],
+      "珊瑚银行": ["追查泄密人", "先稳住大客户"],
+      "龟甲船坞": ["拿爆料压融资条件"]
+    },
+    "news_template": {
+      "title": "交易所今天先开的不是盘，是账本",
+      "body": "{district} 的摊位边忽然挤满了人，嘴比牌价更快地把消息推高。",
+      "tags": ["交易所", "爆料", "金融"]
+    }
+  },
+  {
+    "id": "rate_hike",
+    "name": "珊瑚加息",
+    "district": "交易所",
+    "description": "珊瑚银行把放贷口收得更紧，空气里先变冷的是小店和短债。",
+    "trigger_conditions": ["interest_rate < 3.0"],
+    "macro_effect": {"economy_heat": -8, "housing_heat": -5, "media_sentiment": -2, "worker_unrest": 3},
+    "goods_effect": {"面包": -0.02, "煤": -0.04, "罐头": 0.03},
+    "stock_effect": {"海藻食业": -0.09, "珊瑚金控": 0.05, "龟甲船运": -0.08},
+    "district_effect": {"交易所": "declining", "贫民街": "tense"},
+    "family_effect": {
+      "海藻家族": ["要求补贴农业"],
+      "珊瑚银行": ["收紧信用", "筛掉高风险客户"],
+      "龟甲船坞": ["寻找过桥融资"]
+    },
+    "news_template": {
+      "title": "利息一拧紧，街上的笑声也跟着收了",
+      "body": "{district} 的算盘珠子打得更快，借钱的人却先把话音压低了。",
+      "tags": ["银行", "利率", "信用"]
+    }
+  },
+  {
+    "id": "weather_disruption",
+    "name": "海风扰航",
+    "district": "港口",
+    "description": "海风把航线和养殖货期都扭了一下，供给和运费一起抖起来。",
+    "trigger_conditions": ["seasonal"],
+    "macro_effect": {"economy_heat": -2, "housing_heat": 0, "media_sentiment": -1, "worker_unrest": 1},
+    "goods_effect": {"面包": 0.07, "煤": 0.08, "罐头": 0.10},
+    "stock_effect": {"海藻食业": -0.04, "珊瑚金控": 0.01, "龟甲船运": -0.06},
+    "district_effect": {"港口": "tense", "交易所": "normal"},
+    "family_effect": {
+      "海藻家族": ["先保住近岸供货"],
+      "珊瑚银行": ["借天气谈风险溢价"],
+      "龟甲船坞": ["抢修航线", "要求政府放宽时限"]
+    },
+    "news_template": {
+      "title": "风先在港口收税，货船只是替它点头",
+      "body": "{district} 的缆绳、货单和谣言一起被吹得发紧了。",
+      "tags": ["天气", "运输", "港口"]
+    }
+  },
+  {
+    "id": "factory_layoff",
+    "name": "船坞裁班",
+    "district": "工厂区",
+    "description": "新班表贴上墙，少掉的是工位，多出来的是压不住的火气。",
+    "trigger_conditions": ["economy_heat < 60"],
+    "macro_effect": {"economy_heat": -5, "housing_heat": -1, "media_sentiment": -4, "worker_unrest": 9},
+    "goods_effect": {"面包": -0.02, "煤": -0.01, "罐头": 0.06},
+    "stock_effect": {"海藻食业": -0.03, "珊瑚金控": 0.02, "龟甲船运": 0.04},
+    "district_effect": {"工厂区": "unrest", "贫民街": "declining"},
+    "family_effect": {
+      "海藻家族": ["担心需求继续下坠"],
+      "珊瑚银行": ["趁低评估债务人"],
+      "龟甲船坞": ["压低工资线", "拿效率说服镇长"]
+    },
+    "news_template": {
+      "title": "班表薄下去以后，脾气就厚起来了",
+      "body": "{district} 今天少了几张工牌，多了几句压不住的抱怨。",
+      "tags": ["工厂区", "裁班", "失业"]
+    }
+  },
+  {
+    "id": "street_unrest",
+    "name": "粮价抱怨升温",
+    "district": "贫民街",
+    "description": "底层居民对物价、工资和账单的不满开始在市集与酒馆里串成线。",
+    "trigger_conditions": ["worker_unrest > 65"],
+    "macro_effect": {"economy_heat": -4, "housing_heat": -2, "media_sentiment": -5, "worker_unrest": 10},
+    "goods_effect": {"面包": 0.10, "煤": 0.03, "罐头": 0.08},
+    "stock_effect": {"海藻食业": -0.06, "珊瑚金控": -0.02, "龟甲船运": -0.03},
+    "district_effect": {"贫民街": "unrest", "交易所": "tense"},
+    "family_effect": {
+      "海藻家族": ["被推到粮价怒火前面"],
+      "珊瑚银行": ["开始催债又怕真挤兑"],
+      "龟甲船坞": ["提高戒备", "盯住工会串联"]
+    },
+    "news_template": {
+      "title": "街上先涨起来的不是面包，是怨气",
+      "body": "{district} 的锅太轻了，抱怨就很容易在摊位和门口越堆越重。",
+      "tags": ["贫民街", "粮价", "民生"]
+    }
+  },
+  {
+    "id": "housing_boom",
+    "name": "并购风声升温",
+    "district": "交易所",
+    "description": "珊瑚银行和龟甲船坞的并购传闻被越写越热，连稳派都开始重新算账。",
+    "trigger_conditions": ["housing_heat > 55"],
+    "macro_effect": {"economy_heat": 3, "housing_heat": 8, "media_sentiment": 5, "worker_unrest": 2},
+    "goods_effect": {"面包": 0.01, "煤": 0.06, "罐头": 0.04},
+    "stock_effect": {"海藻食业": 0.02, "珊瑚金控": 0.08, "龟甲船运": 0.09},
+    "district_effect": {"交易所": "prosperous", "工厂区": "tense"},
+    "family_effect": {
+      "海藻家族": ["担心实体被金融化吞进去"],
+      "珊瑚银行": ["包装成增长故事"],
+      "龟甲船坞": ["借势谈并购", "拿产能换估值"]
+    },
+    "news_template": {
+      "title": "牌桌上的并购话先热了，工位上的人还没轮到说话",
+      "body": "{district} 的传单和耳语一起把并购写成机会，也写成了新的不安。",
+      "tags": ["交易所", "并购", "资本"]
+    }
+  }
+]
