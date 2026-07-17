@@ -82,6 +82,12 @@ export async function completeQuestionnaire(input: BasicQuestionnaire): Promise<
   return result.user;
 }
 
+export async function supplementProfile(input: BasicQuestionnaire): Promise<LauncherUser> {
+  const result = await requireAuthApi().supplementProfile(input);
+  if (!result.ok) throw new Error(result.message);
+  return result.user;
+}
+
 export async function signOut() {
   await requireAuthApi().logout();
 }

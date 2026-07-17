@@ -303,7 +303,18 @@ ipcMain.handle('auth:complete-questionnaire', (event, input: BasicQuestionnaire)
     currentUser = accountStore.completeBasicQuestionnaire(currentUser.id, input);
     return { ok: true, user: currentUser };
   } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : '问卷保存失败，请稍后重试。' };
+    return { ok: false, message: error instanceof Error ? error.message : '个人资料保存失败，请稍后重试。' };
+  }
+});
+
+ipcMain.handle('auth:supplement-profile', (event, input: BasicQuestionnaire) => {
+  assertTrustedSender(event);
+  if (!accountStore || !currentUser) return { ok: false, message: '当前账户会话无效，请重新登录。' };
+  try {
+    currentUser = accountStore.supplementProfile(currentUser.id, input);
+    return { ok: true, user: currentUser };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : '资料补充失败，请稍后重试。' };
   }
 });
 

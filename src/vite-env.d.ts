@@ -29,6 +29,10 @@ interface Window {
         | { ok: true; user: LauncherUserData }
         | { ok: false; message: string }
       >;
+      supplementProfile: (input: BasicQuestionnaireData) => Promise<
+        | { ok: true; user: LauncherUserData }
+        | { ok: false; message: string }
+      >;
       logout: () => Promise<{ ok: boolean }>;
     };
     ai: {

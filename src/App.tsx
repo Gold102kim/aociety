@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { BasicQuestionnaire, completeQuestionnaire, LauncherUser, login, register, signOut } from './auth';
+import { BasicQuestionnaire, completeQuestionnaire, LauncherUser, login, register, signOut, supplementProfile } from './auth';
 import { ChatMessage, getAiStatus, sendAiMessage } from './ai';
 import { colorOptions, getThemeStyle } from './theme';
 
@@ -18,6 +18,10 @@ const Icon = ({ name }: { name: 'home' | 'world' | 'avatar' | 'friends' | 'setti
   };
   return <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
 };
+
+function PageTabs<T extends string>({ items, active, onChange }: { items: Array<{ value: T; label: string; badge?: string }>; active: T; onChange: (value: T) => void }) {
+  return <nav className="page-tabs" aria-label="页面分类">{items.map((item) => <button key={item.value} className={active === item.value ? 'active' : ''} onClick={() => onChange(item.value)}><span>{item.label}</span>{item.badge && <small>{item.badge}</small>}</button>)}</nav>;
+}
 
 function TitleBar({ canEnterCompanion }: { canEnterCompanion: boolean }) {
   return (
@@ -193,7 +197,7 @@ function QuestionnaireScreen({
       const updatedUser = await completeQuestionnaire(form);
       onCompleted(updatedUser);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '问卷保存失败，请稍后重试。');
+      setMessage(error instanceof Error ? error.message : '个人资料保存失败，请稍后重试。');
     } finally {
       setBusy(false);
     }
@@ -204,8 +208,8 @@ function QuestionnaireScreen({
       <aside className="onboarding-intro">
         <div>
           <div className="onboarding-step">ACCOUNT SETUP · 02 / 02</div>
-          <h1>先认识现实中的你。</h1>
-          <p>这些信息将写入玩家账户档案，并在后续帮助系统理解你的偏好。所有问题均为选填，你可以只填写愿意提供的内容。</p>
+          <h1>旅程，从这里开始。</h1>
+          <p>不必急着定义自己。按照此刻的想法，留下你愿意留下的部分。</p>
         </div>
         <div className="onboarding-account">
           <span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span>
@@ -215,10 +219,10 @@ function QuestionnaireScreen({
 
       <section className="questionnaire-panel">
         <div className="questionnaire-header">
-          <div><span>首次账户问卷</span><h2>第一份基础问卷</h2></div>
+          <div><span>PLAYER PROFILE</span><h2>关于你</h2></div>
           <button type="button" onClick={onLogout}>退出账户</button>
         </div>
-        <p className="questionnaire-note">选填内容不会影响账户创建。以后可在账户资料中修改。</p>
+        <p className="questionnaire-note">没有标准答案，所有内容均为选填。请确认后再保存：已填写的内容将被锁定，空白项以后仍可补充。</p>
 
         <form className="questionnaire-form" onSubmit={submit}>
           <div className="form-grid two-columns">
@@ -260,7 +264,7 @@ function QuestionnaireScreen({
           {message && <div className="form-message">{message}</div>}
           <div className="questionnaire-footer">
             <span>保存后将进入 EchoVerse 主界面</span>
-            <button className="primary-button questionnaire-submit" disabled={busy}>{busy ? '正在保存…' : '保存并进入平台'}</button>
+            <button className="primary-button questionnaire-submit" disabled={busy}>{busy ? '正在保存资料…' : '完成个人资料'}</button>
           </div>
         </form>
       </section>
@@ -272,9 +276,38 @@ function formatProfileDate(value: string) {
   return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(value));
 }
 
-function ProfilePage({ user, onBack, onLogout }: { user: LauncherUser; onBack: () => void; onLogout: () => void }) {
+function ProfilePage({ user, onBack, onLogout, onUserUpdated }: { user: LauncherUser; onBack: () => void; onLogout: () => void; onUserUpdated: (user: LauncherUser) => void }) {
   const profile = user.basicQuestionnaire;
   const valueOrEmpty = (value?: string) => value || '未填写';
+  const [section, setSection] = useState<'personal' | 'preferences' | 'ai' | 'security'>('personal');
+  const [supplementing, setSupplementing] = useState(false);
+  const [supplementBusy, setSupplementBusy] = useState(false);
+  const [supplementMessage, setSupplementMessage] = useState('');
+  const [supplement, setSupplement] = useState<BasicQuestionnaire>(() => ({ ...emptyQuestionnaire, interests: ['', '', ''] }));
+  const missingPersonal = ['fullName', 'gender', 'birthDate', 'residence', 'occupation'].some((field) => !profile?.[field as keyof BasicQuestionnaire]);
+  const missingPreferences = ['mbti', 'favoriteColor', 'favoriteMusic', 'belief'].some((field) => !profile?.[field as keyof BasicQuestionnaire]) || (profile?.interests.length ?? 0) < 3;
+  const canSupplement = section === 'personal' ? missingPersonal : section === 'preferences' ? missingPreferences : false;
+  const remainingInterestSlots = Math.max(0, 3 - (profile?.interests.length ?? 0));
+  const updateSupplement = (field: keyof Omit<BasicQuestionnaire, 'interests'>, value: string) => setSupplement((current) => ({ ...current, [field]: value }));
+  const updateSupplementInterest = (index: number, value: string) => setSupplement((current) => ({
+    ...current,
+    interests: current.interests.map((interest, currentIndex) => currentIndex === index ? value : interest),
+  }));
+  const saveSupplement = async (event: FormEvent) => {
+    event.preventDefault();
+    setSupplementBusy(true);
+    setSupplementMessage('');
+    try {
+      const updatedUser = await supplementProfile(supplement);
+      onUserUpdated(updatedUser);
+      setSupplement({ ...emptyQuestionnaire, interests: ['', '', ''] });
+      setSupplementing(false);
+    } catch (error) {
+      setSupplementMessage(error instanceof Error ? error.message : '资料补充失败，请稍后重试。');
+    } finally {
+      setSupplementBusy(false);
+    }
+  };
 
   return (
     <section className="profile-content">
@@ -291,24 +324,51 @@ function ProfilePage({ user, onBack, onLogout }: { user: LauncherUser; onBack: (
         </div>
       </header>
 
-      <div className="profile-layout">
+      <PageTabs active={section} onChange={(nextSection) => { setSection(nextSection); setSupplementing(false); setSupplementMessage(''); }} items={[
+        { value: 'personal', label: '个人资料' },
+        { value: 'preferences', label: '偏好' },
+        { value: 'ai', label: 'AI 档案' },
+        { value: 'security', label: '账户安全' },
+      ]}/>
+
+      <div className={`profile-layout profile-section-${section}`}>
         <article className="profile-card profile-details-card">
           <div className="profile-card-heading">
-            <div><span>ACCOUNT ARCHIVE</span><h2>玩家基础档案</h2></div>
-            <small>首次基础问卷 · 已保存</small>
+            <div><span>{section === 'preferences' ? 'PREFERENCES' : 'ACCOUNT ARCHIVE'}</span><h2>{section === 'preferences' ? '偏好档案' : '玩家基础档案'}</h2></div>
+            <div className="profile-card-actions">
+              <small>{canSupplement ? '已填写内容保持锁定' : '当前资料已完整锁定'}</small>
+              {canSupplement && <button type="button" onClick={() => { setSupplementing((current) => !current); setSupplementMessage(''); }}>{supplementing ? '收起' : '补充空白项'}</button>}
+            </div>
           </div>
+          {supplementing && canSupplement && <form className="profile-supplement-form" onSubmit={saveSupplement}>
+            <div className="profile-supplement-heading"><div><span>PROFILE SUPPLEMENT</span><h3>补充尚未填写的内容</h3></div><p>保存后将不可修改，请确认无误。</p></div>
+            <div className="profile-supplement-grid">
+              {section === 'personal' && !profile?.fullName && <label>姓名（或希望记录的称呼）<input value={supplement.fullName} onChange={(event) => updateSupplement('fullName', event.target.value)} placeholder="选填"/></label>}
+              {section === 'personal' && !profile?.gender && <label>性别<select value={supplement.gender} onChange={(event) => updateSupplement('gender', event.target.value)}><option value="">不填写</option><option value="女性">女性</option><option value="男性">男性</option><option value="非二元">非二元</option><option value="其他/自定义">其他/自定义</option></select></label>}
+              {section === 'personal' && !profile?.birthDate && <label>出生年月日<input value={supplement.birthDate} onChange={(event) => updateSupplement('birthDate', event.target.value)} type="date"/></label>}
+              {section === 'personal' && !profile?.residence && <label>居住地<input value={supplement.residence} onChange={(event) => updateSupplement('residence', event.target.value)} placeholder="国家、城市或地区，选填"/></label>}
+              {section === 'personal' && !profile?.occupation && <label>职业<input value={supplement.occupation} onChange={(event) => updateSupplement('occupation', event.target.value)} placeholder="选填"/></label>}
+              {section === 'preferences' && !profile?.mbti && <label>MBTI<select value={supplement.mbti} onChange={(event) => updateSupplement('mbti', event.target.value)}><option value="">不确定或不填写</option>{mbtiOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>}
+              {section === 'preferences' && !profile?.favoriteColor && <label>喜欢的颜色<select value={supplement.favoriteColor} onChange={(event) => updateSupplement('favoriteColor', event.target.value)}><option value="">不填写</option>{colorOptions.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}</select></label>}
+              {section === 'preferences' && !profile?.favoriteMusic && <label>喜欢的音乐类型<input value={supplement.favoriteMusic} onChange={(event) => updateSupplement('favoriteMusic', event.target.value)} placeholder="选填"/></label>}
+              {section === 'preferences' && !profile?.belief && <label>信奉的主义或宗教<input value={supplement.belief} onChange={(event) => updateSupplement('belief', event.target.value)} placeholder="敏感信息，可完全不填写"/></label>}
+              {section === 'preferences' && remainingInterestSlots > 0 && <fieldset className="profile-supplement-interests"><legend>补充核心爱好 <span>还可填写 {remainingInterestSlots} 个</span></legend><div>{Array.from({ length: remainingInterestSlots }, (_, index) => <input key={index} value={supplement.interests[index]} onChange={(event) => updateSupplementInterest(index, event.target.value)} placeholder={`爱好 ${(profile?.interests.length ?? 0) + index + 1}`}/>)}</div></fieldset>}
+            </div>
+            {supplementMessage && <div className="form-message">{supplementMessage}</div>}
+            <div className="profile-supplement-footer"><span>空白内容可以以后继续补充</span><button className="primary-button" disabled={supplementBusy}>{supplementBusy ? '正在保存…' : '确认并锁定'}</button></div>
+          </form>}
           <div className="profile-definition-grid">
-            <div><span>姓名或称呼</span><strong>{valueOrEmpty(profile?.fullName)}</strong></div>
-            <div><span>性别</span><strong>{valueOrEmpty(profile?.gender)}</strong></div>
-            <div><span>出生年月日</span><strong>{valueOrEmpty(profile?.birthDate)}</strong></div>
-            <div><span>居住地</span><strong>{valueOrEmpty(profile?.residence)}</strong></div>
-            <div><span>职业</span><strong>{valueOrEmpty(profile?.occupation)}</strong></div>
-            <div><span>MBTI</span><strong>{valueOrEmpty(profile?.mbti)}</strong></div>
-            <div><span>喜欢的颜色</span><strong>{valueOrEmpty(profile?.favoriteColor)}</strong></div>
-            <div><span>音乐类型</span><strong>{valueOrEmpty(profile?.favoriteMusic)}</strong></div>
-            <div className="profile-definition-wide"><span>信奉的主义或宗教</span><strong>{valueOrEmpty(profile?.belief)}</strong></div>
+            <div className="personal-field"><span>姓名或称呼</span><strong>{valueOrEmpty(profile?.fullName)}</strong></div>
+            <div className="personal-field"><span>性别</span><strong>{valueOrEmpty(profile?.gender)}</strong></div>
+            <div className="personal-field"><span>出生年月日</span><strong>{valueOrEmpty(profile?.birthDate)}</strong></div>
+            <div className="personal-field"><span>居住地</span><strong>{valueOrEmpty(profile?.residence)}</strong></div>
+            <div className="personal-field"><span>职业</span><strong>{valueOrEmpty(profile?.occupation)}</strong></div>
+            <div className="preference-field"><span>MBTI</span><strong>{valueOrEmpty(profile?.mbti)}</strong></div>
+            <div className="preference-field"><span>喜欢的颜色</span><strong>{valueOrEmpty(profile?.favoriteColor)}</strong></div>
+            <div className="preference-field"><span>音乐类型</span><strong>{valueOrEmpty(profile?.favoriteMusic)}</strong></div>
+            <div className="profile-definition-wide preference-field"><span>信奉的主义或宗教</span><strong>{valueOrEmpty(profile?.belief)}</strong></div>
           </div>
-          <div className="profile-interests">
+          <div className="profile-interests preference-field">
             <span>核心爱好</span>
             <div>{profile?.interests?.length ? profile.interests.map((interest) => <i key={interest}>{interest}</i>) : <em>未填写</em>}</div>
           </div>
@@ -316,20 +376,20 @@ function ProfilePage({ user, onBack, onLogout }: { user: LauncherUser; onBack: (
 
         <aside className="profile-side-column">
           <article className="profile-card account-card">
-            <div className="profile-card-heading compact"><div><span>ACCOUNT</span><h2>账户信息</h2></div></div>
+            <div className="profile-card-heading compact"><div><span>{section === 'ai' ? 'AI ARCHIVE' : section === 'security' ? 'SECURITY' : 'ACCOUNT'}</span><h2>{section === 'ai' ? 'AI 档案' : section === 'security' ? '账户安全' : '账户信息'}</h2></div></div>
             <dl>
-              <div><dt>玩家昵称</dt><dd>{user.displayName}</dd></div>
-              <div><dt>邮箱地址</dt><dd>{user.email}</dd></div>
-              <div><dt>注册日期</dt><dd>{formatProfileDate(user.createdAt)}</dd></div>
-              <div><dt>账户 ID</dt><dd className="account-id">{user.id}</dd></div>
-              <div><dt>专属 AI 状态</dt><dd>{user.aiAgent.status === 'READY' ? '档案已就绪' : '等待基础问卷'}</dd></div>
-              <div><dt>AI Agent ID</dt><dd className="account-id">{user.aiAgent.agentId}</dd></div>
+              <div className="account-field"><dt>玩家昵称</dt><dd>{user.displayName}</dd></div>
+              <div className="security-field"><dt>邮箱地址</dt><dd>{user.email}</dd></div>
+              <div className="account-field"><dt>注册日期</dt><dd>{formatProfileDate(user.createdAt)}</dd></div>
+              <div className="security-field"><dt>账户 ID</dt><dd className="account-id">{user.id}</dd></div>
+              <div className="ai-field"><dt>专属 AI 状态</dt><dd>{user.aiAgent.status === 'READY' ? '档案已就绪' : '等待个人资料'}</dd></div>
+              <div className="ai-field"><dt>AI Agent ID</dt><dd className="account-id">{user.aiAgent.agentId}</dd></div>
             </dl>
           </article>
 
           <article className="profile-card logout-card">
             <div className="logout-icon"><Icon name="user"/></div>
-            <div><h3>退出当前账户</h3><p>退出后将返回登录界面。你的基础问卷和账户资料会继续保存在本机。</p></div>
+            <div><h3>退出当前账户</h3><p>退出后将返回登录界面。你的个人资料和账户信息会继续保存在本机。</p></div>
             <button className="logout-button" onClick={onLogout}>退出登录</button>
           </article>
         </aside>
@@ -339,6 +399,7 @@ function ProfilePage({ user, onBack, onLogout }: { user: LauncherUser; onBack: (
 }
 
 function WorldPage({ user, onLaunch }: { user: LauncherUser; onLaunch: () => void }) {
+  const [section, setSection] = useState<'map' | 'events' | 'travel'>('map');
   const regions = [
     { name: '中央小镇', type: '核心社交区域', status: '原型开发中', className: 'central' },
     { name: '霓虹街区', type: '夜间娱乐区域', status: '尚未开放', className: 'neon' },
@@ -347,11 +408,17 @@ function WorldPage({ user, onLaunch }: { user: LauncherUser; onLaunch: () => voi
   ];
 
   return (
-    <section className="world-content">
+    <section className={`world-content world-section-${section}`}>
       <header className="world-page-header">
         <div><span>WORLD EXPLORER</span><h1>EchoVerse 世界</h1><p>查看世界状态、主题区域、公共事件以及虚拟分身的探索记录。</p></div>
         <span className="world-server-state demo"><i/>本地世界预览 · 模拟数据</span>
       </header>
+
+      <PageTabs active={section} onChange={setSection} items={[
+        { value: 'map', label: '区域地图' },
+        { value: 'events', label: '世界事件', badge: '3' },
+        { value: 'travel', label: '旅行记录', badge: '2' },
+      ]}/>
 
       <section className="world-metrics">
         <article><span>当前阶段</span><strong>PRE-ALPHA</strong><small>世界原型构建中</small></article>
@@ -417,13 +484,21 @@ function AvatarPage({
 }) {
   const profile = user.basicQuestionnaire;
   const interests = profile?.interests.filter(Boolean) ?? [];
+  const [section, setSection] = useState<'appearance' | 'personality' | 'roadmap' | 'chat'>('appearance');
 
   return (
-    <section className="avatar-content">
+    <section className={`avatar-content avatar-section-${section}`}>
       <header className="avatar-page-header">
         <div><span>DIGITAL AVATAR</span><h1>我的虚拟分身</h1><p>查看分身状态、个性来源和未来的外观档案。</p></div>
         <span className="avatar-state-badge"><i/>尚未创建</span>
       </header>
+
+      <PageTabs active={section} onChange={(value) => value === 'chat' ? onChat() : setSection(value)} items={[
+        { value: 'appearance', label: '外观' },
+        { value: 'personality', label: '人格' },
+        { value: 'roadmap', label: '分身档案' },
+        { value: 'chat', label: 'AI 对话' },
+      ]}/>
 
       <div className="avatar-page-layout">
         <article className="avatar-preview-card">
@@ -443,7 +518,7 @@ function AvatarPage({
 
         <aside className="avatar-info-column">
           <article className="avatar-info-card">
-            <div className="avatar-info-heading"><span>PERSONALITY SEED</span><h2>性格种子</h2><p>以下资料来自你的首次基础问卷，未来可用于生成分身的初始性格建议。</p></div>
+            <div className="avatar-info-heading"><span>PERSONALITY SEED</span><h2>性格种子</h2><p>属于你的性格轮廓会随着旅程与互动逐渐丰富。</p></div>
             <dl>
               <div><dt>专属 AI</dt><dd className="agent-ready">{user.aiAgent.status === 'READY' ? '已自动分配' : '等待初始化'}</dd></div>
               <div><dt>基础模型</dt><dd>{user.aiAgent.modelAssignment.baseModelId}</dd></div>
@@ -475,7 +550,7 @@ function AiChatPage({ user, onBack }: { user: LauncherUser; onBack: () => void }
   const [messages, setMessages] = useState<ChatMessage[]>([{
     id: 'welcome',
     role: 'assistant',
-    content: `你好，${user.displayName}。我的人格档案已经建立。你可以从现在开始和我聊天，我会根据你提供的性格与偏好来理解你。`,
+    content: `你好，${user.displayName}。我已经准备好了。我们可以从现在开始聊天，想聊什么都可以。`,
   }]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -574,6 +649,7 @@ function AiChatPage({ user, onBack }: { user: LauncherUser; onBack: () => void }
 function SocialPage({ user, onLaunch }: { user: LauncherUser; onLaunch: () => void }) {
   const [search, setSearch] = useState('');
   const [searched, setSearched] = useState(false);
+  const [section, setSection] = useState<'inbox' | 'friends' | 'discover'>('inbox');
   const interests = user.aiAgent.preferences.interests.filter(Boolean);
 
   const submitSearch = (event: FormEvent) => {
@@ -582,11 +658,17 @@ function SocialPage({ user, onLaunch }: { user: LauncherUser; onLaunch: () => vo
   };
 
   return (
-    <section className="social-content">
+    <section className={`social-content social-section-${section}`}>
       <header className="social-page-header">
         <div><span>SOCIAL NETWORK</span><h1>社交中心</h1><p>管理好友、查看分身带回的社交线索，并决定哪些关系值得继续。</p></div>
         <span className="social-connection"><i/>社交原型 · 模拟内容</span>
       </header>
+
+      <PageTabs active={section} onChange={setSection} items={[
+        { value: 'inbox', label: '消息', badge: '3' },
+        { value: 'friends', label: '好友', badge: '3' },
+        { value: 'discover', label: '探索玩家' },
+      ]}/>
 
       <section className="social-metrics">
         <article><span>演示好友</span><strong>3</strong><small>原型界面模拟关系</small></article>
@@ -618,7 +700,7 @@ function SocialPage({ user, onLaunch }: { user: LauncherUser; onLaunch: () => vo
             </form>
             {searched
               ? <p className="social-search-result">当前原型尚未连接在线玩家目录，暂时无法搜索“{search.trim()}”。</p>
-              : <p>正式版本将通过玩家昵称或账户 ID 查找用户，不会公开问卷中的真实个人资料。</p>}
+              : <p>正式版本将通过玩家昵称或账户 ID 查找用户，不会公开你未选择公开的个人资料。</p>}
           </article>
 
           <article className="social-panel friend-list-card">
@@ -633,7 +715,7 @@ function SocialPage({ user, onLaunch }: { user: LauncherUser; onLaunch: () => vo
       </div>
 
       <article className="social-panel social-preference-card">
-        <div><span>MATCHING SIGNALS</span><h2>当前社交兴趣信号</h2><p>这些信息来自首次基础问卷，只用于未来生成相遇建议，不会直接建立关系。</p></div>
+        <div><span>MATCHING SIGNALS</span><h2>当前社交兴趣信号</h2><p>这些信息来自你的身份偏好，只用于未来生成相遇建议，不会直接建立关系。</p></div>
         <div className="social-interest-tags">{interests.length ? interests.map((interest) => <i key={interest}>{interest}</i>) : <em>尚未填写核心爱好</em>}</div>
         <div className="social-agent-state"><span>专属 AI</span><strong>{user.aiAgent.status === 'READY' ? '档案已就绪' : '等待初始化'}</strong></div>
       </article>
@@ -641,10 +723,10 @@ function SocialPage({ user, onLaunch }: { user: LauncherUser; onLaunch: () => vo
   );
 }
 
-function LauncherHome({ user, onLogout }: { user: LauncherUser; onLogout: () => void }) {
+function LauncherHome({ user, onLogout, onUserUpdated }: { user: LauncherUser; onLogout: () => void; onUserUpdated: (user: LauncherUser) => void }) {
   const [page, setPage] = useState<LauncherPage>(() => {
     const preview = new URLSearchParams(window.location.search).get('preview');
-    return import.meta.env.DEV && (preview === 'world' || preview === 'avatar' || preview === 'chat' || preview === 'social') ? preview : 'home';
+    return import.meta.env.DEV && (preview === 'world' || preview === 'avatar' || preview === 'chat' || preview === 'social' || preview === 'profile') ? preview : 'home';
   });
   const [launchState, setLaunchState] = useState<'idle' | 'launching'>('idle');
   const [toast, setToast] = useState('');
@@ -683,7 +765,7 @@ function LauncherHome({ user, onLogout }: { user: LauncherUser; onLogout: () => 
       </aside>
 
       {page === 'profile'
-        ? <ProfilePage user={user} onBack={() => setPage('home')} onLogout={onLogout}/>
+        ? <ProfilePage user={user} onBack={() => setPage('home')} onLogout={onLogout} onUserUpdated={onUserUpdated}/>
         : page === 'world'
           ? <WorldPage user={user} onLaunch={() => { void launchGame(); }}/>
         : page === 'avatar'
@@ -812,7 +894,7 @@ function LauncherApplication() {
   let content;
   if (!user) content = <AuthScreen onAuthenticated={authenticated}/>;
   else if (!user.basicQuestionnaireCompletedAt) content = <QuestionnaireScreen user={user} onCompleted={questionnaireCompleted} onLogout={() => { void logout(); }}/>;
-  else content = <LauncherHome user={user} onLogout={() => { void logout(); }}/>;
+  else content = <LauncherHome user={user} onLogout={() => { void logout(); }} onUserUpdated={setUser}/>;
   return <div className="app" style={getThemeStyle(user?.basicQuestionnaire?.favoriteColor)}><TitleBar canEnterCompanion={Boolean(user?.basicQuestionnaireCompletedAt)}/>{content}</div>;
 }
 
