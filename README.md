@@ -1,50 +1,104 @@
 # aociety · EchoVerse Launcher
 
-EchoVerse 的 Windows 桌面启动器原型，包含账户注册、登录、保持会话、启动器主页以及版本化的 UE5 游戏启动接口。
+EchoVerse 的 Windows Electron 启动器工程。当前版本是可构建、可测试、可回滚的内部原型，覆盖账户入口、首次资料、世界/社交/虚拟分身页面、人格 AI 对话、透明伴生模式，以及向 UE5 游戏交付启动会话的接口。
 
-日常启动时可直接双击项目总目录中的 `EchoVerse启动器.exe`，不需要打开终端或运行开发命令。该程序会自动定位同目录下的 `软件端` 文件夹和 Electron 运行时。
+它还不是可公开运营的平台：账户仍保存在本机，AI 仍由开发机配置直连供应商，游戏票据仍是联调用原型。生产边界和阻断项见 [工程审计](docs/ENGINEERING_AUDIT.md) 与 [安全说明](SECURITY.md)。
 
-软件每次启动均先显示账户登录界面。新账户注册成功后必须完成一次基础问卷，问卷会写入该账户档案，保存成功后才能进入启动器主页；再次登录已完成问卷的账户会直接进入主页。退出账户后立即返回登录界面。账户保存在 Electron 的 `userData/accounts.json` 中，密码仅保存随机盐和 `scrypt` 哈希，不保存明文。当前账户库适用于单机开发联调，正式联网版本仍需替换为平台账户后端。
+## 当前能力
 
-创建账户时系统会同步分配唯一的 AI Agent 档案与 `deepseek-v4-flash` 专属模型配置，初始状态为 `WAITING_FOR_PROFILE`。首次个人资料保存后，身份、MBTI 和偏好会写入该 Agent，状态更新为 `READY`。虚拟分身页面的“与我的 AI 对话”会把这份结构化档案转换为人格提示，并通过 DeepSeek Chat Completions API 进行对话。当前仅发送最近 12 条本次会话记录，不包含长期记忆。
+- 软件启动后先进入注册/登录，登录成功前不能进入主界面。
+- 新账户完成一次自然的首次资料流程；已填写字段不可修改，空白字段可后续补充。
+- 每个账户获得独立 Agent ID、人格档案和记忆命名空间；基础模型服务可以被多个账户共享，并非每位玩家独占一套模型权重。
+- 资料保存后显示 2–3 秒启动过渡，再进入主界面。
+- 世界、社交、虚拟分身和个人主页具备基础内容与导航，退出登录位于个人主页。
+- Three.js 加载临时 GLB 虚拟分身；页面隐藏时暂停渲染，伴生模式限制帧率，并支持 reduced-motion。
+- 右上角菱形按钮可切换为透明无边框伴生窗口。
+- Launcher Session 通过版本化 JSON Schema 与 UE5 交接。
 
-## 配置账户专属模型
+## 工具链
 
-开发机可将 `config/ai.example.json` 复制为 `config/ai.local.json`，填写 DeepSeek API Key 后重启软件。本地配置文件已被 Git 忽略，不得提交密钥。原有项目专用的 OpenAI 环境变量配置仍作为兼容通道保留。软件不会读取通用 `OPENAI_API_KEY`，以免误用其他开发工具的凭据。检查人格提示与配置隔离逻辑：
+- Windows 10/11 x64
+- Node.js 24.4.x
+- pnpm 11.9.x
+
+首次安装：
 
 ```powershell
-pnpm test:ai
+pnpm install --frozen-lockfile
+pnpm check
 ```
 
-`config/ai.local.json` 已被 Git 忽略。该文件只适用于本地原型测试，不得提交、分发或打包进客户端。正式发布时必须由平台后端保管 API Key，客户端只调用经过身份验证、限流和审计的平台 AI 接口。
-
-## 伴生模式
-
-完成登录和基础问卷后，点击窗口右上角的菱形按钮可进入基础伴生模式。主窗口会隐藏，并在当前显示器工作区右下角显示一个 300×360 的透明无边框分身窗口。拖动透明区域可移动窗口，双击角色或点击悬停后出现的展开按钮可恢复主界面；关闭桌宠窗口时也会自动恢复主界面。
-
-## 玩家强调色
-
-首次基础问卷提供九种颜色预设。选择颜色时问卷会即时预览，保存后颜色名称写入账户档案；后续登录会自动应用到导航栏、主要按钮、状态灯、启动序列、AI 聊天气泡和桌宠核心。旧档案中的常见颜色文本会映射到最接近的预设色，无法识别时回退到默认薄荷绿。
-
-## 本地运行
+开发运行：
 
 ```powershell
-pnpm install
 pnpm dev
 ```
 
-账户模块测试：
+生成真正不依赖源码、Node.js 或 `node_modules` 的 portable EXE：
 
 ```powershell
-pnpm test:auth
+pnpm dist:win
 ```
 
-## 接入本地 UE5 游戏
+产物位于 `release/EchoVerse-Launcher-<version>-x64.exe`，旁边会生成 SHA-256 文件。项目总目录中早期的 6 KB C# 启动器只适合旧开发目录结构，不应作为发布包。
+
+如果中国大陆网络访问 GitHub Release 超时，可只对当前终端临时指定镜像后重试；Electron 与构建工具仍会按锁文件/内置校验值验证：
+
+```powershell
+$env:ELECTRON_MIRROR='https://npmmirror.com/mirrors/electron/'
+$env:ELECTRON_BUILDER_BINARIES_MIRROR='https://npmmirror.com/mirrors/electron-builder-binaries/'
+pnpm install
+pnpm dist:win
+```
+
+## 常用检查
+
+| 命令 | 内容 |
+| --- | --- |
+| `pnpm typecheck` | React 与 Electron TypeScript |
+| `pnpm test:auth` | 注册、登录、资料锁定、并发与备份恢复 |
+| `pnpm test:ai` | 人格提示、供应商/模型匹配、URL 白名单与限流 |
+| `pnpm test:contracts` | UE5 Launcher Session JSON Schema |
+| `pnpm test:assets` | GLB 与预览图格式、结构和体积门禁 |
+| `pnpm test:secrets` | 密钥与开发机绝对路径检查 |
+| `pnpm check` | 全部类型检查、测试和生产构建 |
+
+## 本地数据
+
+开发版和打包版固定使用同一目录：
+
+```text
+%APPDATA%/echoverse-launcher/
+  accounts.json       本地账户和资料
+  accounts.json.bak   上一个有效备份
+  ai.json             仅开发使用的模型配置
+  sessions/           短时 UE5 启动会话
+```
+
+测试只使用系统临时目录，不会清空真实账户。账户密码保存为随机盐与 `scrypt` 哈希，但现实资料仍是本机明文 JSON；拥有当前 Windows 用户文件权限的人仍可读取或篡改它，因此不能把本地账户库当作生产认证系统。
+
+## AI 开发配置
+
+将 `config/ai.example.json` 的结构复制到 `%APPDATA%/echoverse-launcher/ai.json`，再在本机填写开发密钥。不要把真实密钥放入仓库、截图、日志或发布包。当前配置只允许 DeepSeek/OpenAI 官方 HTTPS Origin，并验证 provider 与模型名称的兼容关系。
+
+人格请求默认只发送完成聊天所需的有限信号：显示名、性别、职业、人格字段、兴趣、喜欢的颜色和音乐，以及有限的本次对话历史。真实姓名、精确生日、居住地和信仰保持在本地，尚未建立长期记忆。
+
+正式发布前必须改为 EchoVerse 服务端 AI 网关，由后端托管密钥并实现认证、配额、费用限制、审计、同意、删除和数据保留策略。曾经暴露过的开发密钥也必须在发布前轮换。
+
+## 接入 UE5 游戏
 
 1. 将 `config/game.example.json` 复制为 `config/game.local.json`。
-2. 填写 UE5 打包程序的绝对路径。
-3. 重新启动 Launcher，点击“启动游戏”。
+2. 填写 UE5 开发构建的绝对路径和可选参数。
+3. 重启 Launcher，点击“启动游戏”。
 
-游戏端接口要求见 `docs/UE5_GAME_HANDOFF.md`，数据格式见 `contracts/launcher-session.schema.json`。
+游戏端要求见 [UE5 交接文档](docs/UE5_GAME_HANDOFF.md)，机器可读格式见 [Launcher Session Schema](contracts/launcher-session.schema.json)。`prototype-local` ticket 只允许开发联调，Shipping 构建必须拒绝。
 
-当前账户系统为本地原型，仅用于 UI 与启动流程验证，不可作为正式生产认证系统。
+## 工程文档
+
+- [架构](docs/ARCHITECTURE.md)
+- [工程审计](docs/ENGINEERING_AUDIT.md)
+- [安全说明](SECURITY.md)
+- [贡献规范](CONTRIBUTING.md)
+- [发布检查表](docs/RELEASE_CHECKLIST.md)
+
+提交和发布前请遵循 `CONTRIBUTING.md` 与发布检查表，不要把“内部原型可运行”描述为“生产可用”。

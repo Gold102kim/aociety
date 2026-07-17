@@ -1,33 +1,78 @@
 {
   "name": "echoverse-launcher",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
+  "license": "UNLICENSED",
+  "author": "EchoVerse Project",
   "description": "EchoVerse game launcher and account portal",
   "main": "dist-electron/main.js",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=24.4.0 <25",
+    "pnpm": ">=11.9.0 <12"
+  },
   "scripts": {
-    "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
-    "build": "tsc -p tsconfig.electron.json && vite build",
+    "dev": "concurrently -k \"vite\" \"wait-on tcp:127.0.0.1:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .\"",
+    "start": "electron .",
+    "clean": "node scripts/clean-build.cjs",
+    "build:compile": "tsc -p tsconfig.electron.json && vite build && node scripts/test-build-output.cjs",
+    "build": "pnpm clean && pnpm build:compile",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "test:auth": "tsc -p tsconfig.electron.json && node scripts/test-auth.cjs",
-    "test:ai": "tsc -p tsconfig.electron.json && node scripts/test-ai.cjs"
+    "test:ai": "tsc -p tsconfig.electron.json && node scripts/test-ai.cjs",
+    "test:contracts": "node scripts/test-contracts.cjs",
+    "test:assets": "node scripts/test-assets.cjs",
+    "test:secrets": "node scripts/test-secrets.cjs",
+    "test": "pnpm test:secrets && pnpm test:auth && pnpm test:ai && pnpm test:contracts && pnpm test:assets",
+    "check": "pnpm clean && pnpm typecheck && pnpm test && pnpm build:compile",
+    "dist:win": "pnpm check && electron-builder --win portable && node scripts/checksum-release.cjs"
   },
-  "dependencies": {
-    "@vitejs/plugin-react": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "three": "^0.185.1",
-    "typescript": "latest",
-    "vite": "latest"
-  },
+  "dependencies": {},
   "devDependencies": {
-    "@types/node": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "@types/three": "^0.185.1",
-    "concurrently": "latest",
-    "cross-env": "latest",
-    "electron": "latest",
-    "wait-on": "latest"
+    "@types/node": "26.1.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@types/three": "0.185.1",
+    "@vitejs/plugin-react": "6.0.3",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "concurrently": "10.0.3",
+    "cross-env": "10.1.0",
+    "electron": "43.1.1",
+    "electron-builder": "26.15.3",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "three": "0.185.1",
+    "typescript": "7.0.2",
+    "vite": "8.1.5",
+    "wait-on": "9.0.10"
+  },
+  "build": {
+    "appId": "com.aociety.echoverse.launcher",
+    "productName": "EchoVerse Launcher",
+    "asar": true,
+    "electronDist": "node_modules/electron/dist",
+    "compression": "maximum",
+    "electronLanguages": ["zh-CN", "en-US"],
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "executableName": "EchoVerseLauncher",
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "EchoVerse-Launcher-${version}-${arch}.${ext}"
+    }
   }
 }

@@ -43,7 +43,7 @@ FParse::Value(FCommandLine::Get(), TEXT("LauncherLaunchId="), LaunchId);
   "issuedAt": "2026-07-15T08:00:00.000Z",
   "expiresAt": "2026-07-15T08:02:00.000Z",
   "launcher": {
-    "version": "0.1.0",
+    "version": "0.3.0",
     "platform": "win32",
     "locale": "zh-CN"
   },

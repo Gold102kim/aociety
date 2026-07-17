@@ -4,7 +4,7 @@
   "title": "EchoVerse Launcher Session",
   "type": "object",
   "additionalProperties": false,
-  "required": ["contractVersion", "launchId", "issuedAt", "expiresAt", "launcher", "account", "auth", "game"],
+  "required": ["contractVersion", "launchId", "issuedAt", "expiresAt", "launcher", "account", "agent", "auth", "game"],
   "properties": {
     "contractVersion": { "const": "1.0" },
     "launchId": { "type": "string", "format": "uuid" },

@@ -17,7 +17,7 @@ export type AiAgentProfile = {
   updatedAt: string;
   modelAssignment: {
     baseModelId: string;
-    strategy: 'dedicated-account-model';
+    strategy: 'shared-base-model-account-agent' | 'dedicated-account-model';
     assignedAt: string;
   };
   identity: {

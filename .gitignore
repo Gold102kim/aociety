@@ -1,8 +1,16 @@
 node_modules/
 dist/
 dist-electron/
+release/
 .vite/
 .doc_review/
 *.log
+*.tmp
+*.bak
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
 config/game.local.json
 config/ai.local.json

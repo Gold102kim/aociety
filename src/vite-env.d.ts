@@ -78,7 +78,7 @@ interface AiAgentProfileData {
   profileVersion: 1;
   createdAt: string;
   updatedAt: string;
-  modelAssignment: { baseModelId: string; strategy: 'dedicated-account-model'; assignedAt: string };
+  modelAssignment: { baseModelId: string; strategy: 'shared-base-model-account-agent' | 'dedicated-account-model'; assignedAt: string };
   identity: { fullName: string; gender: string; birthDate: string; residence: string; occupation: string };
   personality: { mbti: string; communicationStyle: 'adaptive'; inferredTraits: Array<{ name: string; confidence: number }> };
   preferences: { interests: string[]; favoriteColor: string; favoriteMusic: string; belief: string };

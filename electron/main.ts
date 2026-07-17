@@ -1,10 +1,12 @@
-import { app, BrowserWindow, ipcMain, IpcMainInvokeEvent, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, IpcMainEvent, IpcMainInvokeEvent, screen, session } from 'electron';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { AccountStore, BasicQuestionnaire, PublicUser } from './auth-service';
 import { AiChatMessage, AiChatService } from './ai-service';
+import { initializeLogger, logError, logEvent } from './logger';
 
 let mainWindow: BrowserWindow | null = null;
 let companionWindow: BrowserWindow | null = null;
@@ -12,6 +14,23 @@ let accountStore: AccountStore | null = null;
 let currentUser: PublicUser | null = null;
 let aiChatService: AiChatService | null = null;
 let isQuitting = false;
+
+// Keep local prototype data stable between `electron .` development runs and
+// packaged builds whose productName is different from the npm package name.
+app.setPath('userData', path.join(app.getPath('appData'), 'echoverse-launcher'));
+initializeLogger(app.getPath('userData'));
+process.on('uncaughtExceptionMonitor', (error) => logError('process.uncaught_exception', error));
+process.on('unhandledRejection', (reason) => logError('process.unhandled_rejection', reason));
+
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (app.isReady()) restoreMainWindow();
+    else app.once('ready', restoreMainWindow);
+  });
+}
 
 type GameConfig = {
   contractVersion: '1.0';
@@ -27,14 +46,16 @@ function readGameConfig(): GameConfig | null {
   const candidates = [
     explicitPath,
     path.join(app.getPath('userData'), 'game.json'),
-    path.join(process.cwd(), 'config', 'game.local.json'),
+    !app.isPackaged ? path.join(app.getAppPath(), 'config', 'game.local.json') : undefined,
   ].filter((value): value is string => Boolean(value));
 
   for (const configPath of candidates) {
     if (!fs.existsSync(configPath)) continue;
     try {
       const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8')) as GameConfig;
-      if (parsed.contractVersion === '1.0' && parsed.executablePath) return parsed;
+      const validArgs = parsed.additionalArgs === undefined
+        || (Array.isArray(parsed.additionalArgs) && parsed.additionalArgs.every((value) => typeof value === 'string'));
+      if (parsed.contractVersion === '1.0' && typeof parsed.executablePath === 'string' && validArgs) return parsed;
     } catch {
       // Continue to the next supported configuration location.
     }
@@ -100,13 +121,75 @@ function removeSessionFile(sessionPath: string) {
   }
 }
 
+function cleanupExpiredSessionFiles() {
+  const directory = path.join(app.getPath('userData'), 'sessions');
+  if (!fs.existsSync(directory)) return;
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+    const sessionPath = path.join(directory, entry.name);
+    try {
+      const value = JSON.parse(fs.readFileSync(sessionPath, 'utf8')) as { expiresAt?: string };
+      const expiresAt = value.expiresAt ? new Date(value.expiresAt).getTime() : Number.NaN;
+      if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) removeSessionFile(sessionPath);
+    } catch {
+      removeSessionFile(sessionPath);
+    }
+  }
+}
+
+function getDevServerUrl() {
+  const value = process.env.VITE_DEV_SERVER_URL;
+  if (!value) return null;
+  const url = new URL(value);
+  const localHost = url.hostname === '127.0.0.1' || url.hostname === 'localhost';
+  if (url.protocol !== 'http:' || !localHost) throw new Error('开发服务器只允许使用本机 HTTP 地址。');
+  return url;
+}
+
+function isTrustedRendererUrl(value: string) {
+  try {
+    const url = new URL(value);
+    const devUrl = getDevServerUrl();
+    if (devUrl) return url.origin === devUrl.origin;
+    if (url.protocol !== 'file:') return false;
+    const expected = path.resolve(__dirname, '..', 'dist', 'index.html');
+    return path.resolve(fileURLToPath(url)) === expected;
+  } catch {
+    return false;
+  }
+}
+
 function assertTrustedSender(event: IpcMainInvokeEvent) {
-  if (!mainWindow || event.sender !== mainWindow.webContents) throw new Error('不受信任的请求来源。');
+  const frame = event.senderFrame;
+  const trustedFrame = frame && frame === event.sender.mainFrame && isTrustedRendererUrl(frame.url);
+  if (!mainWindow || event.sender !== mainWindow.webContents || !trustedFrame) throw new Error('不受信任的请求来源。');
 }
 
 function assertAppWindowSender(event: IpcMainInvokeEvent) {
   const trusted = event.sender === mainWindow?.webContents || event.sender === companionWindow?.webContents;
-  if (!trusted) throw new Error('不受信任的请求来源。');
+  const frame = event.senderFrame;
+  if (!trusted || !frame || frame !== event.sender.mainFrame || !isTrustedRendererUrl(frame.url)) throw new Error('不受信任的请求来源。');
+}
+
+function assertWindowEvent(event: IpcMainEvent, expectedWindow: BrowserWindow | null) {
+  const frame = event.senderFrame;
+  if (!expectedWindow || event.sender !== expectedWindow.webContents || !frame || frame !== event.sender.mainFrame || !isTrustedRendererUrl(frame.url)) {
+    throw new Error('不受信任的请求来源。');
+  }
+}
+
+function configureWindowSecurity(window: BrowserWindow, role: 'main' | 'companion') {
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('will-navigate', (event, targetUrl) => {
+    if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
+  });
+  window.webContents.on('will-attach-webview', (event) => event.preventDefault());
+  window.webContents.on('render-process-gone', (_event, details) => {
+    logEvent('error', 'renderer.process_gone', { role, reason: details.reason, exitCode: details.exitCode });
+  });
+  window.webContents.on('did-fail-load', (_event, errorCode, errorDescription, _validatedUrl, isMainFrame) => {
+    if (isMainFrame) logEvent('error', 'renderer.load_failed', { role, errorCode, errorDescription });
+  });
 }
 
 function companionPosition(width: number, height: number) {
@@ -122,9 +205,9 @@ function companionPosition(width: number, height: number) {
 }
 
 function loadCompanionPage(window: BrowserWindow) {
-  const devUrl = process.env.VITE_DEV_SERVER_URL;
+  const devUrl = getDevServerUrl();
   if (devUrl) {
-    const url = new URL(devUrl);
+    const url = new URL(devUrl.toString());
     url.searchParams.set('mode', 'companion');
     void window.loadURL(url.toString());
   } else {
@@ -159,9 +242,11 @@ function createCompanionWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      devTools: !app.isPackaged,
     },
   });
   companionWindow.setAlwaysOnTop(true, 'floating');
+  configureWindowSecurity(companionWindow, 'companion');
   loadCompanionPage(companionWindow);
   companionWindow.on('closed', () => {
     companionWindow = null;
@@ -207,12 +292,14 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      devTools: !app.isPackaged,
     },
   });
 
-  const devUrl = process.env.VITE_DEV_SERVER_URL;
+  configureWindowSecurity(mainWindow, 'main');
+  const devUrl = getDevServerUrl();
   if (devUrl) {
-    void mainWindow.loadURL(devUrl);
+    void mainWindow.loadURL(devUrl.toString());
   } else {
     void mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
@@ -225,8 +312,12 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  if (!hasSingleInstanceLock) return;
+  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
+  cleanupExpiredSessionFiles();
   accountStore = new AccountStore(path.join(app.getPath('userData'), 'accounts.json'));
-  aiChatService = new AiChatService(app.getPath('userData'), process.cwd());
+  aiChatService = new AiChatService(app.getPath('userData'), app.isPackaged ? path.dirname(process.execPath) : app.getAppPath());
+  logEvent('info', 'app.ready', { version: app.getVersion(), packaged: app.isPackaged, platform: process.platform });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -238,25 +329,36 @@ app.on('window-all-closed', () => {
 });
 app.on('before-quit', () => {
   isQuitting = true;
+  logEvent('info', 'app.before_quit');
+});
+app.on('child-process-gone', (_event, details) => {
+  logEvent('warn', 'app.child_process_gone', { type: details.type, reason: details.reason, exitCode: details.exitCode });
 });
 
-ipcMain.on('window:minimize', () => mainWindow?.minimize());
-ipcMain.on('window:toggle-maximize', () => {
+ipcMain.on('window:minimize', (event) => {
+  assertWindowEvent(event, mainWindow);
+  mainWindow?.minimize();
+});
+ipcMain.on('window:toggle-maximize', (event) => {
+  assertWindowEvent(event, mainWindow);
   if (!mainWindow) return;
   if (mainWindow.isMaximized()) mainWindow.unmaximize();
   else mainWindow.maximize();
 });
-ipcMain.on('window:close', () => mainWindow?.close());
+ipcMain.on('window:close', (event) => {
+  assertWindowEvent(event, mainWindow);
+  mainWindow?.close();
+});
 ipcMain.handle('window:enter-companion', (event) => {
   assertTrustedSender(event);
   return enterCompanionMode();
 });
 ipcMain.on('companion:restore', (event) => {
-  if (event.sender !== companionWindow?.webContents) return;
+  assertWindowEvent(event, companionWindow);
   restoreMainWindow();
 });
 ipcMain.on('companion:quit', (event) => {
-  if (event.sender !== companionWindow?.webContents) return;
+  assertWindowEvent(event, companionWindow);
   app.quit();
 });
 ipcMain.handle('companion:get-state', (event) => {
@@ -266,7 +368,10 @@ ipcMain.handle('companion:get-state', (event) => {
     : { displayName: 'Echo', agentStatus: 'WAITING_FOR_PROFILE', favoriteColor: '薄荷绿' };
 });
 
-ipcMain.handle('app:get-version', () => app.getVersion());
+ipcMain.handle('app:get-version', (event) => {
+  assertAppWindowSender(event);
+  return app.getVersion();
+});
 
 ipcMain.handle('auth:register', async (event, input: { displayName: string; email: string; password: string }) => {
   assertTrustedSender(event);
@@ -296,22 +401,22 @@ ipcMain.handle('auth:logout', (event) => {
   return { ok: true };
 });
 
-ipcMain.handle('auth:complete-questionnaire', (event, input: BasicQuestionnaire) => {
+ipcMain.handle('auth:complete-questionnaire', async (event, input: BasicQuestionnaire) => {
   assertTrustedSender(event);
   if (!accountStore || !currentUser) return { ok: false, message: '当前账户会话无效，请重新登录。' };
   try {
-    currentUser = accountStore.completeBasicQuestionnaire(currentUser.id, input);
+    currentUser = await accountStore.completeBasicQuestionnaire(currentUser.id, input);
     return { ok: true, user: currentUser };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : '个人资料保存失败，请稍后重试。' };
   }
 });
 
-ipcMain.handle('auth:supplement-profile', (event, input: BasicQuestionnaire) => {
+ipcMain.handle('auth:supplement-profile', async (event, input: BasicQuestionnaire) => {
   assertTrustedSender(event);
   if (!accountStore || !currentUser) return { ok: false, message: '当前账户会话无效，请重新登录。' };
   try {
-    currentUser = accountStore.supplementProfile(currentUser.id, input);
+    currentUser = await accountStore.supplementProfile(currentUser.id, input);
     return { ok: true, user: currentUser };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : '资料补充失败，请稍后重试。' };
@@ -364,12 +469,21 @@ ipcMain.handle('game:launch', (event) => {
       cwd: config.workingDirectory || path.dirname(config.executablePath),
       detached: true,
       stdio: 'ignore',
+      windowsHide: true,
     });
-    child.once('error', () => removeSessionFile(sessionPath));
-    child.once('exit', () => removeSessionFile(sessionPath));
+    child.once('error', (error) => {
+      logError('game.launch_failed', error, { channel: config.channel || 'development' });
+      removeSessionFile(sessionPath);
+    });
+    child.once('exit', (code, signal) => {
+      logEvent('info', 'game.exited', { code, signal });
+      removeSessionFile(sessionPath);
+    });
     child.unref();
+    logEvent('info', 'game.launched', { launchId, channel: config.channel || 'development' });
     return { ok: true, message: '游戏已启动。' };
-  } catch {
+  } catch (error) {
+    logError('game.launch_failed', error, { channel: config.channel || 'development' });
     removeSessionFile(sessionPath);
     return { ok: false, message: '游戏启动失败，请稍后重试。' };
   }

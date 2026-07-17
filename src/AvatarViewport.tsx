@@ -7,14 +7,97 @@ type AvatarViewportProps = {
   variant: 'preview' | 'companion';
 };
 
-const modelUrl = `${import.meta.env.BASE_URL}models/ecy-avatar.glb`;
+type ResourceTracker = {
+  geometries: Set<THREE.BufferGeometry>;
+  materials: Set<THREE.Material>;
+  textures: Set<THREE.Texture>;
+  skeletons: Set<THREE.Skeleton>;
+  imageBitmaps: Set<object>;
+};
 
-function disposeMaterial(material: THREE.Material) {
-  const values = Object.values(material) as unknown[];
-  for (const value of values) {
-    if (value instanceof THREE.Texture) value.dispose();
+const modelUrl = `${import.meta.env.BASE_URL}models/ecy-avatar.glb`;
+const yAxis = new THREE.Vector3(0, 1, 0);
+
+function createResourceTracker(): ResourceTracker {
+  return {
+    geometries: new Set(),
+    materials: new Set(),
+    textures: new Set(),
+    skeletons: new Set(),
+    imageBitmaps: new Set(),
+  };
+}
+
+function disposeTexture(texture: THREE.Texture, resources: ResourceTracker) {
+  if (resources.textures.has(texture)) return;
+  resources.textures.add(texture);
+  texture.dispose();
+
+  const source = texture.source.data as { close?: () => void } | null | undefined;
+  if (source && typeof source.close === 'function' && !resources.imageBitmaps.has(source)) {
+    resources.imageBitmaps.add(source);
+    source.close();
   }
+}
+
+function disposeTextureValues(
+  value: unknown,
+  resources: ResourceTracker,
+  visited: WeakSet<object>,
+  depth = 0,
+) {
+  if (value instanceof THREE.Texture) {
+    disposeTexture(value, resources);
+    return;
+  }
+  if (!value || typeof value !== 'object' || depth > 6 || visited.has(value)) return;
+
+  visited.add(value);
+  if (Array.isArray(value)) {
+    value.forEach((entry) => disposeTextureValues(entry, resources, visited, depth + 1));
+    return;
+  }
+
+  if (Object.getPrototypeOf(value) === Object.prototype) {
+    Object.values(value).forEach((entry) => disposeTextureValues(entry, resources, visited, depth + 1));
+  }
+}
+
+function disposeMaterial(material: THREE.Material, resources: ResourceTracker) {
+  if (resources.materials.has(material)) return;
+  resources.materials.add(material);
+  const visited = new WeakSet<object>();
+  Object.values(material).forEach((value) => disposeTextureValues(value, resources, visited));
   material.dispose();
+}
+
+function disposeObject3D(root: THREE.Object3D, resources: ResourceTracker) {
+  root.traverse((object) => {
+    if (object instanceof THREE.SkinnedMesh && !resources.skeletons.has(object.skeleton)) {
+      resources.skeletons.add(object.skeleton);
+      object.skeleton.dispose();
+    }
+
+    const renderable = object as THREE.Object3D & {
+      geometry?: THREE.BufferGeometry;
+      material?: THREE.Material | THREE.Material[];
+      customDepthMaterial?: THREE.Material;
+      customDistanceMaterial?: THREE.Material;
+    };
+    if (renderable.geometry instanceof THREE.BufferGeometry && !resources.geometries.has(renderable.geometry)) {
+      resources.geometries.add(renderable.geometry);
+      renderable.geometry.dispose();
+    }
+
+    const materials = Array.isArray(renderable.material)
+      ? renderable.material
+      : renderable.material
+        ? [renderable.material]
+        : [];
+    materials.forEach((material) => disposeMaterial(material, resources));
+    if (renderable.customDepthMaterial) disposeMaterial(renderable.customDepthMaterial, resources);
+    if (renderable.customDistanceMaterial) disposeMaterial(renderable.customDistanceMaterial, resources);
+  });
 }
 
 export function AvatarViewport({ variant }: AvatarViewportProps) {
@@ -25,6 +108,9 @@ export function AvatarViewport({ variant }: AvatarViewportProps) {
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+
+    setStatus('loading');
+    setProgress(0);
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(34, 1, 0.01, 1000);
@@ -48,9 +134,11 @@ export function AvatarViewport({ variant }: AvatarViewportProps) {
     rimLight.position.set(1, 3, -4);
     scene.add(rimLight);
 
+    const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let prefersReducedMotion = motionPreference.matches;
     const controls = variant === 'preview' ? new OrbitControls(camera, renderer.domElement) : null;
     if (controls) {
-      controls.enableDamping = true;
+      controls.enableDamping = !prefersReducedMotion;
       controls.enablePan = false;
       controls.rotateSpeed = 0.55;
       controls.zoomSpeed = 0.65;
@@ -59,18 +147,94 @@ export function AvatarViewport({ variant }: AvatarViewportProps) {
 
     let avatar: THREE.Group | null = null;
     let avatarSize = new THREE.Vector3(1, 1, 1);
+    const avatarBasePosition = new THREE.Vector3();
+    const avatarBaseQuaternion = new THREE.Quaternion();
+    const animatedQuaternion = new THREE.Quaternion();
+    const swayQuaternion = new THREE.Quaternion();
+    const loadedRoots: THREE.Object3D[] = [];
+    const resources = createResourceTracker();
     let animationFrame = 0;
+    let renderTimer = 0;
     let disposed = false;
-    const timer = new THREE.Timer();
-    timer.connect(document);
+    let elapsedSeconds = 0;
+    let previousTimestamp: number | null = null;
+    let previousRenderTimestamp = 0;
+
+    const cancelScheduledRender = () => {
+      if (animationFrame !== 0) window.cancelAnimationFrame(animationFrame);
+      if (renderTimer !== 0) window.clearTimeout(renderTimer);
+      animationFrame = 0;
+      renderTimer = 0;
+    };
+
+    const renderScene = () => {
+      if (disposed || document.hidden) return;
+      renderer.render(scene, camera);
+    };
+
+    function requestRender() {
+      if (disposed || document.hidden || animationFrame !== 0 || renderTimer !== 0) return;
+
+      const minimumFrameInterval = variant === 'companion' ? 1000 / 30 : 0;
+      const delay = previousRenderTimestamp === 0
+        ? 0
+        : Math.max(minimumFrameInterval - (performance.now() - previousRenderTimestamp), 0);
+      if (delay > 1) {
+        renderTimer = window.setTimeout(() => {
+          renderTimer = 0;
+          if (!disposed && !document.hidden) {
+            animationFrame = window.requestAnimationFrame(renderFrame);
+          }
+        }, delay);
+        return;
+      }
+      animationFrame = window.requestAnimationFrame(renderFrame);
+    }
+
+    function renderFrame(timestamp: number) {
+      animationFrame = 0;
+      if (disposed || document.hidden) {
+        previousTimestamp = null;
+        return;
+      }
+
+      const deltaSeconds = previousTimestamp === null
+        ? 0
+        : Math.min(Math.max((timestamp - previousTimestamp) / 1000, 0), 0.1);
+      previousTimestamp = timestamp;
+      if (!prefersReducedMotion) elapsedSeconds += deltaSeconds;
+
+      if (avatar) {
+        if (prefersReducedMotion) {
+          avatar.position.copy(avatarBasePosition);
+          avatar.quaternion.copy(avatarBaseQuaternion);
+        } else {
+          const sway = Math.sin(elapsedSeconds * 0.42) * (variant === 'companion' ? 0.08 : 0.035);
+          const bob = Math.sin(elapsedSeconds * 0.8) * avatarSize.y * 0.006;
+          avatar.position.copy(avatarBasePosition).addScaledVector(yAxis, bob);
+          swayQuaternion.setFromAxisAngle(yAxis, sway);
+          animatedQuaternion.copy(avatarBaseQuaternion).multiply(swayQuaternion);
+          avatar.quaternion.copy(animatedQuaternion);
+        }
+      }
+      controls?.update();
+      renderScene();
+      previousRenderTimestamp = timestamp;
+
+      if (!prefersReducedMotion) requestRender();
+    }
 
     const fitCamera = () => {
+      if (disposed) return;
       const width = Math.max(host.clientWidth, 1);
       const height = Math.max(host.clientHeight, 1);
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      if (!avatar) return;
+      if (!avatar) {
+        requestRender();
+        return;
+      }
 
       const verticalFov = THREE.MathUtils.degToRad(camera.fov);
       const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect);
@@ -89,71 +253,105 @@ export function AvatarViewport({ variant }: AvatarViewportProps) {
         controls.maxDistance = distance * 1.9;
         controls.update();
       }
+      requestRender();
     };
 
     const resizeObserver = new ResizeObserver(fitCamera);
     resizeObserver.observe(host);
 
+    const handleVisibilityChange = () => {
+      previousTimestamp = null;
+      previousRenderTimestamp = 0;
+      if (document.hidden) {
+        cancelScheduledRender();
+        return;
+      }
+      requestRender();
+    };
+
+    const handleMotionPreferenceChange = (event: MediaQueryListEvent) => {
+      prefersReducedMotion = event.matches;
+      if (controls) controls.enableDamping = !prefersReducedMotion;
+      previousTimestamp = null;
+      previousRenderTimestamp = 0;
+      requestRender();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    motionPreference.addEventListener('change', handleMotionPreferenceChange);
+    controls?.addEventListener('change', requestRender);
+
     new GLTFLoader().load(
       modelUrl,
       (gltf) => {
-        if (disposed) return;
-        avatar = gltf.scene;
-        const removable: THREE.Object3D[] = [];
-        avatar.traverse((object) => {
-          if (object instanceof THREE.Camera || object instanceof THREE.Light || object.name === '_gltfNode_243') removable.push(object);
-          if (object instanceof THREE.Mesh) {
-            object.castShadow = false;
-            object.receiveShadow = false;
-          }
-        });
-        removable.forEach((object) => object.parent?.remove(object));
+        const roots = [...new Set(gltf.scenes.length > 0 ? gltf.scenes : [gltf.scene])];
+        if (disposed) {
+          roots.forEach((root) => disposeObject3D(root, resources));
+          return;
+        }
 
-        const bounds = new THREE.Box3().setFromObject(avatar);
-        const center = bounds.getCenter(new THREE.Vector3());
-        avatarSize = bounds.getSize(new THREE.Vector3());
-        avatar.position.sub(center);
-        scene.add(avatar);
-        fitCamera();
-        setProgress(100);
-        setStatus('ready');
+        try {
+          loadedRoots.push(...roots);
+          avatar = gltf.scene;
+          const removable: THREE.Object3D[] = [];
+          avatar.traverse((object) => {
+            if (object instanceof THREE.Camera || object instanceof THREE.Light) removable.push(object);
+            if (object instanceof THREE.Mesh) {
+              object.castShadow = false;
+              object.receiveShadow = false;
+            }
+          });
+          removable.forEach((object) => object.removeFromParent());
+
+          const bounds = new THREE.Box3().setFromObject(avatar);
+          if (bounds.isEmpty()) throw new Error('Avatar model has no renderable bounds.');
+          const center = bounds.getCenter(new THREE.Vector3());
+          avatarSize = bounds.getSize(new THREE.Vector3());
+          avatar.position.sub(center);
+          avatarBasePosition.copy(avatar.position);
+          avatarBaseQuaternion.copy(avatar.quaternion);
+          scene.add(avatar);
+          fitCamera();
+          setProgress(100);
+          setStatus('ready');
+        } catch {
+          avatar?.removeFromParent();
+          roots.forEach((root) => disposeObject3D(root, resources));
+          avatar = null;
+          loadedRoots.length = 0;
+          if (!disposed) setStatus('error');
+        }
       },
       (event) => {
-        if (event.total > 0) setProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+        if (!disposed && event.total > 0) {
+          setProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+        }
       },
       () => {
         if (!disposed) setStatus('error');
       },
     );
-
-    const render = (timestamp?: number) => {
-      animationFrame = window.requestAnimationFrame(render);
-      timer.update(timestamp);
-      const elapsed = timer.getElapsed();
-      if (avatar) {
-        avatar.rotation.y = Math.sin(elapsed * 0.42) * (variant === 'companion' ? 0.08 : 0.035);
-        avatar.position.y = Math.sin(elapsed * 0.8) * avatarSize.y * 0.006;
-      }
-      controls?.update();
-      renderer.render(scene, camera);
-    };
-    render();
+    requestRender();
 
     return () => {
       disposed = true;
-      window.cancelAnimationFrame(animationFrame);
+      cancelScheduledRender();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      motionPreference.removeEventListener('change', handleMotionPreferenceChange);
+      controls?.removeEventListener('change', requestRender);
       resizeObserver.disconnect();
       controls?.dispose();
-      timer.dispose();
-      if (avatar) {
-        avatar.traverse((object) => {
-          if (!(object instanceof THREE.Mesh)) return;
-          object.geometry.dispose();
-          const materials = Array.isArray(object.material) ? object.material : [object.material];
-          materials.forEach(disposeMaterial);
-        });
-      }
+      loadedRoots.forEach((root) => {
+        root.removeFromParent();
+        disposeObject3D(root, resources);
+      });
+      loadedRoots.length = 0;
+      avatar = null;
+      scene.clear();
+      renderer.setAnimationLoop(null);
+      renderer.renderLists.dispose();
       renderer.dispose();
+      renderer.forceContextLoss();
       renderer.domElement.remove();
     };
   }, [variant]);
