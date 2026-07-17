@@ -55,7 +55,7 @@ FParse::Value(FCommandLine::Get(), TEXT("LauncherLaunchId="), LaunchId);
     "agentId": "agent-uuid",
     "status": "READY",
     "profileVersion": 1,
-    "baseModelId": "echo-persona-v1"
+    "baseModelId": "deepseek-v4-flash"
   },
   "auth": {
     "ticket": "一次性短期票据",

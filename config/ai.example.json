@@ -1,7 +1,7 @@
 {
-  "provider": "openai",
-  "apiKey": "在这里填写你的 OpenAI API Key",
-  "model": "gpt-5.6-luna",
-  "baseUrl": "https://api.openai.com/v1",
+  "provider": "deepseek",
+  "apiKey": "在这里填写你的 DeepSeek API Key",
+  "model": "deepseek-v4-flash",
+  "baseUrl": "https://api.deepseek.com",
   "maxOutputTokens": 600
 }

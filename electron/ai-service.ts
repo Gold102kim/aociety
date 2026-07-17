@@ -11,7 +11,7 @@ export type AiChatMessage = {
 export type AiConnectionState = 'unconfigured' | 'untested' | 'connected' | 'failed';
 
 type AiConfig = {
-  provider: 'openai';
+  provider: 'openai' | 'deepseek';
   apiKey: string;
   model?: string;
   baseUrl?: string;
@@ -26,6 +26,13 @@ type OpenAiResponse = {
     type?: string;
     content?: Array<{ type?: string; text?: string }>;
   }>;
+};
+
+type ChatCompletionResponse = {
+  id?: string;
+  model?: string;
+  error?: { message?: string };
+  choices?: Array<{ message?: { content?: string } }>;
 };
 
 function cleanChatText(value: unknown, maximumLength: number) {
@@ -72,15 +79,15 @@ export class AiChatService {
   getStatus() {
     try {
       const config = this.readConfig();
-      if (!config) return { configured: false, model: 'gpt-5.6-luna', connection: 'unconfigured' as const };
+      if (!config) return { configured: false, model: 'deepseek-v4-flash', connection: 'unconfigured' as const };
       return {
         configured: true,
-        model: config.model || 'gpt-5.6-luna',
+        model: config.model || 'deepseek-v4-flash',
         connection: this.connectionState,
         message: this.connectionMessage || undefined,
       };
     } catch (error) {
-      return { configured: false, model: 'gpt-5.6-luna', connection: 'failed' as const, message: error instanceof Error ? error.message : 'AI 配置无法读取。' };
+      return { configured: false, model: 'deepseek-v4-flash', connection: 'failed' as const, message: error instanceof Error ? error.message : 'AI 配置无法读取。' };
     }
   }
 
@@ -103,7 +110,7 @@ export class AiChatService {
       try {
         const config = JSON.parse(fs.readFileSync(configPath, 'utf8')) as AiConfig;
         const apiKey = config.apiKey?.trim();
-        if (config.provider === 'openai' && apiKey && !apiKey.includes('在这里填写')) return { ...config, apiKey };
+        if ((config.provider === 'openai' || config.provider === 'deepseek') && apiKey && !apiKey.includes('在这里填写')) return { ...config, apiKey };
       } catch {
         throw new Error(`AI 配置文件无法读取：${configPath}`);
       }
@@ -117,7 +124,7 @@ export class AiChatService {
     if (!message) throw new Error('请输入想对虚拟分身说的话。');
 
     const config = this.readConfig();
-    if (!config) throw new Error('共享大模型尚未配置。请复制 config/ai.example.json 为 config/ai.local.json，并填写 API Key。');
+    if (!config) throw new Error('专属模型服务尚未配置。请检查本地 AI 配置。');
 
     const history = Array.isArray(historyInput)
       ? historyInput.slice(-12).map((item) => ({
@@ -127,9 +134,39 @@ export class AiChatService {
       : [];
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 45_000);
-    const baseUrl = (config.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '');
+    const baseUrl = (config.baseUrl || (config.provider === 'deepseek' ? 'https://api.deepseek.com' : 'https://api.openai.com/v1')).replace(/\/$/, '');
+    const assignedModel = user.aiAgent.modelAssignment.baseModelId || config.model || 'deepseek-v4-flash';
+    const maxOutputTokens = Math.min(Math.max(config.maxOutputTokens || 600, 128), 1200);
 
     try {
+      if (config.provider === 'deepseek') {
+        const response = await fetch(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${config.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: assignedModel,
+            messages: [
+              { role: 'system', content: buildPersonaInstructions(user) },
+              ...history,
+              { role: 'user', content: message },
+            ],
+            max_tokens: maxOutputTokens,
+            stream: false,
+          }),
+          signal: controller.signal,
+        });
+        const data = await response.json() as ChatCompletionResponse;
+        if (!response.ok) throw new Error(data.error?.message || `模型请求失败（HTTP ${response.status}）。`);
+        const text = data.choices?.[0]?.message?.content?.trim() || '';
+        if (!text) throw new Error('模型没有返回可显示的文本。');
+        this.connectionState = 'connected';
+        this.connectionMessage = '';
+        return { text, responseId: data.id || '', model: data.model || assignedModel };
+      }
+
       const response = await fetch(`${baseUrl}/responses`, {
         method: 'POST',
         headers: {
@@ -137,12 +174,12 @@ export class AiChatService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: config.model || 'gpt-5.6-luna',
+          model: assignedModel,
           instructions: buildPersonaInstructions(user),
           input: [...history, { role: 'user', content: message }],
           reasoning: { effort: 'low' },
           text: { verbosity: 'medium' },
-          max_output_tokens: Math.min(Math.max(config.maxOutputTokens || 600, 128), 1200),
+          max_output_tokens: maxOutputTokens,
           store: false,
           safety_identifier: createHash('sha256').update(user.id).digest('hex').slice(0, 32),
         }),
@@ -161,7 +198,7 @@ export class AiChatService {
       if (!text) throw new Error('模型没有返回可显示的文本。');
       this.connectionState = 'connected';
       this.connectionMessage = '';
-      return { text, responseId: data.id || '', model: data.model || config.model || 'gpt-5.6-luna' };
+      return { text, responseId: data.id || '', model: data.model || assignedModel };
     } catch (error) {
       this.connectionState = 'failed';
       if (error instanceof Error && error.name === 'AbortError') {
@@ -169,10 +206,10 @@ export class AiChatService {
         throw new Error(this.connectionMessage);
       }
       if (error instanceof TypeError) {
-        this.connectionMessage = '无法连接共享模型服务，请检查网络、防火墙或 Base URL。';
+        this.connectionMessage = '无法连接专属模型服务，请检查网络、防火墙或 Base URL。';
         throw new Error(this.connectionMessage);
       }
-      this.connectionMessage = error instanceof Error ? error.message : '共享模型请求失败。';
+      this.connectionMessage = error instanceof Error ? error.message : '专属模型请求失败。';
       throw error;
     } finally {
       clearTimeout(timeout);

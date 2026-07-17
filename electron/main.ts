@@ -320,7 +320,7 @@ ipcMain.handle('auth:supplement-profile', (event, input: BasicQuestionnaire) => 
 
 ipcMain.handle('ai:get-status', (event) => {
   assertTrustedSender(event);
-  return aiChatService?.getStatus() ?? { configured: false, model: 'gpt-5.6-luna', connection: 'unconfigured' };
+  return aiChatService?.getStatus() ?? { configured: false, model: 'deepseek-v4-flash', connection: 'unconfigured' };
 });
 
 ipcMain.handle('ai:chat', async (event, input: { message: string; history: AiChatMessage[] }) => {

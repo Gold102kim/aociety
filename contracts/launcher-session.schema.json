@@ -37,7 +37,7 @@
         "agentId": { "type": "string", "format": "uuid" },
         "status": { "type": "string", "enum": ["WAITING_FOR_PROFILE", "READY"] },
         "profileVersion": { "const": 1 },
-        "baseModelId": { "const": "echo-persona-v1" }
+        "baseModelId": { "const": "deepseek-v4-flash" }
       }
     },
     "auth": {

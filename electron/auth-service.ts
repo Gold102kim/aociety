@@ -15,8 +15,8 @@ export type AiAgentProfile = {
   createdAt: string;
   updatedAt: string;
   modelAssignment: {
-    baseModelId: 'echo-persona-v1';
-    strategy: 'shared-base-model';
+    baseModelId: string;
+    strategy: 'dedicated-account-model';
     assignedAt: string;
   };
   identity: {
@@ -121,8 +121,8 @@ function createAiAgent(accountId: string, createdAt = new Date().toISOString()):
     createdAt,
     updatedAt: createdAt,
     modelAssignment: {
-      baseModelId: 'echo-persona-v1',
-      strategy: 'shared-base-model',
+      baseModelId: 'deepseek-v4-flash',
+      strategy: 'dedicated-account-model',
       assignedAt: createdAt,
     },
     identity: {

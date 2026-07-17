@@ -54,6 +54,15 @@ body.companion-mode #root { width: 100vw; height: 100vh; background: transparent
 .companion-name i { width: 6px; height: 6px; flex: 0 0 auto; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
 .companion-avatar { position: absolute; z-index: 5; left: 50%; bottom: 39px; width: 230px; height: 270px; transform: translateX(-50%); -webkit-app-region: no-drag; cursor: pointer; animation: companion-breathe 3.4s ease-in-out infinite; }
 .companion-glow { position: absolute; left: 50%; top: 44%; width: 205px; height: 205px; transform: translate(-50%,-50%); border-radius: 50%; background: radial-gradient(circle, var(--accent-soft), var(--accent-faint) 48%, transparent 70%); filter: blur(3px); }
+.avatar-viewport { position: absolute; inset: 0; z-index: 2; overflow: hidden; }
+.avatar-viewport canvas { width: 100%; height: 100%; display: block; outline: none; }
+.avatar-viewport-preview canvas { cursor: grab; }
+.avatar-viewport-preview canvas:active { cursor: grabbing; }
+.avatar-viewport-companion { pointer-events: none; }
+.avatar-viewport-state { position: absolute; z-index: 3; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #84919e; background: radial-gradient(circle, rgba(21,31,39,.42), transparent 58%); font-size: 9px; letter-spacing: .5px; pointer-events: none; }
+.avatar-viewport-state i { width: 26px; height: 26px; border: 2px solid rgba(104,226,203,.18); border-top-color: var(--accent); border-radius: 50%; animation: avatar-loading-spin .8s linear infinite; }
+.avatar-viewport-state.error strong { width: 34px; height: 34px; display: grid; place-items: center; color: #db959a; border: 1px solid rgba(211,91,99,.35); border-radius: 9px; }
+@keyframes avatar-loading-spin { to { transform: rotate(360deg); } }
 .companion-head { position: absolute; z-index: 7; left: 50%; top: 39px; width: 132px; height: 122px; transform: translateX(-50%); border: 2px solid rgba(116,222,205,.38); border-radius: 48% 48% 44% 44%; background: radial-gradient(circle at 42% 33%, #d4eee9 0 5%, #9fc6c1 6%, #49666a 23%, #17272f 66%, #0c151c 100%); box-shadow: inset -13px -10px 25px rgba(4,9,13,.55), 0 12px 30px rgba(0,0,0,.25); }
 .companion-hair { position: absolute; left: 7px; right: 7px; top: 5px; height: 48px; border-radius: 52% 52% 34% 34%; background: linear-gradient(135deg, #273b46, #0d1820 70%); clip-path: polygon(0 0,100% 0,96% 66%,78% 43%,70% 79%,55% 49%,43% 83%,28% 48%,11% 72%); }
 .companion-eye { position: absolute; top: 67px; width: 10px; height: 13px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 9px var(--accent-glow); animation: companion-blink 4.8s infinite; }
@@ -71,7 +80,7 @@ body.companion-mode #root { width: 100vw; height: 100vh; background: transparent
 .companion-foot { position: absolute; z-index: 6; bottom: 13px; width: 68px; height: 38px; border: 2px solid rgba(101,213,193,.24); border-radius: 50% 50% 38% 38%; background: linear-gradient(#172932,#0b151c); }
 .companion-foot.left { left: 44px; transform: rotate(8deg); }
 .companion-foot.right { right: 44px; transform: rotate(-8deg); }
-.companion-shadow { position: absolute; left: 50%; bottom: 31px; width: 210px; height: 24px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse, rgba(0,0,0,.65), transparent 70%); filter: blur(4px); }
+.companion-shadow { position: absolute; left: 50%; bottom: 70px; width: 210px; height: 24px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse, rgba(0,0,0,.65), transparent 70%); filter: blur(4px); }
 .companion-root > p { position: absolute; z-index: 10; left: 50%; bottom: 8px; transform: translateX(-50%); margin: 0; color: rgba(185,207,203,.55); font-size: 8px; letter-spacing: 1px; opacity: 0; transition: opacity .18s; }
 .companion-root:hover > p { opacity: 1; }
 @keyframes companion-breathe { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-6px); } }
@@ -358,6 +367,8 @@ form input::placeholder { color: #505969; }
 .avatar-page-header p { margin: 0; color: #697484; font-size: 10px; }
 .avatar-state-badge { display: inline-flex; align-items: center; gap: 8px; color: #9aa4b2; background: #111720; border: 1px solid #2a333e; border-radius: 3px; padding: 8px 11px; font-size: 9px; }
 .avatar-state-badge i { width: 6px; height: 6px; border-radius: 50%; background: #c69259; box-shadow: 0 0 8px rgba(198,146,89,.8); }
+.avatar-state-badge.temporary { color: #a7d9d0; border-color: rgba(100,218,197,.24); background: rgba(20,42,41,.52); }
+.avatar-state-badge.temporary i { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
 .avatar-page-layout { max-width: 1220px; margin: 0 auto; display: grid; grid-template-columns: minmax(550px, 1.55fr) minmax(300px, .72fr); gap: 17px; align-items: start; }
 .avatar-preview-card, .avatar-info-card { background: linear-gradient(145deg, #111720, #0d1219); border: 1px solid #222a35; border-radius: 6px; overflow: hidden; }
 .avatar-preview-toolbar { height: 49px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid #222a35; }
@@ -372,9 +383,10 @@ form input::placeholder { color: #505969; }
 .avatar-body-placeholder > span { position: absolute; left: 50%; top: -80px; width: 90px; height: 100px; border-radius: 50%; transform: translateX(-50%); background: radial-gradient(circle at 42% 33%, #25313a, #0b1016 70%); }
 .avatar-body-placeholder > i { position: absolute; left: 50%; top: 35px; width: 230px; height: 105px; border-radius: 50%; transform: translateX(-50%); background: linear-gradient(90deg, #0a0e14, #18212a, #090d13); z-index: -1; }
 .avatar-not-created { position: absolute; left: 23px; bottom: 22px; z-index: 3; display: flex; flex-direction: column; max-width: 270px; }
+.avatar-not-created.loaded { z-index: 4; padding: 10px 12px; background: rgba(8,13,19,.66); border: 1px solid rgba(107,220,200,.12); border-radius: 6px; backdrop-filter: blur(7px); pointer-events: none; }
 .avatar-not-created strong { font-size: 14px; margin-bottom: 7px; }
 .avatar-not-created span { color: #667180; font-size: 9px; line-height: 1.6; }
-.avatar-q-preview { position: absolute; top: 18px; right: 18px; width: 126px; border: 1px solid #2a3540; background: rgba(13,18,25,.83); border-radius: 4px; overflow: hidden; }
+.avatar-q-preview { position: absolute; z-index: 4; top: 18px; right: 18px; width: 126px; border: 1px solid #2a3540; background: rgba(13,18,25,.83); border-radius: 4px; overflow: hidden; pointer-events: none; }
 .avatar-q-preview > span { display: block; color: #61707d; font-size: 7px; letter-spacing: 1.3px; padding: 8px 9px; border-bottom: 1px solid #28313b; }
 .avatar-q-preview > div { height: 105px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; }
 .avatar-q-preview i { width: 46px; height: 46px; display: grid; place-items: center; color: #67e2cb; border: 1px solid #38505a; border-radius: 14px 14px 20px 20px; background: #17222a; font-style: normal; font-weight: 800; }
@@ -385,6 +397,7 @@ form input::placeholder { color: #505969; }
 .avatar-preview-footer > div:first-child strong { font-size: 12px; }
 .avatar-progress { height: 3px; background: #262e38; border-radius: 2px; overflow: hidden; }
 .avatar-progress i { display: block; width: 0; height: 100%; background: var(--accent); }
+.avatar-progress.loaded i { width: 100%; box-shadow: 0 0 10px var(--accent-glow); }
 .avatar-preview-footer .play-button { min-width: 190px; padding: 12px 18px; font-size: 10px; }
 .avatar-info-column { display: grid; gap: 17px; }
 .avatar-info-card { padding: 22px; }

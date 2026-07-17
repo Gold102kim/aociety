@@ -1,7 +1,13 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, lazy, Suspense, useEffect, useState } from 'react';
 import { BasicQuestionnaire, completeQuestionnaire, LauncherUser, login, register, signOut, supplementProfile } from './auth';
 import { ChatMessage, getAiStatus, sendAiMessage } from './ai';
 import { colorOptions, getThemeStyle } from './theme';
+
+const AvatarViewport = lazy(() => import('./AvatarViewport').then((module) => ({ default: module.AvatarViewport })));
+
+function AvatarViewportFallback() {
+  return <div className="avatar-viewport avatar-viewport-fallback"><div className="avatar-viewport-state"><i/><span>正在准备 3D 分身</span></div></div>;
+}
 
 type AuthMode = 'login' | 'register';
 type LauncherPage = 'home' | 'world' | 'avatar' | 'chat' | 'social' | 'profile';
@@ -65,15 +71,7 @@ function CompanionApp() {
       <div className="companion-name"><i/>{state.displayName} · {state.agentStatus === 'READY' ? '在线' : '初始化中'}</div>
       <section className="companion-avatar" aria-label={`${state.displayName} 的桌面虚拟分身`}>
         <div className="companion-glow"/>
-        <div className="companion-ear left"/><div className="companion-ear right"/>
-        <div className="companion-head">
-          <div className="companion-hair"/>
-          <i className="companion-eye left"/><i className="companion-eye right"/>
-          <span className="companion-mouth"/>
-        </div>
-        <div className="companion-body"><span className="companion-core">E</span></div>
-        <div className="companion-arm left"/><div className="companion-arm right"/>
-        <div className="companion-foot left"/><div className="companion-foot right"/>
+        <Suspense fallback={<AvatarViewportFallback/>}><AvatarViewport variant="companion"/></Suspense>
       </section>
       <div className="companion-shadow"/>
       <p>双击恢复平台</p>
@@ -489,8 +487,8 @@ function AvatarPage({
   return (
     <section className={`avatar-content avatar-section-${section}`}>
       <header className="avatar-page-header">
-        <div><span>DIGITAL AVATAR</span><h1>我的虚拟分身</h1><p>查看分身状态、个性来源和未来的外观档案。</p></div>
-        <span className="avatar-state-badge"><i/>尚未创建</span>
+        <div><span>DIGITAL AVATAR</span><h1>我的虚拟分身</h1><p>查看分身状态、个性来源和当前使用的外观形象。</p></div>
+        <span className="avatar-state-badge temporary"><i/>临时形象已启用</span>
       </header>
 
       <PageTabs active={section} onChange={(value) => value === 'chat' ? onChat() : setSection(value)} items={[
@@ -502,17 +500,17 @@ function AvatarPage({
 
       <div className="avatar-page-layout">
         <article className="avatar-preview-card">
-          <div className="avatar-preview-toolbar"><span>3D REALISTIC FORM</span><small>UE5 实时预览区域</small></div>
+          <div className="avatar-preview-toolbar"><span>3D AVATAR PREVIEW</span><small>临时分身形象 · WebGL 实时预览</small></div>
           <div className="avatar-preview-stage">
             <div className="avatar-stage-ring ring-one"/><div className="avatar-stage-ring ring-two"/>
-            <div className="avatar-body-placeholder"><span/><i/></div>
-            <div className="avatar-not-created"><strong>分身尚未苏醒</strong><span>进入游戏完成首次外观创建后，这里将显示你的高精度 3D 分身。</span></div>
-            <div className="avatar-q-preview"><span>Q VERSION</span><div><i>E</i><small>同步形态</small></div></div>
+            <Suspense fallback={<AvatarViewportFallback/>}><AvatarViewport variant="preview"/></Suspense>
+            <div className="avatar-not-created loaded"><strong>临时形象已载入</strong><span>拖动可旋转查看，滚轮可以调整距离。</span></div>
+            <div className="avatar-q-preview"><span>CURRENT FORM</span><div><i>3D</i><small>ecy 临时模型</small></div></div>
           </div>
           <div className="avatar-preview-footer">
-            <div><span>创建进度</span><strong>0%</strong></div>
-            <div className="avatar-progress"><i/></div>
-            <button className="play-button" onClick={onLaunch} disabled={launching}><span className="play-triangle"/>{launching ? '正在启动…' : '进入游戏创建分身'}</button>
+            <div><span>临时形象状态</span><strong>已启用</strong></div>
+            <div className="avatar-progress loaded"><i/></div>
+            <button className="play-button" onClick={onLaunch} disabled={launching}><span className="play-triangle"/>{launching ? '正在启动…' : '进入游戏完善分身'}</button>
           </div>
         </article>
 
@@ -555,11 +553,11 @@ function AiChatPage({ user, onBack }: { user: LauncherUser; onBack: () => void }
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [status, setStatus] = useState<{ configured: boolean; model: string; connection: ConnectionState; message?: string }>({ configured: false, model: 'gpt-5.6-luna', connection: 'unconfigured' });
+  const [status, setStatus] = useState<{ configured: boolean; model: string; connection: ConnectionState; message?: string }>({ configured: false, model: user.aiAgent.modelAssignment.baseModelId, connection: 'unconfigured' });
 
   useEffect(() => {
     if (!window.launcher?.ai) return;
-    void getAiStatus().then((result) => setStatus(result)).catch(() => setStatus({ configured: false, model: 'gpt-5.6-luna', connection: 'failed', message: '无法读取模型状态。' }));
+    void getAiStatus().then((result) => setStatus(result)).catch(() => setStatus({ configured: false, model: user.aiAgent.modelAssignment.baseModelId, connection: 'failed', message: '无法读取模型状态。' }));
   }, []);
 
   const submit = async (event: FormEvent) => {
@@ -594,24 +592,24 @@ function AiChatPage({ user, onBack }: { user: LauncherUser; onBack: () => void }
         ? '模型连接失败'
         : '模型尚未配置';
   const connectionTitle = status.connection === 'connected'
-    ? '共享模型已连接'
+    ? '专属模型已连接'
     : status.connection === 'untested'
       ? '模型配置已载入'
       : status.connection === 'failed'
-        ? '共享模型连接失败'
+        ? '专属模型连接失败'
         : '需要配置 API';
   const connectionDescription = status.connection === 'connected'
-    ? '已成功收到 Responses API 回复。'
+    ? '已成功收到 DeepSeek 模型回复。'
     : status.connection === 'untested'
       ? '配置已找到，发送第一条消息后验证实际连接。'
       : status.connection === 'failed'
         ? status.message || '请检查网络、Base URL、模型名称和 API Key。'
-        : '复制 config/ai.example.json 为 config/ai.local.json，并填写有效的 OpenAI API Key。';
+        : '本地模型服务尚未配置，请联系开发人员。';
 
   return (
     <section className="chat-content">
       <header className="chat-page-header">
-        <div><button onClick={onBack}>← 返回虚拟分身</button><span>PERSONA CONVERSATION</span><h1>与我的 AI 对话</h1><p>共享大模型会读取当前账户的人格档案，但不会将 API Key 暴露给页面。</p></div>
+        <div><button onClick={onBack}>← 返回虚拟分身</button><span>PERSONA CONVERSATION</span><h1>与我的 AI 对话</h1><p>当前对话由账户注册时分配的专属模型提供支持。</p></div>
         <span className={`chat-model-status ${status.connection === 'connected' ? 'ready' : ''}`}><i/>{statusLabel}</span>
       </header>
 
@@ -863,7 +861,7 @@ function getDevelopmentPreviewUser(): LauncherUser | null {
     aiAgent: {
       agentId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', accountId: 'preview-account-id', status: 'READY', profileVersion: 1,
       createdAt: '2026-07-15T00:00:00.000Z', updatedAt: '2026-07-15T00:05:00.000Z',
-      modelAssignment: { baseModelId: 'echo-persona-v1', strategy: 'shared-base-model', assignedAt: '2026-07-15T00:00:00.000Z' },
+      modelAssignment: { baseModelId: 'deepseek-v4-flash', strategy: 'dedicated-account-model', assignedAt: '2026-07-15T00:00:00.000Z' },
       identity: { fullName: '金哲', gender: '男性', birthDate: '2000-01-01', residence: '上海', occupation: '游戏开发者' },
       personality: { mbti: 'INTJ', communicationStyle: 'adaptive', inferredTraits: [] },
       preferences: { interests: ['游戏', '音乐', '科幻'], favoriteColor: new URLSearchParams(window.location.search).get('themeColor') || '薄荷绿', favoriteMusic: '电子音乐', belief: '' },

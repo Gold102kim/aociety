@@ -20,7 +20,8 @@ async function run() {
     assert.equal(registered.basicQuestionnaireCompletedAt, undefined);
     assert.equal(registered.aiAgent.accountId, registered.id);
     assert.equal(registered.aiAgent.status, 'WAITING_FOR_PROFILE');
-    assert.equal(registered.aiAgent.modelAssignment.baseModelId, 'echo-persona-v1');
+    assert.equal(registered.aiAgent.modelAssignment.baseModelId, 'deepseek-v4-flash');
+    assert.equal(registered.aiAgent.modelAssignment.strategy, 'dedicated-account-model');
     assert.match(registered.aiAgent.memoryNamespace, new RegExp(registered.aiAgent.agentId));
 
     await assert.rejects(
