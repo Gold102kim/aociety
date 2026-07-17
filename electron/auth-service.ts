@@ -174,6 +174,55 @@ function normalizeQuestionnaire(input: BasicQuestionnaire): BasicQuestionnaire {
   };
 }
 
+const lockedTextFields: Array<keyof Omit<BasicQuestionnaire, 'interests'>> = [
+  'fullName', 'gender', 'birthDate', 'residence', 'occupation', 'mbti', 'favoriteColor', 'favoriteMusic', 'belief',
+];
+
+function mergeProfileSupplement(current: BasicQuestionnaire, input: BasicQuestionnaire): BasicQuestionnaire {
+  const supplement = normalizeQuestionnaire(input);
+  const merged: BasicQuestionnaire = { ...current, interests: [...current.interests] };
+
+  for (const field of lockedTextFields) {
+    const existingValue = current[field];
+    const suppliedValue = supplement[field];
+    if (existingValue) {
+      if (suppliedValue && suppliedValue !== existingValue) throw new Error('已保存的个人资料不可修改，只能补充尚未填写的内容。');
+      continue;
+    }
+    if (suppliedValue) merged[field] = suppliedValue;
+  }
+
+  const additions = supplement.interests.filter((interest) => !merged.interests.includes(interest));
+  const remainingSlots = Math.max(0, 3 - merged.interests.length);
+  if (additions.length > remainingSlots) throw new Error(`核心爱好只剩 ${remainingSlots} 个可补充位置。`);
+  merged.interests.push(...additions);
+  return merged;
+}
+
+function syncAgentProfile(account: AccountRecord, updatedAt: string) {
+  const profile = account.basicQuestionnaire;
+  if (!profile) return;
+  const agent = account.aiAgent ?? createAiAgent(account.id, account.createdAt);
+  agent.status = 'READY';
+  agent.updatedAt = updatedAt;
+  agent.questionnaireCompletedAt = account.basicQuestionnaireCompletedAt;
+  agent.identity = {
+    fullName: profile.fullName,
+    gender: profile.gender,
+    birthDate: profile.birthDate,
+    residence: profile.residence,
+    occupation: profile.occupation,
+  };
+  agent.personality = { ...agent.personality, mbti: profile.mbti };
+  agent.preferences = {
+    interests: profile.interests,
+    favoriteColor: profile.favoriteColor,
+    favoriteMusic: profile.favoriteMusic,
+    belief: profile.belief,
+  };
+  account.aiAgent = agent;
+}
+
 export class AccountStore {
   private readonly failedAttempts = new Map<string, FailedAttempt>();
 
@@ -262,30 +311,23 @@ export class AccountStore {
     const account = database.accounts.find((candidate) => candidate.id === accountId);
     if (!account) throw new Error('账户不存在，请重新登录。');
 
+    if (account.basicQuestionnaireCompletedAt) throw new Error('个人资料已完成首次保存，之后只能补充未填写的内容。');
+
     account.basicQuestionnaire = normalizeQuestionnaire(input);
     account.basicQuestionnaireCompletedAt = new Date().toISOString();
-    const agent = account.aiAgent ?? createAiAgent(account.id, account.createdAt);
-    agent.status = 'READY';
-    agent.updatedAt = account.basicQuestionnaireCompletedAt;
-    agent.questionnaireCompletedAt = account.basicQuestionnaireCompletedAt;
-    agent.identity = {
-      fullName: account.basicQuestionnaire.fullName,
-      gender: account.basicQuestionnaire.gender,
-      birthDate: account.basicQuestionnaire.birthDate,
-      residence: account.basicQuestionnaire.residence,
-      occupation: account.basicQuestionnaire.occupation,
-    };
-    agent.personality = {
-      ...agent.personality,
-      mbti: account.basicQuestionnaire.mbti,
-    };
-    agent.preferences = {
-      interests: account.basicQuestionnaire.interests,
-      favoriteColor: account.basicQuestionnaire.favoriteColor,
-      favoriteMusic: account.basicQuestionnaire.favoriteMusic,
-      belief: account.basicQuestionnaire.belief,
-    };
-    account.aiAgent = agent;
+    syncAgentProfile(account, account.basicQuestionnaireCompletedAt);
+    this.writeDatabase(database);
+    return toPublicUser(account);
+  }
+
+  supplementProfile(accountId: string, input: BasicQuestionnaire): PublicUser {
+    const database = this.readDatabase();
+    const account = database.accounts.find((candidate) => candidate.id === accountId);
+    if (!account) throw new Error('账户不存在，请重新登录。');
+    if (!account.basicQuestionnaire || !account.basicQuestionnaireCompletedAt) throw new Error('请先完成首次个人资料。');
+
+    account.basicQuestionnaire = mergeProfileSupplement(account.basicQuestionnaire, input);
+    syncAgentProfile(account, new Date().toISOString());
     this.writeDatabase(database);
     return toPublicUser(account);
   }

@@ -112,7 +112,7 @@ export class AiChatService {
   }
 
   async chat(user: PublicUser, messageInput: string, historyInput: AiChatMessage[]) {
-    if (user.aiAgent.status !== 'READY') throw new Error('AI 档案尚未完成初始化，请先填写基础问卷。');
+    if (user.aiAgent.status !== 'READY') throw new Error('AI 档案尚未完成初始化，请先完善个人资料。');
     const message = cleanChatText(messageInput, 2000);
     if (!message) throw new Error('请输入想对虚拟分身说的话。');
 

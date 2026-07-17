@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('launcher', {
       ipcRenderer.invoke('auth:login', input) as Promise<AuthResult>,
     completeQuestionnaire: (input: BasicQuestionnaire) =>
       ipcRenderer.invoke('auth:complete-questionnaire', input) as Promise<AuthResult>,
+    supplementProfile: (input: BasicQuestionnaire) =>
+      ipcRenderer.invoke('auth:supplement-profile', input) as Promise<AuthResult>,
     logout: () => ipcRenderer.invoke('auth:logout') as Promise<{ ok: boolean }>,
   },
   ai: {
