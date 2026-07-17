@@ -627,7 +627,87 @@ form input::placeholder { color: #505969; }
 .social-interest-tags i { font-size: 11px; }
 .social-agent-state span { font-size: 10px; }
 .social-agent-state strong { font-size: 12px; }
-.toast { position: fixed; right: 22px; bottom: 22px; z-index: 50; max-width: 420px; padding: 13px 16px; background: #161c26; border: 1px solid #384451; border-left: 3px solid var(--accent); border-radius: 4px; color: #d5dbe3; font-size: 11px; box-shadow: 0 12px 35px rgba(0,0,0,.35); }
+
+/* Final legibility standard. Only decorative English markers may remain below 11px. */
+.brand-mini { font-size: 12px; }
+.companion-name { font-size: 11px; }
+.companion-root > p { font-size: 10px; }
+form label, .interest-fields legend, .color-preference legend { font-size: 13px; }
+.form-message { font-size: 12px; }
+.legal, .prototype-note { font-size: 11px; }
+.questionnaire-header button, .questionnaire-note, .questionnaire-footer > span { font-size: 12px; }
+.onboarding-account small { font-size: 11px; }
+.interest-fields legend span, .color-preference legend span { font-size: 11px; }
+.color-options button, .color-preview, .color-preview button { font-size: 11px; }
+.page-tabs button small { font-size: 10px; }
+.profile strong { font-size: 12px; }
+.profile small { font-size: 12px; }
+.profile-back { font-size: 12px; }
+.profile-identity p, .profile-status { font-size: 12px; }
+.profile-definition-grid span, .profile-interests > span, .account-card dt { font-size: 12px; }
+.profile-definition-grid strong, .account-card dd { font-size: 14px; }
+.account-card .account-id { font-size: 12px; }
+.profile-interests i, .profile-interests em { font-size: 12px; }
+.logout-card p, .logout-button { font-size: 12px; }
+.world-node strong { font-size: 12px; }
+.world-node span { font-size: 12px; }
+.world-map-legend { font-size: 10px; }
+.world-map-footer span { font-size: 11px; }
+.world-map-footer strong { font-size: 13px; }
+.world-map-footer .play-button { font-size: 12px; }
+.world-event-list strong, .world-travel-list strong { font-size: 13px; }
+.world-event-list p, .world-travel-list p { font-size: 12px; }
+.world-event-list time, .world-travel-list small { font-size: 12px; }
+.world-region-heading p { font-size: 11px; }
+.world-region-card h3 { font-size: 13px; }
+.world-region-card p { font-size: 11px; }
+.world-region-card small { font-size: 10px; }
+.avatar-preview-toolbar span, .avatar-preview-toolbar small { font-size: 10px; }
+.avatar-not-created span { font-size: 12px; }
+.avatar-q-preview > span, .avatar-q-preview small { font-size: 10px; }
+.avatar-preview-footer > div:first-child span { font-size: 11px; }
+.avatar-preview-footer .play-button, .avatar-chat-button { font-size: 12px; }
+.avatar-info-heading p { font-size: 12px; }
+.avatar-info-card dt, .avatar-interest-summary > span { font-size: 12px; }
+.avatar-info-card dd { font-size: 14px; }
+.avatar-interest-summary i, .avatar-interest-summary em { font-size: 12px; }
+.avatar-creation-roadmap li > i { font-size: 11px; }
+.avatar-creation-roadmap li strong { font-size: 13px; }
+.avatar-creation-roadmap li span { font-size: 11px; }
+.chat-page-header button { font-size: 12px; }
+.chat-page-header p { font-size: 13px; }
+.chat-model-status { font-size: 11px; }
+.chat-agent-bar strong { font-size: 13px; }
+.chat-agent-bar small, .chat-agent-bar button { font-size: 12px; }
+.chat-message > span { font-size: 10px; }
+.chat-message small { font-size: 12px; }
+.chat-message p { font-size: 13px; }
+.chat-error { font-size: 12px; }
+.chat-composer textarea { font-size: 13px; }
+.chat-composer span { font-size: 12px; }
+.chat-composer button { font-size: 12px; }
+.chat-side-card dt { font-size: 12px; }
+.chat-side-card dd { font-size: 12px; }
+.chat-config-card p, .chat-suggestions button { font-size: 12px; }
+.social-feed strong { font-size: 13px; }
+.social-feed p { font-size: 12px; }
+.social-feed time, .social-feed small { font-size: 12px; }
+.social-inbox-footer { font-size: 12px; }
+.social-search-card form input, .social-search-card form button, .social-search-card > p { font-size: 12px; }
+.friend-preview-list strong { font-size: 12px; }
+.friend-preview-list small { font-size: 12px; }
+.social-preference-card p, .social-interest-tags i, .social-interest-tags em { font-size: 12px; }
+.social-agent-state span { font-size: 12px; }
+.status-pill { font-size: 10px; }
+.game-meta { font-size: 11px; }
+.card-tag { font-size: 10px; }
+.news-card p, .activity-card p { font-size: 12px; }
+.news-card span, .activity-head span { font-size: 11px; }
+.home-activity-feed strong { font-size: 12px; }
+.activity-card .home-activity-feed span { font-size: 11px; }
+.home-activity-feed time { font-size: 10px; }
+.toast { font-size: 12px; }
+.toast { position: fixed; right: 22px; bottom: 22px; z-index: 50; max-width: 420px; padding: 13px 16px; background: #161c26; border: 1px solid #384451; border-left: 3px solid var(--accent); border-radius: 4px; color: #d5dbe3; font-size: 12px; box-shadow: 0 12px 35px rgba(0,0,0,.35); }
 
 @media (max-width: 1400px) {
   .chat-layout { height: auto; grid-template-columns: 1fr; }
