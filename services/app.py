@@ -28,8 +28,12 @@ def load_dotenv_file() -> None:
         key = key.strip()
         value = value.strip()
         # Keep the game backend deterministic: stale user/session credentials
-        # must not override the project-local GLM endpoint and model settings.
-        if key in {"TOKENHUB_API_KEY", "TOKENHUB_BASE_URL", "TOKENHUB_MODEL"}:
+        # must not override the project-local DeepSeek route.
+        if key in {
+            "DEEPSEEK_API_KEY",
+            "DEEPSEEK_BASE_URL",
+            "DEEPSEEK_MODEL",
+        }:
             os.environ[key] = value
         else:
             os.environ.setdefault(key, value)
@@ -123,16 +127,25 @@ app = FastAPI(title="Aociety Forest Town Service", lifespan=lifespan)
 
 @app.get("/health")
 def health() -> dict[str, Any]:
+    model = getattr(forest_ark, "model_id", "deepseek-v4-flash")
+    provider = getattr(forest_ark, "provider", "deepseek")
+    base_url = getattr(
+        forest_ark, "base_url", "https://api.deepseek.com/"
+    ).rstrip("/")
     return {
         "status": "ok",
         "pulse_interval_seconds": engine.pulse_interval_seconds,
+        "ai_enabled": forest_ark.enabled,
+        "ai_configured": forest_ark.configured,
+        "ai_model": model,
+        "ai_provider": provider,
+        "ai_base_url": base_url,
+        # Compatibility aliases for older launchers and health dashboards.
         "glm_enabled": forest_ark.enabled,
         "glm_configured": forest_ark.configured,
-        "glm_model": getattr(forest_ark, "model_id", "glm-5.2"),
-        "glm_provider": getattr(forest_ark, "provider", "tokenhub"),
-        "glm_base_url": getattr(
-            forest_ark, "base_url", "https://api.tokenhub.market/v1/"
-        ).rstrip("/"),
+        "glm_model": model,
+        "glm_provider": provider,
+        "glm_base_url": base_url,
     }
 
 
@@ -210,7 +223,7 @@ def npc_conversation(payload: ConversationRequest) -> dict[str, Any]:
             "screenshot_b64": payload.screenshot_b64,
             "scene_context": payload.scene_context,
         },
-        # Explicit in-game resident encounters use GLM. Background scheduled
+        # Explicit in-game resident encounters use DeepSeek. Background scheduled
         # simulation remains rate-limited by the engine's pulse/budget rules.
         allow_llm=True,
     )
@@ -222,7 +235,7 @@ def forest_probe() -> dict[str, Any]:
     result = forest_ark.probe()
     return {
         **result,
-        "provider": "tokenhub",
+        "provider": forest_ark.provider,
         "base_url": forest_ark.base_url.rstrip("/"),
     }
 

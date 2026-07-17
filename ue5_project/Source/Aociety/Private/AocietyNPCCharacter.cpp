@@ -14,6 +14,23 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "TimerManager.h"
 
+namespace
+{
+void DisableLegacyWorldText(UTextRenderComponent* TextComponent)
+{
+    if (!TextComponent)
+    {
+        return;
+    }
+
+    TextComponent->SetText(FText::GetEmpty());
+    TextComponent->SetVisibility(false, true);
+    TextComponent->SetHiddenInGame(true, true);
+    TextComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    TextComponent->SetCastShadow(false);
+}
+}
+
 AAocietyNPCCharacter::AAocietyNPCCharacter()
 {
     PrimaryActorTick.bCanEverTick = true;
@@ -28,14 +45,22 @@ AAocietyNPCCharacter::AAocietyNPCCharacter()
     Movement->MaxWalkSpeed = WanderSpeed;
     Movement->BrakingDecelerationWalking = 720.0f;
 
+    ResidentVisual = CreateDefaultSubobject<USkeletalMeshComponent>(
+        TEXT("ResidentVisual"));
+    ResidentVisual->SetupAttachment(GetCapsuleComponent());
+    ResidentVisual->SetRelativeLocation(FVector(0.0f, 0.0f, -46.0f));
+    ResidentVisual->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
+    ResidentVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    ResidentVisual->SetGenerateOverlapEvents(false);
+
     Nameplate = CreateDefaultSubobject<UTextRenderComponent>(TEXT("Nameplate"));
     Nameplate->SetupAttachment(RootComponent);
     Nameplate->SetRelativeLocation(FVector(0.0f, 0.0f, 205.0f));
     Nameplate->SetHorizontalAlignment(EHTA_Center);
     Nameplate->SetWorldSize(24.0f);
     Nameplate->SetTextRenderColor(FColor(110, 235, 255));
-    Nameplate->SetText(FText::FromString(TEXT("AI 居民 · GLM 5.2")));
-    Nameplate->SetVisibility(false);
+    Nameplate->SetText(FText::FromString(TEXT("AI 居民 · DeepSeek V4 Flash")));
+    DisableLegacyWorldText(Nameplate);
 
     SpeechBubble = CreateDefaultSubobject<UTextRenderComponent>(TEXT("SpeechBubble"));
     SpeechBubble->SetupAttachment(RootComponent);
@@ -43,8 +68,7 @@ AAocietyNPCCharacter::AAocietyNPCCharacter()
     SpeechBubble->SetHorizontalAlignment(EHTA_Center);
     SpeechBubble->SetWorldSize(27.0f);
     SpeechBubble->SetTextRenderColor(FColor(255, 230, 150));
-    SpeechBubble->SetText(FText::GetEmpty());
-    SpeechBubble->SetVisibility(false);
+    DisableLegacyWorldText(SpeechBubble);
 
     SolidBubble = CreateDefaultSubobject<UWidgetComponent>(TEXT("SolidBubble"));
     SolidBubble->SetupAttachment(RootComponent);
@@ -57,7 +81,9 @@ AAocietyNPCCharacter::AAocietyNPCCharacter()
     SolidBubble->SetBlendMode(EWidgetBlendMode::Transparent);
     SolidBubble->SetBackgroundColor(FLinearColor::Transparent);
     SolidBubble->SetTintColorAndOpacity(FLinearColor::White);
-    SolidBubble->SetTwoSided(true);
+    SolidBubble->SetTwoSided(false);
+    SolidBubble->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    SolidBubble->SetCastShadow(false);
     SolidBubble->SetTranslucentSortPriority(20);
     SolidBubble->SetWidgetClass(UAocietyNPCBubbleWidget::StaticClass());
     SolidBubble->SetVisibility(false);
@@ -82,30 +108,60 @@ void AAocietyNPCCharacter::BeginPlay()
             *NpcId, *GetMesh()->GetRelativeScale3D().ToCompactString());
         GetMesh()->SetRelativeScale3D(FVector::OneVector);
     }
+    ResidentVisual->SetSkeletalMeshAsset(GetMesh()->GetSkeletalMeshAsset());
+    for (int32 MaterialIndex = 0;
+         MaterialIndex < GetMesh()->GetNumMaterials();
+         ++MaterialIndex)
+    {
+        ResidentVisual->SetMaterial(MaterialIndex, GetMesh()->GetMaterial(MaterialIndex));
+    }
+    ResidentVisual->SetRelativeLocation(FVector(0.0f, 0.0f, -46.0f));
+    ResidentVisual->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
+    ResidentVisual->SetRelativeScale3D(FVector::OneVector);
+    ResidentVisual->SetVisibility(true, true);
+    ResidentVisual->SetHiddenInGame(false, true);
+    ResidentVisual->SetOwnerNoSee(false);
+    ResidentVisual->SetOnlyOwnerSee(false);
+    ResidentVisual->SetRenderInMainPass(true);
+    ResidentVisual->SetRenderInDepthPass(true);
+    ResidentVisual->bEnableUpdateRateOptimizations = false;
+    ResidentVisual->VisibilityBasedAnimTickOption =
+        EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+    ResidentVisual->bComponentUseFixedSkelBounds = true;
+    ResidentVisual->SetBoundsScale(1.5f);
+    ResidentVisual->MarkRenderStateDirty();
+    GetMesh()->SetVisibility(false, true);
+    GetMesh()->SetHiddenInGame(true, true);
 
     HomeLocation = GetActorLocation();
+    // Placed instances may retain serialized visibility from the retired
+    // TextRender UI. Keep those components permanently disabled so only the
+    // styled UMG bubble can render in game.
+    DisableLegacyWorldText(Nameplate);
+    DisableLegacyWorldText(SpeechBubble);
+
     UCharacterMovementComponent* Movement = GetCharacterMovement();
     Movement->bRunPhysicsWithNoController = true;
     Movement->bOrientRotationToMovement = true;
     Movement->bUseControllerDesiredRotation = false;
     Movement->MaxWalkSpeed = WanderSpeed;
-    GetMesh()->bEnableUpdateRateOptimizations = false;
-    GetMesh()->VisibilityBasedAnimTickOption =
-        EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
     SolidBubble->SetRelativeLocation(FVector(0.0f, 0.0f, 242.0f));
     SolidBubble->SetDrawSize(FVector2D(512.0f, 256.0f));
     SolidBubble->SetRelativeScale3D(FVector(0.20f));
+    SolidBubble->SetWidgetSpace(EWidgetSpace::World);
     SolidBubble->SetPivot(FVector2D(0.34f, 1.0f));
     SolidBubble->SetBlendMode(EWidgetBlendMode::Transparent);
     SolidBubble->SetBackgroundColor(FLinearColor::Transparent);
     SolidBubble->SetTintColorAndOpacity(FLinearColor::White);
-    SolidBubble->SetTwoSided(true);
+    SolidBubble->SetTwoSided(false);
+    SolidBubble->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    SolidBubble->SetCastShadow(false);
     SolidBubble->SetTranslucentSortPriority(20);
     SolidBubble->SetWidgetClass(UAocietyNPCBubbleWidget::StaticClass());
     SolidBubble->SetVisibility(false);
     SolidBubble->InitWidget();
     Nameplate->SetText(FText::FromString(
-        FString::Printf(TEXT("%s [%s] · GLM 5.2"), *DisplayName, *NpcId)));
+        FString::Printf(TEXT("%s [%s] · DeepSeek V4 Flash"), *DisplayName, *NpcId)));
     if (UAocietyNPCBubbleWidget* Widget =
             Cast<UAocietyNPCBubbleWidget>(SolidBubble->GetUserWidgetObject()))
     {
@@ -118,7 +174,7 @@ void AAocietyNPCCharacter::BeginPlay()
         TEXT("[AocietyNPC] ready id=%s actor_scale=%s mesh_scale=%s idle=%s walk=%s"),
         *NpcId,
         *GetActorScale3D().ToCompactString(),
-        *GetMesh()->GetRelativeScale3D().ToCompactString(),
+        *ResidentVisual->GetRelativeScale3D().ToCompactString(),
         *GetNameSafe(IdleAnimation),
         *GetNameSafe(WalkAnimation));
 }
@@ -162,7 +218,7 @@ void AAocietyNPCCharacter::Tick(float DeltaSeconds)
     if (IsValid(PlayerPawn))
     {
         const FVector ToPlayer = PlayerPawn->GetActorLocation() - GetActorLocation();
-        if (ToPlayer.SizeSquared2D() < FMath::Square(520.0f))
+        if (ToPlayer.SizeSquared2D() < FMath::Square(150.0f))
         {
             const FRotator Facing = ToPlayer.Rotation();
             SetActorRotation(FRotator(0.0f, Facing.Yaw, 0.0f));
@@ -217,7 +273,6 @@ void AAocietyNPCCharacter::ShowDialogue(
     float Duration)
 {
     const FString Wrapped = Line.Len() > 64 ? Line.Left(64) + TEXT("...") : Line;
-    SpeechBubble->SetText(FText::FromString(Wrapped));
     SolidBubble->SetVisibility(true);
     if (UAocietyNPCBubbleWidget* Widget =
             Cast<UAocietyNPCBubbleWidget>(SolidBubble->GetUserWidgetObject()))
@@ -232,12 +287,11 @@ void AAocietyNPCCharacter::ShowDialogue(
 
 void AAocietyNPCCharacter::ShowThinking()
 {
-    SpeechBubble->SetText(FText::FromString(TEXT("正在思考 · GLM 5.2...")));
     SolidBubble->SetVisibility(true);
     if (UAocietyNPCBubbleWidget* Widget =
             Cast<UAocietyNPCBubbleWidget>(SolidBubble->GetUserWidgetObject()))
     {
-        Widget->SetThinking(DisplayName, TEXT("glm-5.2"));
+        Widget->SetThinking(DisplayName, TEXT("deepseek-v4-flash"));
     }
     GetWorldTimerManager().ClearTimer(DialogueTimer);
     GetWorldTimerManager().SetTimer(
@@ -249,13 +303,11 @@ void AAocietyNPCCharacter::ShowListening(
     const FString& SpeakerName,
     float Duration)
 {
-    SpeechBubble->SetText(FText::FromString(
-        FString::Printf(TEXT("正在听 %s 说话..."), *SpeakerName)));
     SolidBubble->SetVisibility(true);
     if (UAocietyNPCBubbleWidget* Widget =
             Cast<UAocietyNPCBubbleWidget>(SolidBubble->GetUserWidgetObject()))
     {
-        Widget->SetListening(DisplayName, SpeakerName, TEXT("glm-5.2"));
+        Widget->SetListening(DisplayName, SpeakerName, TEXT("deepseek-v4-flash"));
     }
     GetWorldTimerManager().ClearTimer(DialogueTimer);
     GetWorldTimerManager().SetTimer(
@@ -310,9 +362,9 @@ void AAocietyNPCCharacter::PlayLocomotionAnimation(bool bMoving)
         return;
     }
 
-    GetMesh()->SetRelativeScale3D(FVector::OneVector);
-    GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-    GetMesh()->PlayAnimation(Desired, true);
+    ResidentVisual->SetRelativeScale3D(FVector::OneVector);
+    ResidentVisual->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+    ResidentVisual->PlayAnimation(Desired, true);
     ActiveAnimation = Desired;
 
     UE_LOG(LogTemp, Log,
@@ -323,7 +375,6 @@ void AAocietyNPCCharacter::PlayLocomotionAnimation(bool bMoving)
 
 void AAocietyNPCCharacter::ClearDialogue()
 {
-    SpeechBubble->SetText(FText::GetEmpty());
     if (UAocietyNPCBubbleWidget* Widget =
             Cast<UAocietyNPCBubbleWidget>(SolidBubble->GetUserWidgetObject()))
     {

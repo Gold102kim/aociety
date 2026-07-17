@@ -39,7 +39,7 @@ private:
     FString DisplayName = TEXT("小镇居民");
     FString Message = TEXT("你好");
     FString Source = TEXT("pending");
-    FString Model = TEXT("glm-5.2");
+    FString Model = TEXT("deepseek-v4-flash");
     bool bIsThinking = false;
     bool bIsListening = false;
     bool bIsRealtimeResponse = false;

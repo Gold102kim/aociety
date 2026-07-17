@@ -8,6 +8,9 @@
 
 class UCameraComponent;
 class USpringArmComponent;
+class USkeletalMeshComponent;
+class UPoseSearchDatabase;
+class UIKRetargeter;
 class AAocietyNPCCharacter;
 
 UCLASS()
@@ -30,6 +33,8 @@ private:
     void MoveForward(float Value);
     void MoveRight(float Value);
     void Interact();
+    void RunRuntimeAudit(float DeltaSeconds);
+    void CaptureRuntimeAuditScreenshot(const TCHAR* FileName) const;
 
     UPROPERTY(VisibleAnywhere, Category="Aociety|Camera")
     TObjectPtr<USpringArmComponent> CameraBoom;
@@ -37,12 +42,31 @@ private:
     UPROPERTY(VisibleAnywhere, Category="Aociety|Camera")
     TObjectPtr<UCameraComponent> FollowCamera;
 
-    UPROPERTY()
-    TObjectPtr<class UAnimSequence> IdleAnimation;
+    UPROPERTY(VisibleAnywhere, Category="Aociety|Animation")
+    TObjectPtr<USkeletalMeshComponent> MotionDriverMesh;
 
-    UPROPERTY()
-    TObjectPtr<class UAnimSequence> WalkAnimation;
+    UPROPERTY(Transient)
+    TObjectPtr<UPoseSearchDatabase> MotionDatabase;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UIKRetargeter> EcyRetargeter;
 
     TWeakObjectPtr<AAocietyNPCCharacter> NearbyNPC;
-    bool bWasMoving = false;
+    float MotionEvidenceAccumulator = 0.0f;
+    FVector PreviousLeftFootLocation = FVector::ZeroVector;
+    bool bHasPreviousLeftFootLocation = false;
+    bool bInitialCameraPitchApplied = false;
+    bool bRuntimeAuditEnabled = false;
+    bool bRuntimeAuditIdleCaptured = false;
+    bool bRuntimeAuditWalkCaptured = false;
+    bool bRuntimeAuditJumpStarted = false;
+    bool bRuntimeAuditJumpCaptured = false;
+    bool bRuntimeAuditFinalCaptured = false;
+    bool bRuntimeAuditNPCViewSet = false;
+    bool bRuntimeAuditNPCThinkingCaptured = false;
+    bool bRuntimeAuditNPCReplyCaptured = false;
+    bool bRuntimeAuditPlayerInteractionStarted = false;
+    bool bRuntimeAuditPlayerPendingCaptured = false;
+    bool bRuntimeAuditPlayerReplyCaptured = false;
+    float RuntimeAuditElapsed = 0.0f;
 };

@@ -1,35 +1,37 @@
 @echo off
+setlocal
 chcp 65001 >nul
-echo =============================================
-echo   Aociety - 统一后端启动脚本
-echo =============================================
-echo.
+title Aociety Resident Service Launcher
 
-cd /d %~dp0
+cd /d "%~dp0"
 
-if "%BIGMODEL_API_KEY%"=="" (
-    if exist .env (
-        echo [INFO] 从 .env 加载环境变量...
-        for /f "tokens=*" %%a in (.env) do set %%a
-    )
+if exist .env (
+    echo [INFO] Loading local .env...
+    for /f "usebackq eol=# tokens=1,* delims==" %%A in (".env") do set "%%A=%%B"
 )
 
-echo [1/2] 启动主后端服务 (端口 %AOCIETY_PORT%)
-start "Aociety-Backend" cmd /c "uvicorn backend.main:app --host 0.0.0.0 --port %AOCIETY_PORT% --reload --log-level info"
+if "%AOCIETY_PORT%"=="" set "AOCIETY_PORT=8000"
 
-echo [2/2] 等待服务就绪...
-timeout /t 3 /nobreak >nul
+echo =============================================
+echo   Aociety Forest Resident Service
+echo   DeepSeek V4 Flash - port %AOCIETY_PORT%
+echo =============================================
+
+start "Aociety-Residents" cmd /c "python -m uvicorn services.app:app --host 127.0.0.1 --port %AOCIETY_PORT% --log-level info"
+
+echo Waiting for http://127.0.0.1:%AOCIETY_PORT%/health ...
+:wait_residents
+timeout /t 1 /nobreak >nul
+curl.exe -sf "http://127.0.0.1:%AOCIETY_PORT%/health" >nul 2>&1
+if errorlevel 1 goto wait_residents
 
 echo.
-echo =============================================
-echo   服务已启动!
-echo   主后端: http://127.0.0.1:%AOCIETY_PORT%
-echo   API文档: docs/API_UE5.md
-echo =============================================
+echo Resident service is ready.
+echo Health: http://127.0.0.1:%AOCIETY_PORT%/health
+echo Probe:  POST http://127.0.0.1:%AOCIETY_PORT%/forest/probe
 echo.
-echo 按任意键停止服务...
+echo Press any key to stop the resident service...
 pause >nul
 
-echo 正在停止服务...
-taskkill /fi "WINDOWTITLE eq Aociety-Backend" /f >nul 2>&1
-echo 已停止。
+taskkill /fi "WINDOWTITLE eq Aociety-Residents" /t /f >nul 2>&1
+endlocal

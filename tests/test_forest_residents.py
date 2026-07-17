@@ -5,12 +5,18 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from services.ark_client import ArkClient, FOREST_LEGACY_TERMS
+from services.ark_client import (
+    ArkClient,
+    DEEPSEEK_MODEL_ID,
+    DEEPSEEK_PROVIDER,
+    FOREST_LEGACY_TERMS,
+    THINKING_DISABLED_BODY,
+)
 from services.forest_residents import ForestResidentService
 
 
 class FakeArk:
-    model_id = "glm-5.2"
+    model_id = DEEPSEEK_MODEL_ID
 
     def __init__(self, replies: list[dict[str, str] | None]) -> None:
         self.replies = list(replies)
@@ -28,8 +34,8 @@ def llm_reply(text: str, mood: str = "平静") -> dict[str, str]:
         "reply": text,
         "mood": mood,
         "_meta_source": "llm",
-        "_meta_model": "glm-5.2",
-        "_meta_provider": "tokenhub",
+        "_meta_model": DEEPSEEK_MODEL_ID,
+        "_meta_provider": DEEPSEEK_PROVIDER,
     }
 
 
@@ -42,8 +48,8 @@ class TestForestResidentService(unittest.TestCase):
         second = service.chat(npc_id="npc_01", live_event="你还记得刚才的话吗？")
 
         self.assertEqual(first["source"], "llm")
-        self.assertEqual(first["provider"], "tokenhub")
-        self.assertEqual(first["model"], "glm-5.2")
+        self.assertEqual(first["provider"], DEEPSEEK_PROVIDER)
+        self.assertEqual(first["model"], DEEPSEEK_MODEL_ID)
         self.assertEqual(second["dialogue"]["source"], "llm")
         recent = ark.payloads[1]["recent_dialogue"]
         self.assertEqual(recent[-1]["reply"], "今天林间的风很轻。")
@@ -82,6 +88,21 @@ class TestForestResidentService(unittest.TestCase):
 
         self.assertEqual(result["source"], "error")
 
+    def test_wrong_provider_or_model_is_rejected(self) -> None:
+        wrong_provider = llm_reply("今天适合散步。")
+        wrong_provider["_meta_provider"] = "tokenhub"
+        wrong_model = llm_reply("我正准备去看花草。")
+        wrong_model["_meta_model"] = "glm-5.2"
+        service = ForestResidentService(  # type: ignore[arg-type]
+            FakeArk([wrong_provider, wrong_model])
+        )
+
+        provider_result = service.chat(npc_id="npc_01", live_event="你好")
+        model_result = service.chat(npc_id="npc_02", live_event="早上好")
+
+        self.assertEqual(provider_result["source"], "error")
+        self.assertEqual(model_result["source"], "error")
+
     def test_verified_metadata_cannot_bypass_legacy_story_filter(self) -> None:
         service = ForestResidentService(  # type: ignore[arg-type]
             FakeArk([llm_reply("我刚从海藻重工回来。")])
@@ -119,7 +140,9 @@ class TestArkClientRoute(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
-                "TOKENHUB_API_KEY": "",
+                "TOKENHUB_API_KEY": "legacy-tokenhub-key",
+                "TOKENHUB_BASE_URL": "https://api.tokenhub.market/v1",
+                "TOKENHUB_MODEL": "glm-5.2",
                 "GLM_API_KEY": "legacy-glm-key",
                 "OPENAI_API_KEY": "legacy-openai-key",
                 "ANTHROPIC_API_KEY": "legacy-anthropic-key",
@@ -131,8 +154,9 @@ class TestArkClientRoute(unittest.TestCase):
             client = ArkClient()
 
         self.assertEqual(client.api_key, "")
-        self.assertEqual(client.base_url, "https://api.tokenhub.market/v1/")
-        self.assertEqual(client.model_id, "glm-5.2")
+        self.assertEqual(client.base_url, "https://api.deepseek.com/")
+        self.assertEqual(client.model_id, DEEPSEEK_MODEL_ID)
+        self.assertEqual(client.provider, DEEPSEEK_PROVIDER)
         self.assertFalse(client.configured)
         client._dialogue_executor.shutdown(wait=False)
         client._background_executor.shutdown(wait=False)
@@ -141,8 +165,8 @@ class TestArkClientRoute(unittest.TestCase):
         client = object.__new__(ArkClient)
         client._client = object()
         client._disabled_until = 0.0
-        client.model_id = "glm-5.2"
-        client.provider = "tokenhub"
+        client.model_id = DEEPSEEK_MODEL_ID
+        client.provider = DEEPSEEK_PROVIDER
         captured: dict[str, object] = {}
 
         def fake_completion(**kwargs: object) -> object:
@@ -168,6 +192,9 @@ class TestArkClientRoute(unittest.TestCase):
         for term in FOREST_LEGACY_TERMS:
             self.assertNotIn(term, system_prompt)
         self.assertEqual(result["_meta_source"], "llm")
+        self.assertEqual(result["_meta_provider"], DEEPSEEK_PROVIDER)
+        self.assertEqual(result["_meta_model"], DEEPSEEK_MODEL_ID)
+        self.assertEqual(captured["extra_body"], THINKING_DISABLED_BODY)
 
 
 if __name__ == "__main__":

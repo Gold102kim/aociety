@@ -105,6 +105,14 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Aociety|Config")
     bool bAutoConnect = true;
 
+    // The forest service exposes neither /ws/emotion nor /emotion/current.
+    // Hardware integrations can opt into either transport explicitly.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Aociety|Config")
+    bool bEnableEmotionWebSocket = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Aociety|Config")
+    bool bEnableEmotionPolling = false;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Aociety|Config")
     FString PreferredTTSVoice = TEXT("xiaoxiao");
 
@@ -157,7 +165,7 @@ public:
     UFUNCTION(BlueprintCallable, Category="Aociety|World")
     void RequestNPCCare(const FString& NpcId);
 
-    // Send player input to the in-game GLM NPC agent. The backend also
+    // Send player input to the in-game DeepSeek NPC agent. The backend also
     // receives the latest affect state and returns a world-aware reply.
     UFUNCTION(BlueprintCallable, Category="Aociety|NPC")
     void RequestNPCDialogue(const FString& NpcId, const FString& PlayerInput,

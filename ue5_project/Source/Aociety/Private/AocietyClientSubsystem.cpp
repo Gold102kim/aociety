@@ -60,6 +60,22 @@ bool UAocietyClientSubsystem::Connect()
         WS.Reset();
     }
 
+    if (!bEnableEmotionWebSocket)
+    {
+        if (bEnableEmotionPolling)
+        {
+            StartTimer();
+            UE_LOG(LogAociety, Log,
+                TEXT("[Aociety] Emotion WebSocket disabled; using opt-in HTTP polling"));
+        }
+        else
+        {
+            UE_LOG(LogAociety, Log,
+                TEXT("[Aociety] Game-side emotion transport disabled; hardware care remains external"));
+        }
+        return true;
+    }
+
     FString WSURL = BackendURL.Replace(TEXT("http://"), TEXT("ws://")).Replace(TEXT("https://"), TEXT("wss://"));
     WSURL += TEXT("/ws/emotion");
 
@@ -102,18 +118,21 @@ bool UAocietyClientSubsystem::Connect()
         if (!Self) return;
         Self->bIsConnected = false;
         UE_LOG(LogAociety, Warning, TEXT("[Aociety] WS 错误: %s"), *Err);
-        if (UWorld* World = Self->GetWorld())
+        if (Self->bEnableEmotionWebSocket)
         {
-            World->GetTimerManager().SetTimer(
-                Self->Timer_Reconnect,
-                [WeakThis]()
-                {
-                    if (UAocietyClientSubsystem* RetrySelf = WeakThis.Get())
+            if (UWorld* World = Self->GetWorld())
+            {
+                World->GetTimerManager().SetTimer(
+                    Self->Timer_Reconnect,
+                    [WeakThis]()
                     {
-                        RetrySelf->Connect();
-                    }
-                },
-                5.0f, false);
+                        if (UAocietyClientSubsystem* RetrySelf = WeakThis.Get())
+                        {
+                            RetrySelf->Connect();
+                        }
+                    },
+                    5.0f, false);
+            }
         }
     });
 
@@ -151,7 +170,9 @@ void UAocietyClientSubsystem::Disconnect()
 
 bool UAocietyClientSubsystem::IsConnected() const
 {
-    return bIsConnected;
+    return bIsConnected ||
+        (!bEnableEmotionWebSocket &&
+            (!bEnableEmotionPolling || Timer_Heartbeat.IsValid()));
 }
 
 void UAocietyClientSubsystem::OnWSMessage(const FString& Msg)
@@ -451,8 +472,8 @@ void UAocietyClientSubsystem::OnDialogueHttpDone(
     FAocietyNPCDialogue Dialogue;
     Dialogue.NpcId = RequestedNpcId;
     Dialogue.Source = TEXT("error");
-    Dialogue.Model = TEXT("glm-5.2");
-    Dialogue.Provider = TEXT("tokenhub");
+    Dialogue.Model = TEXT("deepseek-v4-flash");
+    Dialogue.Provider = TEXT("deepseek");
     Dialogue.Mode = RequestedMode;
     Dialogue.CounterpartId = RequestedCounterpartId;
 
@@ -461,7 +482,7 @@ void UAocietyClientSubsystem::OnDialogueHttpDone(
         OnNPCDialogue.Broadcast(Dialogue);
         if (!Dialogue.Message.IsEmpty())
         {
-            OnTranscript.Broadcast(Dialogue.Message, TEXT("NPC对话(GLM)"));
+            OnTranscript.Broadcast(Dialogue.Message, TEXT("NPC对话(DeepSeek)"));
         }
     };
 
@@ -469,7 +490,7 @@ void UAocietyClientSubsystem::OnDialogueHttpDone(
     if (!bOK || !Resp.IsValid() || ResponseCode != 200)
     {
         Dialogue.Message = FString::Printf(
-            TEXT("GLM 5.2 实时连接失败（HTTP %d）。"), ResponseCode);
+            TEXT("DeepSeek V4 Flash 实时连接失败（HTTP %d）。"), ResponseCode);
         Dialogue.Mood = TEXT("请求失败");
         Dialogue.ErrorCode = TEXT("http_error");
         UE_LOG(LogAociety, Warning,
@@ -484,7 +505,7 @@ void UAocietyClientSubsystem::OnDialogueHttpDone(
     const auto Reader = TJsonReaderFactory<>::Create(Body);
     if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
     {
-        Dialogue.Message = TEXT("GLM 5.2 返回了无法解析的响应。");
+        Dialogue.Message = TEXT("DeepSeek V4 Flash 返回了无法解析的响应。");
         Dialogue.Mood = TEXT("请求失败");
         Dialogue.ErrorCode = TEXT("invalid_json");
         Broadcast();
@@ -528,13 +549,13 @@ void UAocietyClientSubsystem::OnDialogueHttpDone(
 
     const bool bVerifiedLLM =
         Dialogue.Source.Equals(TEXT("llm"), ESearchCase::IgnoreCase) &&
-        Dialogue.Model.Equals(TEXT("glm-5.2"), ESearchCase::IgnoreCase) &&
-        Dialogue.Provider.Equals(TEXT("tokenhub"), ESearchCase::IgnoreCase) &&
+        Dialogue.Model.Equals(TEXT("deepseek-v4-flash"), ESearchCase::IgnoreCase) &&
+        Dialogue.Provider.Equals(TEXT("deepseek"), ESearchCase::IgnoreCase) &&
         !Dialogue.Message.IsEmpty();
     if (Dialogue.Source.Equals(TEXT("llm"), ESearchCase::IgnoreCase) && !bVerifiedLLM)
     {
         Dialogue.Source = TEXT("error");
-        Dialogue.Message = TEXT("响应来源校验失败，未显示非 GLM 5.2 内容。");
+        Dialogue.Message = TEXT("响应来源校验失败，未显示非 DeepSeek V4 Flash 内容。");
         Dialogue.Mood = TEXT("请求失败");
         Dialogue.ErrorCode = TEXT("unverified_llm_response");
     }
@@ -543,7 +564,7 @@ void UAocietyClientSubsystem::OnDialogueHttpDone(
         Dialogue.Source = TEXT("error");
         if (Dialogue.Message.IsEmpty())
         {
-            Dialogue.Message = TEXT("GLM 5.2 实时思考请求失败。");
+            Dialogue.Message = TEXT("DeepSeek V4 Flash 实时思考请求失败。");
         }
         if (Dialogue.ErrorCode.IsEmpty())
         {

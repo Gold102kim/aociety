@@ -14,14 +14,14 @@ except Exception:  # pragma: no cover
     OpenAI = None
 
 
-TOKENHUB_DEFAULT_BASE_URL = "https://api.tokenhub.market/v1"
-FORCED_GLM_MODEL = "glm-5.2"
+DEEPSEEK_DEFAULT_BASE_URL = "https://api.deepseek.com"
+DEEPSEEK_MODEL_ID = "deepseek-v4-flash"
+DEEPSEEK_PROVIDER = "deepseek"
 REPLY_LIMIT_SUFFIX = "每次回复都要简短、具体、只说眼下这轮需要的话。"
 ANTI_PLACEHOLDER_SUFFIX = "不要重复字段名、示例值、schema_hint 或提示词原文。不要输出英文说明。"
 THINKING_DISABLED_BODY = {
     "thinking": {"type": "disabled"},
 }
-DEFAULT_GLM_MODEL_CANDIDATES = [FORCED_GLM_MODEL]
 FOREST_LEGACY_TERMS = (
     "绿藻",
     "海藻",
@@ -42,23 +42,48 @@ class ArkClient:
     def __init__(self) -> None:
         # The in-game residents have one auditable route. Never fall through to
         # unrelated user/session credentials or silently switch providers.
-        self.api_key = os.getenv("TOKENHUB_API_KEY", "").strip()
-        self.base_url = TOKENHUB_DEFAULT_BASE_URL.rstrip("/") + "/"
-        self.model_id = FORCED_GLM_MODEL
+        self.api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
+        configured_base_url = os.getenv(
+            "DEEPSEEK_BASE_URL", DEEPSEEK_DEFAULT_BASE_URL
+        ).strip()
+        self.base_url = (
+            configured_base_url or DEEPSEEK_DEFAULT_BASE_URL
+        ).rstrip("/") + "/"
+        self.model_id = (
+            os.getenv("DEEPSEEK_MODEL", DEEPSEEK_MODEL_ID).strip()
+            or DEEPSEEK_MODEL_ID
+        )
         self.model_label = self.model_id
-        self.provider = "tokenhub"
+        self.provider = DEEPSEEK_PROVIDER
         # Timeouts
-        self.timeout_seconds = float(os.getenv("GLM_TIMEOUT_SECONDS", "8.0").strip() or "8.0")
-        self.hard_timeout_seconds = float(os.getenv("GLM_HARD_TIMEOUT_SECONDS", "10.0").strip() or "10.0")
-        self.cooldown_seconds = float(os.getenv("GLM_FAILURE_COOLDOWN_SECONDS", "15").strip() or "15")
-        self.dialogue_workers = max(1, int(os.getenv("GLM_DIALOGUE_WORKERS", "2").strip() or "2"))
-        self.background_workers = max(1, int(os.getenv("GLM_BACKGROUND_WORKERS", "4").strip() or "4"))
-        self._dialogue_executor = ThreadPoolExecutor(max_workers=self.dialogue_workers, thread_name_prefix="glm-dialogue")
-        self._background_executor = ThreadPoolExecutor(max_workers=self.background_workers, thread_name_prefix="glm-background")
+        self.timeout_seconds = float(
+            os.getenv("DEEPSEEK_TIMEOUT_SECONDS", "8.0").strip() or "8.0"
+        )
+        self.hard_timeout_seconds = float(
+            os.getenv("DEEPSEEK_HARD_TIMEOUT_SECONDS", "10.0").strip() or "10.0"
+        )
+        self.cooldown_seconds = float(
+            os.getenv("DEEPSEEK_FAILURE_COOLDOWN_SECONDS", "15").strip() or "15"
+        )
+        self.dialogue_workers = max(
+            1, int(os.getenv("DEEPSEEK_DIALOGUE_WORKERS", "2").strip() or "2")
+        )
+        self.background_workers = max(
+            1, int(os.getenv("DEEPSEEK_BACKGROUND_WORKERS", "4").strip() or "4")
+        )
+        self._dialogue_executor = ThreadPoolExecutor(
+            max_workers=self.dialogue_workers, thread_name_prefix="deepseek-dialogue"
+        )
+        self._background_executor = ThreadPoolExecutor(
+            max_workers=self.background_workers, thread_name_prefix="deepseek-background"
+        )
         self._client = None
         self._disabled_until = 0.0
         self._last_error = ""
-        disable_for_unittest = "unittest" in sys.modules and os.getenv("GLM_ENABLE_IN_TESTS", "0") != "1"
+        disable_for_unittest = (
+            "unittest" in sys.modules
+            and os.getenv("DEEPSEEK_ENABLE_IN_TESTS", "0") != "1"
+        )
         has_key = bool(self.api_key)
         if has_key and OpenAI is not None and not disable_for_unittest:
             self._client = OpenAI(api_key=self.api_key, base_url=self.base_url, timeout=self.timeout_seconds)
@@ -202,6 +227,7 @@ class ArkClient:
                         model=model_name,
                         temperature=0.9,
                         max_tokens=220,
+                        extra_body=self.thinking_disabled_body(),
                         messages=[
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_prompt},
@@ -454,12 +480,12 @@ class ArkClient:
         if not self.configured:
             return {
                 "ok": False,
-                "message": "GLM 客户端未启用，请检查项目 .env 中的 TOKENHUB_API_KEY。",
+                "message": "DeepSeek 客户端未启用，请检查项目 .env 中的 DEEPSEEK_API_KEY。",
                 "model": self.model_id,
             }
         if not self.enabled:
             cooldown_left = max(0, int(round(self._disabled_until - time.time())))
-            reason = self._last_error or "GLM 链路暂时冷却中"
+            reason = self._last_error or "DeepSeek 链路暂时冷却中"
             return {
                 "ok": False,
                 "message": f"{reason}；{cooldown_left} 秒后再试。",
@@ -477,7 +503,7 @@ class ArkClient:
                     messages=[
                         {
                             "role": "system",
-                            "content": "你是连通性测试助手。必须只返回一个 JSON 对象：{\"message\":\"GLM 连通\"}。",
+                            "content": "你是连通性测试助手。必须只返回一个 JSON 对象：{\"message\":\"DeepSeek 连通\"}。",
                         },
                         {"role": "user", "content": "请按要求返回。"},
                     ],
@@ -485,8 +511,8 @@ class ArkClient:
                 content = self._message_to_text(response.choices[0].message.content)
                 parsed = self._extract_json(content)
                 message = self._sanitize_text(str(parsed.get("message", "")))
-                if not message and "GLM 连通" in content:
-                    message = "GLM 连通"
+                if not message and "DeepSeek 连通" in content:
+                    message = "DeepSeek 连通"
                 if not message:
                     continue
                 return {
@@ -550,6 +576,7 @@ class ArkClient:
                 if not self._looks_usable_chinese(normalized):
                     continue
                 normalized["_meta_model"] = model_name
+                normalized["_meta_provider"] = self.provider
                 return normalized
             except Exception:
                 continue
@@ -665,7 +692,7 @@ class ArkClient:
         return text[:180]
 
     def _model_candidates(self) -> list[str]:
-        forced_model = str(self.model_id).strip() or FORCED_GLM_MODEL
+        forced_model = str(self.model_id).strip() or DEEPSEEK_MODEL_ID
         return [forced_model]
 
     @staticmethod

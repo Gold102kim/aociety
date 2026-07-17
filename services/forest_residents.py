@@ -6,7 +6,12 @@ import time
 import uuid
 from typing import Any
 
-from .ark_client import ArkClient, FOREST_LEGACY_TERMS
+from .ark_client import (
+    ArkClient,
+    DEEPSEEK_MODEL_ID,
+    DEEPSEEK_PROVIDER,
+    FOREST_LEGACY_TERMS,
+)
 
 
 RESIDENTS: dict[str, dict[str, str]] = {
@@ -59,8 +64,8 @@ class ForestResidentService:
                 "message": "这名居民暂时不在小镇中。",
                 "mood": "请求失败",
                 "source": "error",
-                "model": "glm-5.2",
-                "provider": "tokenhub",
+                "model": DEEPSEEK_MODEL_ID,
+                "provider": DEEPSEEK_PROVIDER,
                 "error_code": "resident_not_found",
                 "mode": "player",
                 "counterpart_id": "",
@@ -110,11 +115,11 @@ class ForestResidentService:
         if not self._is_verified_llm_result(generated):
             dialogue = {
                 "npc_id": npc_id,
-                "message": "GLM 5.2 实时思考请求失败，请检查 TokenHub 模型权限或额度。",
+                "message": "DeepSeek V4 Flash 实时思考请求失败，请检查 API 权限、额度或网络。",
                 "mood": "请求失败",
                 "source": "error",
-                "model": getattr(self.ark, "model_id", "glm-5.2"),
-                "provider": "tokenhub",
+                "model": getattr(self.ark, "model_id", DEEPSEEK_MODEL_ID),
+                "provider": DEEPSEEK_PROVIDER,
                 "error_code": "llm_unavailable",
                 "request_id": request_id,
                 "mode": normalized_mode,
@@ -155,8 +160,10 @@ class ForestResidentService:
             "message": reply,
             "mood": mood,
             "source": "llm",
-            "model": model or "glm-5.2",
-            "provider": str(generated.get("_meta_provider", "tokenhub")),
+            "model": model or DEEPSEEK_MODEL_ID,
+            "provider": str(
+                generated.get("_meta_provider", DEEPSEEK_PROVIDER)
+            ),
             "request_id": request_id,
             "mode": normalized_mode,
             "counterpart_id": valid_counterpart_id,
@@ -172,8 +179,8 @@ class ForestResidentService:
             return False
         return (
             generated.get("_meta_source") == "llm"
-            and generated.get("_meta_provider") == "tokenhub"
-            and generated.get("_meta_model") == "glm-5.2"
+            and generated.get("_meta_provider") == DEEPSEEK_PROVIDER
+            and generated.get("_meta_model") == DEEPSEEK_MODEL_ID
         )
 
     @staticmethod

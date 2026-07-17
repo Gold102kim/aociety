@@ -27,6 +27,11 @@ public class Aociety : ModuleRules
             "UMG",
             "Slate",
             "SlateCore",
+            "AnimGraphRuntime",
+            "PoseSearch",
+            "BlendStack",
+            "IKRig",
+            "AnimationWarpingRuntime",
             "OpenCV",
             "OpenCVHelper"
         });

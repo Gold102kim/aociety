@@ -87,7 +87,7 @@ void UAocietyNPCBubbleWidget::SetIdle(const FString& InDisplayName)
     DisplayName = InDisplayName;
     Message = TEXT("正在小镇中散步");
     Source = TEXT("idle");
-    Model = TEXT("glm-5.2");
+    Model = TEXT("deepseek-v4-flash");
     bIsThinking = false;
     bIsListening = false;
     bIsRealtimeResponse = false;
@@ -101,7 +101,7 @@ void UAocietyNPCBubbleWidget::SetThinking(
     DisplayName = InDisplayName;
     Message = TEXT("正在观察你和周围环境…");
     Source = TEXT("pending");
-    Model = InModel.IsEmpty() ? TEXT("glm-5.2") : InModel;
+    Model = InModel.IsEmpty() ? TEXT("deepseek-v4-flash") : InModel;
     bIsThinking = true;
     bIsListening = false;
     bIsRealtimeResponse = false;
@@ -116,7 +116,7 @@ void UAocietyNPCBubbleWidget::SetListening(
     DisplayName = InDisplayName;
     Message = FString::Printf(TEXT("正在听 %s 说话…"), *InSpeakerName);
     Source = TEXT("pending");
-    Model = InModel.IsEmpty() ? TEXT("glm-5.2") : InModel;
+    Model = InModel.IsEmpty() ? TEXT("deepseek-v4-flash") : InModel;
     bIsThinking = false;
     bIsListening = true;
     bIsRealtimeResponse = false;

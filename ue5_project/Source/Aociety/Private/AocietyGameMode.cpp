@@ -87,7 +87,7 @@ void AAocietyGameMode::BeginPlay()
         }
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[AocietyGameMode] Bound %d GLM dialogue triggers"),
+    UE_LOG(LogTemp, Log, TEXT("[AocietyGameMode] Bound %d DeepSeek dialogue triggers"),
            DialogueTriggers.Num());
 
     GetWorldTimerManager().SetTimer(
