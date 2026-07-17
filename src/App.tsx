@@ -279,7 +279,7 @@ function formatProfileDate(value: string) {
 function ProfilePage({ user, onBack, onLogout }: { user: LauncherUser; onBack: () => void; onLogout: () => void }) {
   const profile = user.basicQuestionnaire;
   const valueOrEmpty = (value?: string) => value || '未填写';
-  const [section, setSection] = useState<'overview' | 'personal' | 'preferences' | 'ai' | 'security'>('overview');
+  const [section, setSection] = useState<'personal' | 'preferences' | 'ai' | 'security'>('personal');
 
   return (
     <section className="profile-content">
@@ -297,7 +297,6 @@ function ProfilePage({ user, onBack, onLogout }: { user: LauncherUser; onBack: (
       </header>
 
       <PageTabs active={section} onChange={setSection} items={[
-        { value: 'overview', label: '总览' },
         { value: 'personal', label: '个人资料' },
         { value: 'preferences', label: '偏好' },
         { value: 'ai', label: 'AI 档案' },
@@ -352,7 +351,7 @@ function ProfilePage({ user, onBack, onLogout }: { user: LauncherUser; onBack: (
 }
 
 function WorldPage({ user, onLaunch }: { user: LauncherUser; onLaunch: () => void }) {
-  const [section, setSection] = useState<'overview' | 'map' | 'events' | 'travel'>('overview');
+  const [section, setSection] = useState<'map' | 'events' | 'travel'>('map');
   const regions = [
     { name: '中央小镇', type: '核心社交区域', status: '原型开发中', className: 'central' },
     { name: '霓虹街区', type: '夜间娱乐区域', status: '尚未开放', className: 'neon' },
@@ -368,7 +367,6 @@ function WorldPage({ user, onLaunch }: { user: LauncherUser; onLaunch: () => voi
       </header>
 
       <PageTabs active={section} onChange={setSection} items={[
-        { value: 'overview', label: '总览' },
         { value: 'map', label: '区域地图' },
         { value: 'events', label: '世界事件', badge: '3' },
         { value: 'travel', label: '旅行记录', badge: '2' },
@@ -438,7 +436,7 @@ function AvatarPage({
 }) {
   const profile = user.basicQuestionnaire;
   const interests = profile?.interests.filter(Boolean) ?? [];
-  const [section, setSection] = useState<'overview' | 'appearance' | 'personality' | 'roadmap' | 'chat'>('overview');
+  const [section, setSection] = useState<'appearance' | 'personality' | 'roadmap' | 'chat'>('appearance');
 
   return (
     <section className={`avatar-content avatar-section-${section}`}>
@@ -448,7 +446,6 @@ function AvatarPage({
       </header>
 
       <PageTabs active={section} onChange={(value) => value === 'chat' ? onChat() : setSection(value)} items={[
-        { value: 'overview', label: '总览' },
         { value: 'appearance', label: '外观' },
         { value: 'personality', label: '人格' },
         { value: 'roadmap', label: '分身档案' },
@@ -604,7 +601,7 @@ function AiChatPage({ user, onBack }: { user: LauncherUser; onBack: () => void }
 function SocialPage({ user, onLaunch }: { user: LauncherUser; onLaunch: () => void }) {
   const [search, setSearch] = useState('');
   const [searched, setSearched] = useState(false);
-  const [section, setSection] = useState<'overview' | 'inbox' | 'friends' | 'discover'>('overview');
+  const [section, setSection] = useState<'inbox' | 'friends' | 'discover'>('inbox');
   const interests = user.aiAgent.preferences.interests.filter(Boolean);
 
   const submitSearch = (event: FormEvent) => {
@@ -620,7 +617,6 @@ function SocialPage({ user, onLaunch }: { user: LauncherUser; onLaunch: () => vo
       </header>
 
       <PageTabs active={section} onChange={setSection} items={[
-        { value: 'overview', label: '总览' },
         { value: 'inbox', label: '消息', badge: '3' },
         { value: 'friends', label: '好友', badge: '3' },
         { value: 'discover', label: '探索玩家' },

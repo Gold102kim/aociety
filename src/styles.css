@@ -229,7 +229,6 @@ form input::placeholder { color: #505969; }
 .logout-button { grid-column: 1 / -1; width: 100%; margin-top: 20px; padding: 11px; color: #e19a9e; background: rgba(204,65,76,.07); border: 1px solid rgba(204,65,76,.28); border-radius: 4px; font-size: 10px; cursor: pointer; }
 .logout-button:hover { color: white; background: #bf3f49; border-color: #bf3f49; }
 
-.profile-section-overview .logout-card { display: none; }
 .profile-section-personal, .profile-section-preferences, .profile-section-ai, .profile-section-security { grid-template-columns: 1fr; }
 .profile-section-personal .profile-side-column, .profile-section-preferences .profile-side-column { display: none; }
 .profile-section-personal .preference-field { display: none; }
@@ -324,8 +323,6 @@ form input::placeholder { color: #505969; }
 .world-region-card.coast { background-color: #101820; }
 .world-region-card.cafe { background-color: #181614; }
 
-.world-section-overview .world-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.world-section-overview .world-metrics article:nth-child(2), .world-section-overview .world-metrics article:nth-child(3), .world-section-overview .world-region-section { display: none; }
 .world-section-map .world-metrics, .world-section-map .world-side-column { display: none; }
 .world-section-map .world-layout { grid-template-columns: 1fr; }
 .world-section-events .world-metrics, .world-section-events .world-map-card, .world-section-events .world-travel-card, .world-section-events .world-region-section { display: none; }
@@ -398,7 +395,6 @@ form input::placeholder { color: #505969; }
 .avatar-creation-roadmap li.current > i { color: var(--accent-contrast); background: var(--accent); border-color: var(--accent); }
 .avatar-creation-roadmap li.current strong { color: #dce2e9; }
 
-.avatar-section-overview .avatar-creation-roadmap { display: none; }
 .avatar-section-appearance .avatar-page-layout, .avatar-section-personality .avatar-page-layout, .avatar-section-roadmap .avatar-page-layout { grid-template-columns: 1fr; }
 .avatar-section-appearance .avatar-info-column { display: none; }
 .avatar-section-personality .avatar-preview-card, .avatar-section-personality .avatar-creation-roadmap { display: none; }
@@ -540,9 +536,6 @@ form input::placeholder { color: #505969; }
 .social-agent-state span { color: #626d7b; font-size: 8px; }
 .social-agent-state strong { color: var(--accent); font-size: 10px; }
 
-.social-section-overview .social-search-card { display: none; }
-.social-section-overview .social-feed > article:nth-child(3) { display: none; }
-.social-section-overview .social-inbox { min-height: 380px; }
 .social-section-inbox .social-metrics, .social-section-inbox .social-side-column, .social-section-inbox .social-preference-card { display: none; }
 .social-section-inbox .social-layout { grid-template-columns: 1fr; }
 .social-section-inbox .social-inbox { min-height: 560px; }
