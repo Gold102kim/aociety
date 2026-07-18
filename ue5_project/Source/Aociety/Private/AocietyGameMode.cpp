@@ -4,7 +4,6 @@
 #include "AocietyClientSubsystem.h"
 #include "AocietyPlayerCharacter.h"
 #include "AocietyNPCCharacter.h"
-#include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
@@ -171,14 +170,6 @@ void AAocietyGameMode::HandleNPCDialogue(FAocietyNPCDialogue Dialogue)
 
     UE_LOG(LogTemp, Log, TEXT("[Aociety][NPC] %s: %s (%s)"),
            *Dialogue.NpcId, *Dialogue.Message, *Attribution);
-
-    if (GEngine && !Dialogue.Message.IsEmpty())
-    {
-        GEngine->AddOnScreenDebugMessage(
-            -1, 12.0f, FColor(160, 235, 255),
-            FString::Printf(TEXT("%s：%s\n[%s]"),
-                *SpeakerName, *Dialogue.Message, *Attribution));
-    }
 
     if (!Speaker)
     {

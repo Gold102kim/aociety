@@ -13,7 +13,6 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "HAL/FileManager.h"
-#include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "EngineUtils.h"
 #include "Misc/App.h"
@@ -426,13 +425,6 @@ void AAocietyPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerI
 void AAocietyPlayerCharacter::SetNearbyNPC(AAocietyNPCCharacter* NPC)
 {
     NearbyNPC = NPC;
-    if (GEngine && IsValid(NPC))
-    {
-        GEngine->AddOnScreenDebugMessage(
-            -1, 6.0f, FColor(255, 220, 120),
-            FString::Printf(TEXT("按 E 与 %s [%s] 交谈"),
-                *NPC->DisplayName, *NPC->NpcId));
-    }
 }
 
 void AAocietyPlayerCharacter::ClearNearbyNPC(AAocietyNPCCharacter* NPC)
@@ -448,12 +440,6 @@ void AAocietyPlayerCharacter::Interact()
     AAocietyNPCCharacter* NPC = NearbyNPC.Get();
     if (!IsValid(NPC))
     {
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(
-                -1, 2.5f, FColor(180, 210, 255),
-                TEXT("请先靠近一名居民"));
-        }
         return;
     }
 
