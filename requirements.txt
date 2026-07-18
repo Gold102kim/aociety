@@ -1,0 +1,19 @@
+fastapi>=0.128.0
+uvicorn[standard]>=0.40.0
+openai>=1.0.0
+httpx>=0.28.0
+pydantic>=2.0.0
+python-multipart>=0.0.5
+websockets>=10.0
+numpy>=1.24.0
+socksio>=1.0.0
+
+# 情感计算 — 视觉
+opencv-python>=4.8.0
+mediapipe>=0.10.0
+onnxruntime>=1.15.0
+
+# 情感计算 — 音频 (可选)
+# pyaudio>=0.2.11
+# sounddevice>=0.4.0
+# sherpa_onnx>=1.10.0

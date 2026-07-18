@@ -1,5 +1,11 @@
 # aociety · EchoVerse Launcher
 
+## UE5 Aociety 游戏 Demo
+
+仓库同时包含 UE5.8 森林小镇 Demo、DeepSeek 实时居民服务和硬件情感计算接口。游戏内有 Ecy 第三人称角色、两名自主漫游居民、NPC-NPC 对话与玩家按 `E` 交互；居民回复由 `deepseek-v4-flash` 实时生成，失败时明确显示 `source=error`，不会用固定台词冒充模型结果。
+
+游戏、后端、Motion Matching、地图和验收说明见 [Aociety UE5 Demo](docs/AOCIETY_UE5_DEMO.md)。主动式情感关怀仍属于硬件端，游戏只提供场景、交互和必要的情绪上下文。
+
 EchoVerse 的 Windows Electron 启动器工程。当前版本是可构建、可测试、可回滚的内部原型，覆盖账户入口、首次资料、世界/社交/虚拟分身页面、人格 AI 对话、透明伴生模式，以及向 UE5 游戏交付启动会话的接口。
 
 它还不是可公开运营的平台：账户仍保存在本机，AI 仍由开发机配置直连供应商，游戏票据仍是联调用原型。生产边界和阻断项见 [工程审计](docs/ENGINEERING_AUDIT.md) 与 [安全说明](SECURITY.md)。

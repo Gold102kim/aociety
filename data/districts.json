@@ -1,0 +1,49 @@
+[
+  {
+    "id": "slum",
+    "name": "贫民街",
+    "state": "normal",
+    "rent_pressure": 70,
+    "traffic": 58,
+    "subregions": [
+      {"id": "forest_farm", "name": "左岸台地", "scene_id": "forest_farm", "entry_spawn_id": "farm_gate"},
+      {"id": "courtyard_garden", "name": "鱼市前街", "scene_id": "courtyard_garden", "entry_spawn_id": "garden_path"},
+      {"id": "wild_path", "name": "坡巷旧屋", "scene_id": "wild_path", "entry_spawn_id": "trail_bend"}
+    ]
+  },
+  {
+    "id": "port",
+    "name": "港口",
+    "state": "normal",
+    "rent_pressure": 48,
+    "traffic": 72,
+    "subregions": [
+      {"id": "shipyard_workshop", "name": "船坞工坊", "scene_id": "shipyard_workshop", "entry_spawn_id": "dock_ramp"},
+      {"id": "canal_harbor", "name": "运河小港", "scene_id": "canal_harbor", "entry_spawn_id": "canal_steps"},
+      {"id": "stonebridge_quarter", "name": "石桥住区", "scene_id": "stonebridge_quarter", "entry_spawn_id": "bridge_square"}
+    ]
+  },
+  {
+    "id": "factory",
+    "name": "工厂区",
+    "state": "tense",
+    "rent_pressure": 52,
+    "traffic": 66,
+    "subregions": [
+      {"id": "watermill_yard", "name": "水车磨坊", "scene_id": "watermill_yard", "entry_spawn_id": "mill_gate"},
+      {"id": "stoneyard_workcamp", "name": "石院工棚", "scene_id": "stoneyard_workcamp", "entry_spawn_id": "yard_entry"}
+    ]
+  },
+  {
+    "id": "exchange",
+    "name": "交易所",
+    "state": "prosperous",
+    "rent_pressure": 61,
+    "traffic": 74,
+    "subregions": [
+      {"id": "clocktower_market", "name": "钟楼市场", "scene_id": "clocktower_market", "entry_spawn_id": "market_gate"},
+      {"id": "rune_tower", "name": "符文塔楼", "scene_id": "rune_tower", "entry_spawn_id": "tower_steps"},
+      {"id": "church_graveyard", "name": "教堂墓园", "scene_id": "church_graveyard", "entry_spawn_id": "grave_path"}
+    ]
+  }
+]

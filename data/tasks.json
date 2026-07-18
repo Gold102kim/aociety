@@ -1,0 +1,38 @@
+[
+  {
+    "id": "task_egret_credit",
+    "title": "海藻账房先听风",
+    "family": "海藻家族",
+    "district": "贫民街",
+    "description": "海藻家族想知道街头是不是已经开始为粮价发紧。去打听 2 次消息，再把风向带回市集。",
+    "requirement": {"type": "gather_info", "target": "any", "quantity": 2},
+    "reward": {"cash": 12, "reputation": 2, "family_relation": 10, "family_name": "海藻家族"}
+  },
+  {
+    "id": "task_wolf_coal",
+    "title": "龟甲要看谁敢压工价",
+    "family": "龟甲船坞",
+    "district": "工厂区",
+    "description": "龟甲船坞正在摸工区风向。完成 2 次煤的买卖，让他们知道你看得懂产线情绪。",
+    "requirement": {"type": "trade_goods", "target": "煤", "quantity": 2},
+    "reward": {"cash": 15, "reputation": 1, "family_relation": 12, "family_name": "龟甲船坞"}
+  },
+  {
+    "id": "task_owl_headline",
+    "title": "珊瑚想看你会不会顺势下注",
+    "family": "珊瑚银行",
+    "district": "交易所",
+    "description": "买入一次珊瑚金控，再结束一天。珊瑚银行想看你会不会跟着情绪走。",
+    "requirement": {"type": "swing_trade_media", "target": "珊瑚金控", "quantity": 1},
+    "reward": {"cash": 18, "reputation": 2, "family_relation": 11, "family_name": "珊瑚银行"}
+  },
+  {
+    "id": "task_slum_bread",
+    "title": "贫民街今天先吃上饭",
+    "family": "街头互助会",
+    "district": "贫民街",
+    "description": "买入或卖出 2 次面包，证明你还记得底层最先在乎的是什么。",
+    "requirement": {"type": "trade_goods", "target": "面包", "quantity": 2},
+    "reward": {"cash": 10, "reputation": 3, "family_relation": 6, "family_name": "街头互助会"}
+  }
+]

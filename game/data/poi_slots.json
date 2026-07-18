@@ -1,0 +1,773 @@
+{
+  "HQ_Victor_Desk": {
+    "x": 1450.0,
+    "y": 380.0,
+    "district": "???",
+    "subregion_id": "rune_tower",
+    "capacity": 1
+  },
+  "HQ_Victor_Desk_Locked": {
+    "x": 1450.0,
+    "y": 380.0,
+    "district": "???",
+    "subregion_id": "rune_tower",
+    "capacity": 1
+  },
+  "HQ_Silas_Terminal": {
+    "x": 1320.0,
+    "y": 430.0,
+    "district": "???",
+    "subregion_id": "rune_tower",
+    "capacity": 1
+  },
+  "HQ_DarkPool_Terminal_A": {
+    "x": 1280.0,
+    "y": 470.0,
+    "district": "???",
+    "subregion_id": "rune_tower",
+    "capacity": 1
+  },
+  "HQ_DarkPool_Terminals": {
+    "x": 1340.0,
+    "y": 520.0,
+    "district": "???",
+    "subregion_id": "rune_tower",
+    "capacity": 3
+  },
+  "HQ_Finance_Desk": {
+    "x": 1390.0,
+    "y": 470.0,
+    "district": "???",
+    "subregion_id": "rune_tower",
+    "capacity": 1
+  },
+  "HQ_Legal_Desk": {
+    "x": 1240.0,
+    "y": 570.0,
+    "district": "???",
+    "subregion_id": "rune_tower",
+    "capacity": 1
+  },
+  "HQ_Guest_Room": {
+    "x": 1300.0,
+    "y": 520.0,
+    "district": "???",
+    "subregion_id": "rune_tower",
+    "capacity": 1
+  },
+  "HQ_Garage_Shadow": {
+    "x": 1460.0,
+    "y": 720.0,
+    "district": "???",
+    "subregion_id": "rune_tower",
+    "capacity": 1
+  },
+  "HQ_Lobby_Safe_Room": {
+    "x": 1360.0,
+    "y": 650.0,
+    "district": "???",
+    "subregion_id": "rune_tower",
+    "capacity": 2
+  },
+  "HQ_Lobby_Gate_Outside": {
+    "x": 1380.0,
+    "y": 760.0,
+    "district": "???",
+    "subregion_id": "rune_tower",
+    "capacity": 2
+  },
+  "HQ_Lobby_Gate_Outside_Flank": {
+    "x": 1260.0,
+    "y": 770.0,
+    "district": "???",
+    "subregion_id": "rune_tower",
+    "capacity": 2
+  },
+  "HQ_Square_Center": {
+    "x": 1450.0,
+    "y": 860.0,
+    "district": "???",
+    "subregion_id": "rune_tower",
+    "capacity": 4
+  },
+  "Villa_Golf_Hole_18": {
+    "x": 2240.0,
+    "y": 520.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 2,
+    "fallback_slot": "Club_VIP_Booth"
+  },
+  "Villa_Evelyn_Apt": {
+    "x": 2140.0,
+    "y": 600.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 1
+  },
+  "Villa_Umbrella_Seat": {
+    "x": 2170.0,
+    "y": 560.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 2
+  },
+  "Club_VIP_Booth": {
+    "x": 2480.0,
+    "y": 250.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 3
+  },
+  "Club_Back_Alley": {
+    "x": 2560.0,
+    "y": 360.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 2
+  },
+  "Club_Hostess": {
+    "x": 2440.0,
+    "y": 300.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Police_HQ_Office": {
+    "x": 1780.0,
+    "y": 470.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 1
+  },
+  "Police_Briefing_Room": {
+    "x": 1760.0,
+    "y": 520.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 5
+  },
+  "Police_HQ_Window": {
+    "x": 1780.0,
+    "y": 430.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 1
+  },
+  "TH_Archive_Room": {
+    "x": 1840.0,
+    "y": 500.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 1
+  },
+  "TH_Gate": {
+    "x": 1880.0,
+    "y": 620.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 3
+  },
+  "TH_Gate_Steps": {
+    "x": 1880.0,
+    "y": 660.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 4
+  },
+  "TH_Mayor_Office_Chair": {
+    "x": 1870.0,
+    "y": 480.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 1
+  },
+  "TH_Mayor_Office_Desk": {
+    "x": 1900.0,
+    "y": 500.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 1
+  },
+  "TH_Mayor_Office_Guest": {
+    "x": 1940.0,
+    "y": 500.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 2
+  },
+  "TH_Mayor_Office_Corridor": {
+    "x": 1920.0,
+    "y": 540.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 2
+  },
+  "TH_Police_Desk_Hidden": {
+    "x": 1800.0,
+    "y": 520.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 1
+  },
+  "TH_Hospital_Corridor": {
+    "x": 1960.0,
+    "y": 560.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 2
+  },
+  "TH_Hospital_Director_Room": {
+    "x": 1980.0,
+    "y": 520.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 1
+  },
+  "News_JJ_Desk": {
+    "x": 2270.0,
+    "y": 240.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "News_Printing_Press": {
+    "x": 2330.0,
+    "y": 260.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "News_Public_Noticeboard": {
+    "x": 2360.0,
+    "y": 300.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 3
+  },
+  "Clinic_Surgery_Table": {
+    "x": 2000.0,
+    "y": 560.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 1
+  },
+  "Clinic_Medicine_Cabinet": {
+    "x": 2050.0,
+    "y": 560.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 1
+  },
+  "Clinic_Waiting_Bench": {
+    "x": 2100.0,
+    "y": 590.0,
+    "district": "???",
+    "subregion_id": "church_graveyard",
+    "capacity": 4
+  },
+  "Factory_Sarah_Podium": {
+    "x": 2010.0,
+    "y": 1320.0,
+    "district": "???",
+    "subregion_id": "watermill_yard",
+    "capacity": 3
+  },
+  "Admin_Graves_Desk": {
+    "x": 2260.0,
+    "y": 1080.0,
+    "district": "???",
+    "subregion_id": "watermill_yard",
+    "capacity": 1
+  },
+  "Admin_Security_Locker": {
+    "x": 2300.0,
+    "y": 1100.0,
+    "district": "???",
+    "subregion_id": "watermill_yard",
+    "capacity": 2
+  },
+  "Dock_Wh7_Meeting": {
+    "x": 1450.0,
+    "y": 1540.0,
+    "district": "??",
+    "subregion_id": "shipyard_workshop",
+    "capacity": 2
+  },
+  "Dock_Wh7_Loading_Bay": {
+    "x": 1520.0,
+    "y": 1580.0,
+    "district": "??",
+    "subregion_id": "shipyard_workshop",
+    "capacity": 2
+  },
+  "Dock_Lookout": {
+    "x": 1320.0,
+    "y": 1180.0,
+    "district": "??",
+    "subregion_id": "canal_harbor",
+    "capacity": 1
+  },
+  "Dock_Escape_Point": {
+    "x": 1500.0,
+    "y": 1800.0,
+    "district": "??",
+    "subregion_id": "shipyard_workshop",
+    "capacity": 1
+  },
+  "Sam_Mainframe_Terminal": {
+    "x": 1460.0,
+    "y": 1720.0,
+    "district": "??",
+    "subregion_id": "shipyard_workshop",
+    "capacity": 1
+  },
+  "Apt_Player_Room": {
+    "x": 610.0,
+    "y": 560.0,
+    "district": "???",
+    "subregion_id": "forest_farm",
+    "capacity": 1
+  },
+  "Apt_Corridor_Eviction": {
+    "x": 590.0,
+    "y": 540.0,
+    "district": "???",
+    "subregion_id": "forest_farm",
+    "capacity": 4
+  },
+  "Apt_Stairwell_Dark": {
+    "x": 560.0,
+    "y": 600.0,
+    "district": "???",
+    "subregion_id": "forest_farm",
+    "capacity": 2
+  },
+  "Bunker_Podium": {
+    "x": 350.0,
+    "y": 1500.0,
+    "district": "???",
+    "subregion_id": "wild_path",
+    "capacity": 2
+  },
+  "Bunker_Map_Table": {
+    "x": 420.0,
+    "y": 1520.0,
+    "district": "???",
+    "subregion_id": "wild_path",
+    "capacity": 3
+  },
+  "Bunker_Radio_Array": {
+    "x": 470.0,
+    "y": 1490.0,
+    "district": "???",
+    "subregion_id": "wild_path",
+    "capacity": 1
+  },
+  "Sewer_Deep_Hub": {
+    "x": 250.0,
+    "y": 1550.0,
+    "district": "???",
+    "subregion_id": "wild_path",
+    "capacity": 1
+  },
+  "Sewer_Ladder_To_Dock": {
+    "x": 780.0,
+    "y": 1560.0,
+    "district": "???",
+    "subregion_id": "wild_path",
+    "capacity": 1
+  },
+  "Apt_Hudson_Door": {
+    "x": 560.0,
+    "y": 520.0,
+    "district": "???",
+    "subregion_id": "forest_farm",
+    "capacity": 1
+  },
+  "Slum_Apt_Hudson_Room": {
+    "x": 540.0,
+    "y": 560.0,
+    "district": "???",
+    "subregion_id": "canal_harbor",
+    "capacity": 1
+  },
+  "Slum_Apt_302": {
+    "x": 620.0,
+    "y": 540.0,
+    "district": "???",
+    "subregion_id": "canal_harbor",
+    "capacity": 1
+  },
+  "Slum_Corridor_Slot": {
+    "x": 590.0,
+    "y": 540.0,
+    "district": "???",
+    "subregion_id": "canal_harbor",
+    "capacity": 1
+  },
+  "Slum_Entrance": {
+    "x": 520.0,
+    "y": 620.0,
+    "district": "???",
+    "subregion_id": "canal_harbor",
+    "capacity": 1
+  },
+  "Slum_Alley_Corner": {
+    "x": 450.0,
+    "y": 760.0,
+    "district": "???",
+    "subregion_id": "canal_harbor",
+    "capacity": 1
+  },
+  "Slum_Alley_Entrance": {
+    "x": 390.0,
+    "y": 720.0,
+    "district": "???",
+    "subregion_id": "canal_harbor",
+    "capacity": 1
+  },
+  "Slum_Alley_Shadow": {
+    "x": 330.0,
+    "y": 820.0,
+    "district": "???",
+    "subregion_id": "canal_harbor",
+    "capacity": 1
+  },
+  "Slum_Sewer_Grate_01": {
+    "x": 410.0,
+    "y": 1460.0,
+    "district": "???",
+    "subregion_id": "wild_path",
+    "capacity": 1
+  },
+  "Slum_Sewer_Outlet": {
+    "x": 760.0,
+    "y": 1560.0,
+    "district": "???",
+    "subregion_id": "wild_path",
+    "capacity": 1
+  },
+  "Slum_Sewer_Deep": {
+    "x": 250.0,
+    "y": 1550.0,
+    "district": "???",
+    "subregion_id": "wild_path",
+    "capacity": 1
+  },
+  "Slum_Deep_Basement": {
+    "x": 300.0,
+    "y": 1580.0,
+    "district": "???",
+    "subregion_id": "wild_path",
+    "capacity": 1
+  },
+  "Slum_Hidden_Server_Room": {
+    "x": 500.0,
+    "y": 1480.0,
+    "district": "???",
+    "subregion_id": "canal_harbor",
+    "capacity": 1
+  },
+  "Slum_Bunker_Podium": {
+    "x": 350.0,
+    "y": 1500.0,
+    "district": "???",
+    "subregion_id": "wild_path",
+    "capacity": 1
+  },
+  "Louise_Rent_Room": {
+    "x": 680.0,
+    "y": 1500.0,
+    "district": "???",
+    "subregion_id": "wild_path",
+    "capacity": 1
+  },
+  "Secret_Radio_Station": {
+    "x": 700.0,
+    "y": 1490.0,
+    "district": "???",
+    "subregion_id": "wild_path",
+    "capacity": 1
+  },
+  "SN_Bob_Register": {
+    "x": 470.0,
+    "y": 1090.0,
+    "district": "???",
+    "subregion_id": "courtyard_garden",
+    "capacity": 1
+  },
+  "SN_Bob_Store_Door": {
+    "x": 430.0,
+    "y": 1080.0,
+    "district": "???",
+    "subregion_id": "courtyard_garden",
+    "capacity": 1
+  },
+  "Beach_Polluted_Edge": {
+    "x": 1180.0,
+    "y": 1210.0,
+    "district": "??",
+    "subregion_id": "canal_harbor",
+    "capacity": 1
+  },
+  "Clinic_Triage_Desk": {
+    "x": 1980.0,
+    "y": 610.0,
+    "district": "???",
+    "subregion_id": "canal_harbor",
+    "capacity": 1
+  },
+  "Comm_Tavern_Door": {
+    "x": 2100.0,
+    "y": 340.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Comm_Tavern_Backroom": {
+    "x": 2140.0,
+    "y": 300.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Comm_Tavern_Bar": {
+    "x": 2190.0,
+    "y": 320.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Comm_Tavern_Gambling": {
+    "x": 2260.0,
+    "y": 320.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Ruth_Bar_Corner": {
+    "x": 2120.0,
+    "y": 300.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Ruth_Bar_Stage": {
+    "x": 2180.0,
+    "y": 280.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Monument_Base": {
+    "x": 1450.0,
+    "y": 830.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Monument_Base_Shadow": {
+    "x": 1500.0,
+    "y": 870.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Monument_Notice_Board": {
+    "x": 1410.0,
+    "y": 870.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Comm_Center": {
+    "x": 1460.0,
+    "y": 860.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Comm_Center_Hideout": {
+    "x": 1530.0,
+    "y": 900.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Comm_Street": {
+    "x": 1320.0,
+    "y": 840.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Comm_Street_Node1": {
+    "x": 1250.0,
+    "y": 860.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Comm_Street_Node2": {
+    "x": 1370.0,
+    "y": 900.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Comm_Phone_Booth_01": {
+    "x": 920.0,
+    "y": 820.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Comm_Dark_Alley_Bribe": {
+    "x": 1580.0,
+    "y": 880.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Comm_News_Office": {
+    "x": 2300.0,
+    "y": 250.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "FB_Dock_Command_Center": {
+    "x": 1380.0,
+    "y": 1040.0,
+    "district": "??",
+    "subregion_id": "canal_harbor",
+    "capacity": 2
+  },
+  "FB_Dock_Command": {
+    "x": 1350.0,
+    "y": 1030.0,
+    "district": "??",
+    "subregion_id": "canal_harbor",
+    "capacity": 2
+  },
+  "FB_Cargo_Start_01": {
+    "x": 1180.0,
+    "y": 1510.0,
+    "district": "??",
+    "subregion_id": "shipyard_workshop",
+    "capacity": 1
+  },
+  "FB_Cargo_End_01": {
+    "x": 1510.0,
+    "y": 1600.0,
+    "district": "??",
+    "subregion_id": "shipyard_workshop",
+    "capacity": 1
+  },
+  "FB_Smuggle_Alley": {
+    "x": 930.0,
+    "y": 1650.0,
+    "district": "??",
+    "subregion_id": "shipyard_workshop",
+    "capacity": 1
+  },
+  "Dock_Entrance_Shadow": {
+    "x": 1020.0,
+    "y": 1460.0,
+    "district": "??",
+    "subregion_id": "shipyard_workshop",
+    "capacity": 1
+  },
+  "Family_Mansion_Study": {
+    "x": 900.0,
+    "y": 760.0,
+    "district": "??",
+    "subregion_id": "stonebridge_quarter",
+    "capacity": 1
+  },
+  "FC_Manager_Balcony": {
+    "x": 2210.0,
+    "y": 1040.0,
+    "district": "???",
+    "subregion_id": "watermill_yard",
+    "capacity": 1
+  },
+  "FC_Office_Desk": {
+    "x": 2240.0,
+    "y": 1120.0,
+    "district": "???",
+    "subregion_id": "watermill_yard",
+    "capacity": 1
+  },
+  "FC_Pollution_Outlet": {
+    "x": 2350.0,
+    "y": 1280.0,
+    "district": "???",
+    "subregion_id": "watermill_yard",
+    "capacity": 1
+  },
+  "FC_AssemblyLine_Slot_01": {
+    "x": 2080.0,
+    "y": 1180.0,
+    "district": "???",
+    "subregion_id": "watermill_yard",
+    "capacity": 2
+  },
+  "FC_AssemblyLine_Slot_02": {
+    "x": 2140.0,
+    "y": 1200.0,
+    "district": "???",
+    "subregion_id": "watermill_yard",
+    "capacity": 2
+  },
+  "FC_Gate_Strike_Center": {
+    "x": 2010.0,
+    "y": 1320.0,
+    "district": "???",
+    "subregion_id": "watermill_yard",
+    "capacity": 2
+  },
+  "FC_Manager_Office": {
+    "x": 2240.0,
+    "y": 1100.0,
+    "district": "???",
+    "subregion_id": "watermill_yard",
+    "capacity": 1
+  },
+  "Utility_Grid_Console": {
+    "x": 2400.0,
+    "y": 1200.0,
+    "district": "???",
+    "subregion_id": "watermill_yard",
+    "capacity": 1
+  },
+  "Comm_Cafe_Window": {
+    "x": 2230.0,
+    "y": 250.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Comm_Bar_VIP": {
+    "x": 2330.0,
+    "y": 290.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 2
+  },
+  "Comm_Bar_Counter": {
+    "x": 2190.0,
+    "y": 320.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 1
+  },
+  "Comm_Tavern_VIP": {
+    "x": 2280.0,
+    "y": 300.0,
+    "district": "???",
+    "subregion_id": "clocktower_market",
+    "capacity": 2
+  }
+}

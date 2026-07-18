@@ -14,3 +14,49 @@ release/
 Thumbs.db
 config/game.local.json
 config/ai.local.json
+
+# Python services and generated artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.pid
+backups/
+build_temp/
+artifacts/
+models/
+nul
+
+# Unreal generated output
+ue5_project/Binaries/
+ue5_project/DerivedDataCache/
+ue5_project/Intermediate/
+ue5_project/Saved/
+ue5_project/.vs/
+
+# Keep third-party environment packs local and track Aociety content.
+ue5_project/Content/*
+!ue5_project/Content/Aociety/
+!ue5_project/Content/Aociety/**
+!ue5_project/Content/Python/
+!ue5_project/Content/Python/**
+ue5_project/Content/Python/__pycache__/
+
+# Editor and local experiment state
+.vs/
+.idea/
+.vscode/
+*.sln
+*.suo
+*.opensdf
+*.sdf
+mcp_headers.txt
+mcp_init.json
+SourceAssets/Characters/NPC_VRoid/
+SourceAssets/Characters/Player_Ecy/AxisTests/
+SourceAssets/Characters/Player_Ecy/ExportFixedTest/
+ue5_project/Content/Aociety/Characters/EcyFixedTest/
+ue5_project/Content/Aociety/Characters/**/*_ImportedBackup.uasset
+ue5_project/Content/Aociety/Characters/GeneratedMaterials/MF3_Ecy_OutlineHidden.uasset
+ue5_project/Content/Python/import_ecy_fixed_test.py
+tools/render_ecy_*.py
+data/test_*
