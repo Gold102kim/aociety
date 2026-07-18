@@ -8,10 +8,14 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Components/WidgetComponent.h"
+#include "Engine/SkeletalMesh.h"
+#include "Animation/SkeletalMeshActor.h"
+#include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "GameFramework/PlayerController.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Materials/MaterialInterface.h"
 #include "TimerManager.h"
 
 namespace
@@ -29,6 +33,53 @@ void DisableLegacyWorldText(UTextRenderComponent* TextComponent)
     TextComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     TextComponent->SetCastShadow(false);
 }
+
+void ApplyResidentVariantMaterials(
+    USkeletalMeshComponent* VisualMesh,
+    const FString& NpcId)
+{
+    if (!VisualMesh)
+    {
+        return;
+    }
+
+    const TCHAR* ClothPath = nullptr;
+    const TCHAR* HairPath = nullptr;
+    if (NpcId == TEXT("npc_01"))
+    {
+        ClothPath = TEXT("/Game/Aociety/Characters/GeneratedMaterials/M_EcyNPC_Linxi_Cloth.M_EcyNPC_Linxi_Cloth");
+        HairPath = TEXT("/Game/Aociety/Characters/GeneratedMaterials/M_EcyNPC_Linxi_Hair.M_EcyNPC_Linxi_Hair");
+    }
+    else if (NpcId == TEXT("npc_02"))
+    {
+        ClothPath = TEXT("/Game/Aociety/Characters/GeneratedMaterials/M_EcyNPC_Sakura_Cloth.M_EcyNPC_Sakura_Cloth");
+        HairPath = TEXT("/Game/Aociety/Characters/GeneratedMaterials/M_EcyNPC_Sakura_Hair.M_EcyNPC_Sakura_Hair");
+    }
+
+    if (ClothPath)
+    {
+        if (UMaterialInterface* Cloth = LoadObject<UMaterialInterface>(nullptr, ClothPath))
+        {
+            VisualMesh->SetMaterial(0, Cloth);
+        }
+    }
+    if (HairPath)
+    {
+        if (UMaterialInterface* Hair = LoadObject<UMaterialInterface>(nullptr, HairPath))
+        {
+            VisualMesh->SetMaterial(3, Hair);
+        }
+    }
+}
+}
+
+USkeletalMeshComponent* AAocietyNPCCharacter::GetResidentVisual() const
+{
+    if (IsValid(RuntimeVisualActor))
+    {
+        return RuntimeVisualActor->GetSkeletalMeshComponent();
+    }
+    return GetMesh();
 }
 
 AAocietyNPCCharacter::AAocietyNPCCharacter()
@@ -52,6 +103,11 @@ AAocietyNPCCharacter::AAocietyNPCCharacter()
     ResidentVisual->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
     ResidentVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     ResidentVisual->SetGenerateOverlapEvents(false);
+    ResidentVisual->SetReceivesDecals(false);
+    ResidentVisual->SetVisibility(false, true);
+    ResidentVisual->SetHiddenInGame(true, true);
+
+    GetMesh()->SetReceivesDecals(false);
 
     Nameplate = CreateDefaultSubobject<UTextRenderComponent>(TEXT("Nameplate"));
     Nameplate->SetupAttachment(RootComponent);
@@ -93,6 +149,9 @@ void AAocietyNPCCharacter::BeginPlay()
 {
     Super::BeginPlay();
 
+    ResidentVisual->SetReceivesDecals(false);
+    GetMesh()->SetReceivesDecals(false);
+
     if (!GetActorScale3D().Equals(FVector::OneVector, KINDA_SMALL_NUMBER))
     {
         UE_LOG(LogTemp, Warning,
@@ -108,30 +167,64 @@ void AAocietyNPCCharacter::BeginPlay()
             *NpcId, *GetMesh()->GetRelativeScale3D().ToCompactString());
         GetMesh()->SetRelativeScale3D(FVector::OneVector);
     }
-    ResidentVisual->SetSkeletalMeshAsset(GetMesh()->GetSkeletalMeshAsset());
-    for (int32 MaterialIndex = 0;
-         MaterialIndex < GetMesh()->GetNumMaterials();
-         ++MaterialIndex)
-    {
-        ResidentVisual->SetMaterial(MaterialIndex, GetMesh()->GetMaterial(MaterialIndex));
-    }
-    ResidentVisual->SetRelativeLocation(FVector(0.0f, 0.0f, -46.0f));
-    ResidentVisual->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
-    ResidentVisual->SetRelativeScale3D(FVector::OneVector);
-    ResidentVisual->SetVisibility(true, true);
-    ResidentVisual->SetHiddenInGame(false, true);
-    ResidentVisual->SetOwnerNoSee(false);
-    ResidentVisual->SetOnlyOwnerSee(false);
-    ResidentVisual->SetRenderInMainPass(true);
-    ResidentVisual->SetRenderInDepthPass(true);
-    ResidentVisual->bEnableUpdateRateOptimizations = false;
-    ResidentVisual->VisibilityBasedAnimTickOption =
-        EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
-    ResidentVisual->bComponentUseFixedSkelBounds = true;
-    ResidentVisual->SetBoundsScale(1.5f);
-    ResidentVisual->MarkRenderStateDirty();
+    ResidentVisual->SetVisibility(false, true);
+    ResidentVisual->SetHiddenInGame(true, true);
     GetMesh()->SetVisibility(false, true);
     GetMesh()->SetHiddenInGame(true, true);
+
+    FActorSpawnParameters VisualSpawnParameters;
+    VisualSpawnParameters.Owner = this;
+    VisualSpawnParameters.SpawnCollisionHandlingOverride =
+        ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    VisualSpawnParameters.ObjectFlags |= RF_Transient;
+    RuntimeVisualActor = GetWorld()->SpawnActor<ASkeletalMeshActor>(
+        ASkeletalMeshActor::StaticClass(),
+        GetActorTransform(),
+        VisualSpawnParameters);
+    if (IsValid(RuntimeVisualActor))
+    {
+        RuntimeVisualActor->AttachToActor(
+            this, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+        RuntimeVisualActor->SetActorRelativeLocation(FVector(0.0f, 0.0f, -46.0f));
+        RuntimeVisualActor->SetActorRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
+        RuntimeVisualActor->SetActorRelativeScale3D(FVector::OneVector);
+
+        USkeletalMeshComponent* VisualMesh =
+            RuntimeVisualActor->GetSkeletalMeshComponent();
+        VisualMesh->SetSkeletalMeshAsset(GetMesh()->GetSkeletalMeshAsset());
+        for (int32 MaterialIndex = 0;
+             MaterialIndex < GetMesh()->GetNumMaterials();
+             ++MaterialIndex)
+        {
+            VisualMesh->SetMaterial(
+                MaterialIndex, GetMesh()->GetMaterial(MaterialIndex));
+        }
+        ApplyResidentVariantMaterials(VisualMesh, NpcId);
+        UE_LOG(LogTemp, Log,
+            TEXT("[AocietyNPC] %s visual cloth=%s hair=%s"),
+            *NpcId,
+            *GetPathNameSafe(VisualMesh->GetMaterial(0)),
+            *GetPathNameSafe(VisualMesh->GetMaterial(3)));
+        VisualMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        VisualMesh->SetGenerateOverlapEvents(false);
+        VisualMesh->SetReceivesDecals(false);
+        VisualMesh->SetVisibility(true, true);
+        VisualMesh->SetHiddenInGame(false, true);
+        VisualMesh->SetRenderInMainPass(true);
+        VisualMesh->SetRenderInDepthPass(true);
+        VisualMesh->bEnableUpdateRateOptimizations = false;
+        VisualMesh->VisibilityBasedAnimTickOption =
+            EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+        VisualMesh->bComponentUseFixedSkelBounds = true;
+        VisualMesh->SetBoundsScale(1.5f);
+        VisualMesh->MarkRenderStateDirty();
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error,
+            TEXT("[AocietyNPC] Could not create runtime visual for %s"),
+            *NpcId);
+    }
 
     HomeLocation = GetActorLocation();
     // Placed instances may retain serialized visibility from the retired
@@ -169,7 +262,6 @@ void AAocietyNPCCharacter::BeginPlay()
     }
     BeginWanderPause();
     PlayLocomotionAnimation(false);
-
     UE_LOG(LogTemp, Log,
         TEXT("[AocietyNPC] ready id=%s actor_scale=%s mesh_scale=%s idle=%s walk=%s"),
         *NpcId,
@@ -177,6 +269,17 @@ void AAocietyNPCCharacter::BeginPlay()
         *ResidentVisual->GetRelativeScale3D().ToCompactString(),
         *GetNameSafe(IdleAnimation),
         *GetNameSafe(WalkAnimation));
+}
+
+void AAocietyNPCCharacter::EndPlay(
+    const EEndPlayReason::Type EndPlayReason)
+{
+    if (IsValid(RuntimeVisualActor))
+    {
+        RuntimeVisualActor->Destroy();
+        RuntimeVisualActor = nullptr;
+    }
+    Super::EndPlay(EndPlayReason);
 }
 
 void AAocietyNPCCharacter::Tick(float DeltaSeconds)
@@ -362,9 +465,18 @@ void AAocietyNPCCharacter::PlayLocomotionAnimation(bool bMoving)
         return;
     }
 
-    ResidentVisual->SetRelativeScale3D(FVector::OneVector);
-    ResidentVisual->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-    ResidentVisual->PlayAnimation(Desired, true);
+    USkeletalMeshComponent* VisualMesh = GetResidentVisual();
+    if (!VisualMesh)
+    {
+        return;
+    }
+    if (VisualMesh->GetSkeletalMeshAsset() != GetMesh()->GetSkeletalMeshAsset())
+    {
+        return;
+    }
+    VisualMesh->SetRelativeScale3D(FVector::OneVector);
+    VisualMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+    VisualMesh->PlayAnimation(Desired, true);
     ActiveAnimation = Desired;
 
     UE_LOG(LogTemp, Log,

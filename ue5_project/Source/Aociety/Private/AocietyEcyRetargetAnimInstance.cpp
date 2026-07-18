@@ -25,16 +25,16 @@ void ConfigureDynamicsChain(
     Node.GravityScale = GravityScale;
     Node.Alpha = Alpha;
     Node.bOverrideLinearDamping = true;
-    Node.LinearDampingOverride = 0.92f;
+    Node.LinearDampingOverride = 0.96f;
     Node.bOverrideAngularDamping = true;
-    Node.AngularDampingOverride = 0.92f;
+    Node.AngularDampingOverride = 0.96f;
     Node.bOverrideAngularBias = true;
-    Node.AngularBiasOverride = 0.75f;
+    Node.AngularBiasOverride = 0.82f;
     Node.NumSolverIterationsPreUpdate = 8;
     Node.NumSolverIterationsPostUpdate = 4;
-    Node.ComponentLinearAccScale = FVector(0.035f);
-    Node.ComponentLinearVelScale = FVector(0.015f);
-    Node.ComponentAppliedLinearAccClamp = FVector(45.0f);
+    Node.ComponentLinearAccScale = FVector(0.004f);
+    Node.ComponentLinearVelScale = FVector(0.002f);
+    Node.ComponentAppliedLinearAccClamp = FVector(6.0f);
     Node.PhysicsBodyDefinitions.Reset(Bones.Num());
 
     for (const FName BoneName : Bones)
@@ -92,9 +92,9 @@ void FAocietyEcyRetargetAnimInstanceProxy::ConfigureGraph()
             TEXT("sk_L_009_151"),
             TEXT("sk_L_012_150"),
         },
-        0.24f,
-        0.08f,
-        9.0f);
+        0.045f,
+        0.02f,
+        3.0f);
     ConfigureDynamicsChain(
         RightSkirtDynamics,
         {
@@ -104,9 +104,9 @@ void FAocietyEcyRetargetAnimInstanceProxy::ConfigureGraph()
             TEXT("sk_R_009_166"),
             TEXT("sk_R_012_165"),
         },
-        0.24f,
-        0.08f,
-        9.0f);
+        0.045f,
+        0.02f,
+        3.0f);
     ConfigureDynamicsChain(
         HairDynamics,
         {
@@ -116,9 +116,9 @@ void FAocietyEcyRetargetAnimInstanceProxy::ConfigureGraph()
             TEXT("hair_h_001_R_001_59"),
             TEXT("hair_h_001_R_002_58"),
         },
-        0.16f,
-        0.04f,
-        6.0f);
+        0.05f,
+        0.015f,
+        3.0f);
 }
 
 void FAocietyEcyRetargetAnimInstanceProxy::Initialize(UAnimInstance* Instance)

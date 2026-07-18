@@ -16,6 +16,7 @@
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "EngineUtils.h"
+#include "Misc/App.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
@@ -63,11 +64,14 @@ AAocietyPlayerCharacter::AAocietyPlayerCharacter()
     MotionDriverMesh->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
     MotionDriverMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     MotionDriverMesh->SetGenerateOverlapEvents(false);
+    MotionDriverMesh->SetReceivesDecals(false);
     MotionDriverMesh->SetHiddenInGame(true);
     MotionDriverMesh->SetVisibility(false, true);
     MotionDriverMesh->SetCastShadow(false);
     MotionDriverMesh->VisibilityBasedAnimTickOption =
         EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+
+    GetMesh()->SetReceivesDecals(false);
 
     static ConstructorHelpers::FObjectFinder<USkeletalMesh> EcyMesh(
         TEXT("/Game/Aociety/Characters/Ecy/SK_Ecy.SK_Ecy"));
@@ -84,6 +88,8 @@ AAocietyPlayerCharacter::AAocietyPlayerCharacter()
             EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
         GetMesh()->bComponentUseFixedSkelBounds = true;
         GetMesh()->SetBoundsScale(1.5f);
+        GetMesh()->SetTeleportDistanceThreshold(140.0f);
+        GetMesh()->SetTeleportRotationThreshold(75.0f);
         GetMesh()->AddTickPrerequisiteComponent(MotionDriverMesh);
     }
 
@@ -93,10 +99,14 @@ void AAocietyPlayerCharacter::BeginPlay()
 {
     Super::BeginPlay();
 
+    GetMesh()->SetReceivesDecals(false);
+    MotionDriverMesh->SetReceivesDecals(false);
+
     const bool bRuntimeAuditRequested =
         FParse::Param(FCommandLine::Get(), TEXT("AocietyRuntimeAudit"));
     const UWorld* World = GetWorld();
     bRuntimeAuditEnabled = bRuntimeAuditRequested
+        && FApp::IsUnattended()
         && World
         && World->WorldType == EWorldType::Game;
     if (bRuntimeAuditRequested && !bRuntimeAuditEnabled)
@@ -137,6 +147,9 @@ void AAocietyPlayerCharacter::BeginPlay()
     const bool bRetargetReady = EcyInstance
         && EcyInstance->ConfigureRetarget(EcyRetargeter, MotionDriverMesh);
 
+    PreviousActorLocation = GetActorLocation();
+    bHasPreviousActorLocation = true;
+
     UE_LOG(
         LogTemp,
         Display,
@@ -151,6 +164,19 @@ void AAocietyPlayerCharacter::BeginPlay()
 void AAocietyPlayerCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+
+    const FVector CurrentActorLocation = GetActorLocation();
+    if (bHasPreviousActorLocation
+        && FVector::DistSquared(CurrentActorLocation, PreviousActorLocation)
+            > FMath::Square(140.0f))
+    {
+        if (UAnimInstance* EcyAnimInstance = GetMesh()->GetAnimInstance())
+        {
+            EcyAnimInstance->ResetDynamics(ETeleportType::ResetPhysics);
+        }
+    }
+    PreviousActorLocation = CurrentActorLocation;
+    bHasPreviousActorLocation = true;
 
     if (!bInitialCameraPitchApplied && Controller)
     {

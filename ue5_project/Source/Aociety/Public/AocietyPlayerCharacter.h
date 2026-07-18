@@ -54,7 +54,9 @@ private:
     TWeakObjectPtr<AAocietyNPCCharacter> NearbyNPC;
     float MotionEvidenceAccumulator = 0.0f;
     FVector PreviousLeftFootLocation = FVector::ZeroVector;
+    FVector PreviousActorLocation = FVector::ZeroVector;
     bool bHasPreviousLeftFootLocation = false;
+    bool bHasPreviousActorLocation = false;
     bool bInitialCameraPitchApplied = false;
     bool bRuntimeAuditEnabled = false;
     bool bRuntimeAuditIdleCaptured = false;

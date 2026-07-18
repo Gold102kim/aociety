@@ -9,6 +9,7 @@
 class UTextRenderComponent;
 class UWidgetComponent;
 class USkeletalMeshComponent;
+class ASkeletalMeshActor;
 
 UCLASS()
 class AOCIETY_API AAocietyNPCCharacter : public ACharacter
@@ -19,9 +20,10 @@ public:
     AAocietyNPCCharacter();
 
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void Tick(float DeltaSeconds) override;
 
-    USkeletalMeshComponent* GetResidentVisual() const { return ResidentVisual; }
+    USkeletalMeshComponent* GetResidentVisual() const;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Aociety|NPC")
     FString NpcId = TEXT("npc_01");
@@ -77,6 +79,9 @@ private:
 
     UPROPERTY(VisibleAnywhere, Category="Aociety|NPC")
     TObjectPtr<USkeletalMeshComponent> ResidentVisual;
+
+    UPROPERTY(Transient)
+    TObjectPtr<ASkeletalMeshActor> RuntimeVisualActor;
 
     FVector HomeLocation = FVector::ZeroVector;
     FVector WanderTarget = FVector::ZeroVector;

@@ -25,6 +25,8 @@ FAocietyMotionMatchingAnimInstanceProxy::FAocietyMotionMatchingAnimInstanceProxy
 
 void FAocietyMotionMatchingAnimInstanceProxy::ConfigureGraph()
 {
+    MotionMatchingNode.SetMaxActiveBlends(6);
+
     GroundAirBlendNode.A.SetLinkNode(&MotionMatchingNode);
     GroundAirBlendNode.B.SetLinkNode(&AirSequenceNode);
     GroundAirBlendNode.AlphaInputType = EAnimAlphaInputType::Bool;

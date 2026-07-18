@@ -49,6 +49,17 @@ def is_unit_scale(vector, tolerance=0.001):
     )
 
 
+def get_character_mesh_component(actor):
+    components = actor.get_components_by_class(unreal.SkeletalMeshComponent)
+    for component in components:
+        if component.get_name() == "CharacterMesh0":
+            return component
+    for component in components:
+        if component.get_name() != "ResidentVisual":
+            return component
+    raise RuntimeError(f"{actor.get_actor_label()} has no CharacterMesh0 component")
+
+
 def spawn_skeletal_actor(
     actor_subsystem, mesh, label, location, yaw, scale, tags, preview_animation=None
 ):
@@ -60,7 +71,7 @@ def spawn_skeletal_actor(
     actor.set_actor_label(label)
     actor.set_actor_scale3d(unreal.Vector(scale, scale, scale))
     actor.set_editor_property("tags", [unreal.Name(tag) for tag in tags])
-    component = actor.get_component_by_class(unreal.SkeletalMeshComponent)
+    component = get_character_mesh_component(actor)
     component.set_skeletal_mesh(mesh)
     if preview_animation:
         component.set_animation_mode(unreal.AnimationMode.ANIMATION_SINGLE_NODE)
@@ -110,7 +121,7 @@ def spawn_ai_npc(
     actor.set_editor_property("enable_wander", True)
     actor.set_editor_property("idle_animation", idle_animation)
     actor.set_editor_property("walk_animation", walk_animation)
-    component = actor.get_component_by_class(unreal.SkeletalMeshComponent)
+    component = get_character_mesh_component(actor)
     component.set_skinned_asset_and_update(mesh)
     component.set_animation_mode(unreal.AnimationMode.ANIMATION_SINGLE_NODE)
     component.set_animation(idle_animation)
@@ -148,12 +159,12 @@ if replace:
 if removed_lights:
     actor_subsystem.destroy_actors(removed_lights)
 
-npc_a_mesh = load("/Game/Aociety/Characters/NPC_Cute/AliciaSolid/SK_AliciaSolid")
-npc_c_mesh = load("/Game/Aociety/Characters/NPC_Cute/AliciaSakura/SK_AliciaSakura")
-npc_a_idle = load("/Game/Aociety/Characters/NPC_Cute/AliciaSolid/Animations/A_AliciaSolid_Idle")
-npc_a_walk = load("/Game/Aociety/Characters/NPC_Cute/AliciaSolid/Animations/A_AliciaSolid_Walk")
-npc_c_idle = load("/Game/Aociety/Characters/NPC_Cute/AliciaSakura/Animations/A_AliciaSakura_Idle")
-npc_c_walk = load("/Game/Aociety/Characters/NPC_Cute/AliciaSakura/Animations/A_AliciaSakura_Walk")
+npc_a_mesh = load("/Game/Aociety/Characters/Ecy/SK_Ecy")
+npc_c_mesh = load("/Game/Aociety/Characters/Ecy/SK_Ecy")
+npc_a_idle = load("/Game/Aociety/Characters/Ecy/Animations/A_Ecy_Idle")
+npc_a_walk = load("/Game/Aociety/Characters/Ecy/Animations/A_Ecy_Walk")
+npc_c_idle = load("/Game/Aociety/Characters/Ecy/Animations/A_Ecy_Idle")
+npc_c_walk = load("/Game/Aociety/Characters/Ecy/Animations/A_Ecy_Walk")
 npc_class = unreal.load_class(None, "/Script/Aociety.AocietyNPCCharacter")
 if not npc_class:
     raise RuntimeError("AocietyNPCCharacter native class is not loaded")
@@ -167,8 +178,8 @@ player_start.set_actor_label(f"{PREFIX}PlayerStart")
 player_start.set_actor_scale3d(unreal.Vector(1.0, 1.0, 1.0))
 
 npc_specs = (
-    ("npc_01", "林汐", npc_a_mesh, npc_a_idle, npc_a_walk, (-450.0, 980.0, 228.0), 215.0),
-    ("npc_02", "小樱", npc_c_mesh, npc_c_idle, npc_c_walk, (-850.0, 980.0, 228.0), 325.0),
+    ("npc_01", "林汐", npc_a_mesh, npc_a_idle, npc_a_walk, (-560.0, 930.0, 228.0), 180.0),
+    ("npc_02", "小樱", npc_c_mesh, npc_c_idle, npc_c_walk, (-740.0, 930.0, 228.0), 0.0),
 )
 
 for npc_id, display_name, mesh, idle, walk, location, yaw in npc_specs:
@@ -227,7 +238,7 @@ if final_trigger_ids != EXPECTED_NPC_IDS:
     errors.append(f"unexpected dialogue trigger IDs: {sorted(final_trigger_ids)}")
 
 for actor in final_npcs:
-    component = actor.get_component_by_class(unreal.SkeletalMeshComponent)
+    component = get_character_mesh_component(actor)
     if not is_unit_scale(actor.get_actor_scale3d()):
         errors.append(
             f"{actor.get_actor_label()} actor scale is {actor.get_actor_scale3d()}"

@@ -8,14 +8,14 @@ DIALOGUE_TRIGGER_TAG = "AocietyDialogueTrigger"
 MODEL_TAG = "DEEPSEEK_V4_FLASH"
 EXPECTED_NPCS = {
     "npc_01": {
-        "mesh": "/Game/Aociety/Characters/NPC_Cute/AliciaSolid/SK_AliciaSolid.SK_AliciaSolid",
-        "idle": "/Game/Aociety/Characters/NPC_Cute/AliciaSolid/Animations/A_AliciaSolid_Idle.A_AliciaSolid_Idle",
-        "walk": "/Game/Aociety/Characters/NPC_Cute/AliciaSolid/Animations/A_AliciaSolid_Walk.A_AliciaSolid_Walk",
+        "mesh": "/Game/Aociety/Characters/Ecy/SK_Ecy.SK_Ecy",
+        "idle": "/Game/Aociety/Characters/Ecy/Animations/A_Ecy_Idle.A_Ecy_Idle",
+        "walk": "/Game/Aociety/Characters/Ecy/Animations/A_Ecy_Walk.A_Ecy_Walk",
     },
     "npc_02": {
-        "mesh": "/Game/Aociety/Characters/NPC_Cute/AliciaSakura/SK_AliciaSakura.SK_AliciaSakura",
-        "idle": "/Game/Aociety/Characters/NPC_Cute/AliciaSakura/Animations/A_AliciaSakura_Idle.A_AliciaSakura_Idle",
-        "walk": "/Game/Aociety/Characters/NPC_Cute/AliciaSakura/Animations/A_AliciaSakura_Walk.A_AliciaSakura_Walk",
+        "mesh": "/Game/Aociety/Characters/Ecy/SK_Ecy.SK_Ecy",
+        "idle": "/Game/Aociety/Characters/Ecy/Animations/A_Ecy_Idle.A_Ecy_Idle",
+        "walk": "/Game/Aociety/Characters/Ecy/Animations/A_Ecy_Walk.A_Ecy_Walk",
     },
 }
 
