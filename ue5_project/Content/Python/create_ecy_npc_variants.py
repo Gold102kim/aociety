@@ -25,6 +25,11 @@ def create_tinted_material(asset_name, texture_path, tint, masked, roughness, sp
         raise RuntimeError(f"Could not create material: {asset_path}")
 
     material.set_editor_property("two_sided", masked)
+    unreal.MaterialEditingLibrary.set_base_material_usage(
+        material,
+        unreal.MaterialUsage.MATUSAGE_SKELETAL_MESH,
+        True,
+    )
     material.set_editor_property(
         "blend_mode",
         unreal.BlendMode.BLEND_MASKED if masked else unreal.BlendMode.BLEND_OPAQUE,
@@ -48,7 +53,7 @@ def create_tinted_material(asset_name, texture_path, tint, masked, roughness, sp
     blend_alpha = unreal.MaterialEditingLibrary.create_material_expression(
         material, unreal.MaterialExpressionConstant, -500, 210
     )
-    blend_alpha.set_editor_property("r", 0.82)
+    blend_alpha.set_editor_property("r", 0.58)
     unreal.MaterialEditingLibrary.connect_material_expressions(sample, "RGB", blend, "A")
     unreal.MaterialEditingLibrary.connect_material_expressions(tint_node, "", blend, "B")
     unreal.MaterialEditingLibrary.connect_material_expressions(blend_alpha, "", blend, "Alpha")
@@ -58,7 +63,7 @@ def create_tinted_material(asset_name, texture_path, tint, masked, roughness, sp
     emissive_strength = unreal.MaterialEditingLibrary.create_material_expression(
         material, unreal.MaterialExpressionConstant, -10, -20
     )
-    emissive_strength.set_editor_property("r", 0.15)
+    emissive_strength.set_editor_property("r", 0.025)
     emissive = unreal.MaterialEditingLibrary.create_material_expression(
         material, unreal.MaterialExpressionMultiply, 160, -80
     )
@@ -97,7 +102,7 @@ variants = (
     (
         "M_EcyNPC_Linxi_Cloth",
         f"{ECY_ROOT}/cloth_Base_color",
-        (0.92, 0.12, 0.58),
+        (0.55, 0.08, 0.30),
         False,
         0.86,
         0.22,
@@ -105,7 +110,7 @@ variants = (
     (
         "M_EcyNPC_Linxi_Hair",
         f"{ECY_ROOT}/hair_Base_color",
-        (0.72, 0.10, 0.96),
+        (0.36, 0.07, 0.52),
         True,
         0.64,
         0.30,
@@ -113,7 +118,7 @@ variants = (
     (
         "M_EcyNPC_Sakura_Cloth",
         f"{ECY_ROOT}/cloth_Base_color",
-        (0.08, 0.68, 1.00),
+        (0.05, 0.42, 0.66),
         False,
         0.86,
         0.22,
@@ -121,7 +126,7 @@ variants = (
     (
         "M_EcyNPC_Sakura_Hair",
         f"{ECY_ROOT}/hair_Base_color",
-        (0.92, 0.38, 0.06),
+        (0.48, 0.20, 0.05),
         True,
         0.64,
         0.30,
