@@ -7,7 +7,6 @@
 #include "Animation/AnimInstanceProxy.h"
 #include "Animation/AnimNodeSpaceConversions.h"
 #include "AnimNodes/AnimNode_RetargetPoseFromMesh.h"
-#include "BoneControllers/AnimNode_AnimDynamics.h"
 #include "BoneControllers/AnimNode_ModifyBone.h"
 #include "AocietyEcyRetargetAnimInstance.generated.h"
 
@@ -37,12 +36,12 @@ private:
 
     FAnimNode_RetargetPoseFromMesh RetargetNode;
     FAnimNode_ConvertLocalToComponentSpace LocalToComponentNode;
+    FAnimNode_ModifyBone RootTranslationFix;
     FAnimNode_ModifyBone HipsTranslationFix;
-    FAnimNode_AnimDynamics LeftSkirtDynamics;
-    FAnimNode_AnimDynamics RightSkirtDynamics;
-    FAnimNode_AnimDynamics HairDynamics;
     FAnimNode_ConvertComponentToLocalSpace ComponentToLocalNode;
+    FVector RootReferenceTranslation = FVector::ZeroVector;
     FVector HipsReferenceTranslation = FVector::ZeroVector;
+    bool bRootTranslationFixReady = false;
     bool bHipsTranslationFixReady = false;
 };
 

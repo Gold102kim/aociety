@@ -128,12 +128,11 @@ AAocietyNPCCharacter::AAocietyNPCCharacter()
 
     SolidBubble = CreateDefaultSubobject<UWidgetComponent>(TEXT("SolidBubble"));
     SolidBubble->SetupAttachment(RootComponent);
-    SolidBubble->SetRelativeLocation(FVector(0.0f, 0.0f, 242.0f));
-    SolidBubble->SetDrawSize(FVector2D(512.0f, 256.0f));
-    SolidBubble->SetRelativeScale3D(FVector(0.20f));
+    SolidBubble->SetRelativeLocation(FVector(0.0f, 0.0f, 150.0f));
+    SolidBubble->SetDrawSize(FVector2D(512.0f, 210.0f));
+    SolidBubble->SetRelativeScale3D(FVector(0.18f));
     SolidBubble->SetWidgetSpace(EWidgetSpace::World);
-    // Align the reference artwork's left-side tail with the speaker's head.
-    SolidBubble->SetPivot(FVector2D(0.34f, 1.0f));
+    SolidBubble->SetPivot(FVector2D(0.5f, 1.0f));
     SolidBubble->SetBlendMode(EWidgetBlendMode::Transparent);
     SolidBubble->SetBackgroundColor(FLinearColor::Transparent);
     SolidBubble->SetTintColorAndOpacity(FLinearColor::White);
@@ -238,11 +237,11 @@ void AAocietyNPCCharacter::BeginPlay()
     Movement->bOrientRotationToMovement = true;
     Movement->bUseControllerDesiredRotation = false;
     Movement->MaxWalkSpeed = WanderSpeed;
-    SolidBubble->SetRelativeLocation(FVector(0.0f, 0.0f, 242.0f));
-    SolidBubble->SetDrawSize(FVector2D(512.0f, 256.0f));
-    SolidBubble->SetRelativeScale3D(FVector(0.20f));
+    SolidBubble->SetRelativeLocation(FVector(0.0f, 0.0f, 150.0f));
+    SolidBubble->SetDrawSize(FVector2D(512.0f, 210.0f));
+    SolidBubble->SetRelativeScale3D(FVector(0.18f));
     SolidBubble->SetWidgetSpace(EWidgetSpace::World);
-    SolidBubble->SetPivot(FVector2D(0.34f, 1.0f));
+    SolidBubble->SetPivot(FVector2D(0.5f, 1.0f));
     SolidBubble->SetBlendMode(EWidgetBlendMode::Transparent);
     SolidBubble->SetBackgroundColor(FLinearColor::Transparent);
     SolidBubble->SetTintColorAndOpacity(FLinearColor::White);
