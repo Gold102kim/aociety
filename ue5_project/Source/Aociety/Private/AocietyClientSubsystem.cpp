@@ -11,6 +11,9 @@
 #include "Misc/Base64.h"
 #include "Misc/DateTime.h"
 #include "Misc/Guid.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "HAL/FileManager.h"
 #include "IWebSocket.h"
 #include "WebSocketsModule.h"
 #include "Sound/SoundWave.h"
@@ -29,6 +32,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogAociety, Log, All);
 void UAocietyClientSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
     Super::Initialize(Collection);
+    LoadConversationHistory();
     UE_LOG(LogAociety, Log, TEXT("[Aociety] Subsystem initialized"));
     if (bAutoConnect)
     {
@@ -38,6 +42,7 @@ void UAocietyClientSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UAocietyClientSubsystem::Deinitialize()
 {
+    SaveConversationHistory();
     Disconnect();
     Super::Deinitialize();
 }
@@ -301,6 +306,18 @@ void UAocietyClientSubsystem::RequestNPCDialogue(const FString& NpcId,
     const FString CounterpartId = bAmbient
         ? (NpcId == TEXT("npc_01") ? TEXT("npc_02") : TEXT("npc_01"))
         : TEXT("");
+    if (!bAmbient)
+    {
+        FAocietyConversationEntry PlayerEntry;
+        PlayerEntry.NpcId = NpcId;
+        PlayerEntry.Sender = TEXT("player");
+        PlayerEntry.Text = PlayerInput;
+        PlayerEntry.Source = TEXT("player");
+        PlayerEntry.Model = TEXT("local-input");
+        PlayerEntry.Timestamp = FDateTime::UtcNow().ToIso8601();
+        PlayerEntry.bFromPlayer = true;
+        AppendConversationEntry(PlayerEntry);
+    }
     FVector PlayerLocation = FVector::ZeroVector;
     if (const APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0))
     {
@@ -322,6 +339,152 @@ void UAocietyClientSubsystem::RequestNPCDialogue(const FString& NpcId,
         this, &UAocietyClientSubsystem::OnDialogueHttpDone,
         NpcId, Mode, CounterpartId);
     Req->ProcessRequest();
+}
+
+TArray<FAocietyConversationEntry>
+UAocietyClientSubsystem::GetConversationHistory(const FString& NpcId) const
+{
+    if (const TArray<FAocietyConversationEntry>* History =
+            ConversationHistory.Find(NpcId))
+    {
+        return *History;
+    }
+    return {};
+}
+
+TArray<FString> UAocietyClientSubsystem::GetConversationNpcIds() const
+{
+    TArray<FString> NpcIds;
+    ConversationHistory.GetKeys(NpcIds);
+    NpcIds.Sort();
+    return NpcIds;
+}
+
+void UAocietyClientSubsystem::AppendConversationEntry(
+    const FAocietyConversationEntry& Entry)
+{
+    if (Entry.NpcId.IsEmpty() || Entry.Text.IsEmpty())
+    {
+        return;
+    }
+
+    TArray<FAocietyConversationEntry>& History =
+        ConversationHistory.FindOrAdd(Entry.NpcId);
+    History.Add(Entry);
+    constexpr int32 MaxEntriesPerResident = 120;
+    if (History.Num() > MaxEntriesPerResident)
+    {
+        History.RemoveAt(0, History.Num() - MaxEntriesPerResident);
+    }
+    SaveConversationHistory();
+    OnConversationUpdated.Broadcast(Entry.NpcId, Entry);
+}
+
+void UAocietyClientSubsystem::LoadConversationHistory()
+{
+    ConversationHistory.Reset();
+    const FString Path = FPaths::Combine(
+        FPaths::ProjectSavedDir(), TEXT("Aociety"),
+        TEXT("ConversationHistory.json"));
+    FString JsonText;
+    if (!FFileHelper::LoadFileToString(JsonText, *Path))
+    {
+        return;
+    }
+
+    TSharedPtr<FJsonObject> Root;
+    const TSharedRef<TJsonReader<>> Reader =
+        TJsonReaderFactory<>::Create(JsonText);
+    if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid())
+    {
+        UE_LOG(LogAociety, Warning,
+            TEXT("[Aociety][Inbox] Could not parse %s"), *Path);
+        return;
+    }
+
+    const TSharedPtr<FJsonObject>* Conversations = nullptr;
+    if (!Root->TryGetObjectField(TEXT("conversations"), Conversations)
+        || !Conversations || !Conversations->IsValid())
+    {
+        return;
+    }
+
+    for (const auto& Pair : (*Conversations)->Values)
+    {
+        const FString NpcId(Pair.Key);
+        const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
+        if (!Pair.Value.IsValid()
+            || !Pair.Value->TryGetArray(Values)
+            || !Values)
+        {
+            continue;
+        }
+        TArray<FAocietyConversationEntry>& History =
+            ConversationHistory.FindOrAdd(NpcId);
+        for (const TSharedPtr<FJsonValue>& Value : *Values)
+        {
+            const TSharedPtr<FJsonObject>* Object = nullptr;
+            if (!Value.IsValid()
+                || !Value->TryGetObject(Object)
+                || !Object
+                || !Object->IsValid())
+            {
+                continue;
+            }
+            FAocietyConversationEntry Entry;
+            Entry.NpcId = NpcId;
+            (*Object)->TryGetStringField(TEXT("sender"), Entry.Sender);
+            (*Object)->TryGetStringField(TEXT("text"), Entry.Text);
+            (*Object)->TryGetStringField(TEXT("source"), Entry.Source);
+            (*Object)->TryGetStringField(TEXT("model"), Entry.Model);
+            (*Object)->TryGetStringField(TEXT("timestamp"), Entry.Timestamp);
+            (*Object)->TryGetBoolField(TEXT("from_player"), Entry.bFromPlayer);
+            if (!Entry.Text.IsEmpty())
+            {
+                History.Add(Entry);
+            }
+        }
+    }
+}
+
+void UAocietyClientSubsystem::SaveConversationHistory() const
+{
+    TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+    Root->SetNumberField(TEXT("version"), 1);
+    TSharedRef<FJsonObject> Conversations = MakeShared<FJsonObject>();
+    for (const auto& Pair : ConversationHistory)
+    {
+        TArray<TSharedPtr<FJsonValue>> Values;
+        Values.Reserve(Pair.Value.Num());
+        for (const FAocietyConversationEntry& Entry : Pair.Value)
+        {
+            TSharedRef<FJsonObject> Object = MakeShared<FJsonObject>();
+            Object->SetStringField(TEXT("sender"), Entry.Sender);
+            Object->SetStringField(TEXT("text"), Entry.Text);
+            Object->SetStringField(TEXT("source"), Entry.Source);
+            Object->SetStringField(TEXT("model"), Entry.Model);
+            Object->SetStringField(TEXT("timestamp"), Entry.Timestamp);
+            Object->SetBoolField(TEXT("from_player"), Entry.bFromPlayer);
+            Values.Add(MakeShared<FJsonValueObject>(Object));
+        }
+        Conversations->SetArrayField(Pair.Key, Values);
+    }
+    Root->SetObjectField(TEXT("conversations"), Conversations);
+
+    FString JsonText;
+    const TSharedRef<TJsonWriter<>> Writer =
+        TJsonWriterFactory<>::Create(&JsonText);
+    if (!FJsonSerializer::Serialize(Root, Writer))
+    {
+        return;
+    }
+    const FString Directory = FPaths::Combine(
+        FPaths::ProjectSavedDir(), TEXT("Aociety"));
+    IFileManager::Get().MakeDirectory(*Directory, true);
+    FFileHelper::SaveStringToFile(
+        JsonText,
+        *FPaths::Combine(Directory, TEXT("ConversationHistory.json")),
+        FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 }
 
 void UAocietyClientSubsystem::RequestWorldAction(const FString& ActionType, const FString& District,
@@ -479,6 +642,18 @@ void UAocietyClientSubsystem::OnDialogueHttpDone(
 
     auto Broadcast = [this, &Dialogue]()
     {
+        if (!Dialogue.Message.IsEmpty())
+        {
+            FAocietyConversationEntry Entry;
+            Entry.NpcId = Dialogue.NpcId;
+            Entry.Sender = Dialogue.NpcId;
+            Entry.Text = Dialogue.Message;
+            Entry.Source = Dialogue.Source;
+            Entry.Model = Dialogue.Model;
+            Entry.Timestamp = FDateTime::UtcNow().ToIso8601();
+            Entry.bFromPlayer = false;
+            AppendConversationEntry(Entry);
+        }
         OnNPCDialogue.Broadcast(Dialogue);
         if (!Dialogue.Message.IsEmpty())
         {

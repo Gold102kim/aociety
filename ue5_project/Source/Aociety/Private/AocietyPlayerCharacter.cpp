@@ -2,11 +2,13 @@
 
 #include "AocietyPlayerCharacter.h"
 #include "AocietyClientSubsystem.h"
+#include "AocietyConversationWidget.h"
 #include "AocietyEcyRetargetAnimInstance.h"
 #include "AocietyMotionMatchingAnimInstance.h"
 #include "AocietyNPCCharacter.h"
 
 #include "Camera/CameraComponent.h"
+#include "Blueprint/UserWidget.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -144,6 +146,14 @@ void AAocietyPlayerCharacter::BeginPlay()
         Cast<UAocietyEcyRetargetAnimInstance>(GetMesh()->GetAnimInstance());
     const bool bRetargetReady = EcyInstance
         && EcyInstance->ConfigureRetarget(EcyRetargeter, MotionDriverMesh);
+
+    ConversationWidget = CreateWidget<UAocietyConversationWidget>(
+        GetWorld(), UAocietyConversationWidget::StaticClass());
+    if (ConversationWidget)
+    {
+        ConversationWidget->AddToViewport(100);
+        ConversationWidget->SetVisibility(ESlateVisibility::Collapsed);
+    }
 
     PreviousActorLocation = GetActorLocation();
     bHasPreviousActorLocation = true;
@@ -419,6 +429,10 @@ void AAocietyPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerI
         &ACharacter::StopJumping);
     PlayerInputComponent->BindAction(TEXT("Interact"), IE_Pressed, this,
         &AAocietyPlayerCharacter::Interact);
+    PlayerInputComponent->BindAction(TEXT("Inbox"), IE_Pressed, this,
+        &AAocietyPlayerCharacter::ToggleInbox);
+    PlayerInputComponent->BindAction(TEXT("CloseConversation"), IE_Pressed, this,
+        &AAocietyPlayerCharacter::CloseConversation);
 }
 
 void AAocietyPlayerCharacter::SetNearbyNPC(AAocietyNPCCharacter* NPC)
@@ -436,7 +450,34 @@ void AAocietyPlayerCharacter::ClearNearbyNPC(AAocietyNPCCharacter* NPC)
 
 void AAocietyPlayerCharacter::Interact()
 {
+    if (ConversationWidget && ConversationWidget->IsPanelOpen())
+    {
+        ConversationWidget->ClosePanel();
+        return;
+    }
     AAocietyNPCCharacter* NPC = NearbyNPC.Get();
+    if (!IsValid(NPC))
+    {
+        constexpr float MaxInteractionDistance = 650.0f;
+        const FVector PlayerLocation = GetActorLocation();
+        float BestDistanceSquared = FMath::Square(MaxInteractionDistance);
+        for (TActorIterator<AAocietyNPCCharacter> It(GetWorld()); It; ++It)
+        {
+            AAocietyNPCCharacter* Candidate = *It;
+            if (!IsValid(Candidate))
+            {
+                continue;
+            }
+            const float DistanceSquared = FVector::DistSquared(
+                PlayerLocation, Candidate->GetActorLocation());
+            if (DistanceSquared <= BestDistanceSquared)
+            {
+                BestDistanceSquared = DistanceSquared;
+                NPC = Candidate;
+            }
+        }
+        NearbyNPC = NPC;
+    }
     if (!IsValid(NPC))
     {
         return;
@@ -446,21 +487,54 @@ void AAocietyPlayerCharacter::Interact()
     UAocietyClientSubsystem* Client = GameInstance
         ? GameInstance->GetSubsystem<UAocietyClientSubsystem>()
         : nullptr;
-    if (!Client)
+    if (!Client || !ConversationWidget)
     {
         return;
     }
 
-    NPC->ShowThinking();
-    Client->RequestNPCDialogue(
+    ConversationWidget->OpenChat(
         NPC->NpcId,
-        TEXT("玩家刚刚走到你面前并按下交互键。请观察当下环境、回想最近交流，再决定这一刻自然说什么。不要重复固定欢迎语。"),
-        TEXT("forest_town"),
-        TEXT("player_interaction"));
+        NPC->DisplayName,
+        Client,
+        Cast<APlayerController>(Controller));
+}
+
+void AAocietyPlayerCharacter::ToggleInbox()
+{
+    if (!ConversationWidget)
+    {
+        return;
+    }
+    if (ConversationWidget->IsPanelOpen())
+    {
+        ConversationWidget->ClosePanel();
+        return;
+    }
+    UGameInstance* GameInstance = GetGameInstance();
+    UAocietyClientSubsystem* Client = GameInstance
+        ? GameInstance->GetSubsystem<UAocietyClientSubsystem>()
+        : nullptr;
+    if (Client)
+    {
+        ConversationWidget->OpenInbox(
+            Client, Cast<APlayerController>(Controller));
+    }
+}
+
+void AAocietyPlayerCharacter::CloseConversation()
+{
+    if (ConversationWidget && ConversationWidget->IsPanelOpen())
+    {
+        ConversationWidget->ClosePanel();
+    }
 }
 
 void AAocietyPlayerCharacter::MoveForward(float Value)
 {
+    if (ConversationWidget && ConversationWidget->IsPanelOpen())
+    {
+        return;
+    }
     if (Controller && !FMath::IsNearlyZero(Value))
     {
         const FRotator YawRotation(0.0f, Controller->GetControlRotation().Yaw, 0.0f);
@@ -470,6 +544,10 @@ void AAocietyPlayerCharacter::MoveForward(float Value)
 
 void AAocietyPlayerCharacter::MoveRight(float Value)
 {
+    if (ConversationWidget && ConversationWidget->IsPanelOpen())
+    {
+        return;
+    }
     if (Controller && !FMath::IsNearlyZero(Value))
     {
         const FRotator YawRotation(0.0f, Controller->GetControlRotation().Yaw, 0.0f);

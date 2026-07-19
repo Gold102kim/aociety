@@ -12,6 +12,7 @@ class USkeletalMeshComponent;
 class UPoseSearchDatabase;
 class UIKRetargeter;
 class AAocietyNPCCharacter;
+class UAocietyConversationWidget;
 
 UCLASS()
 class AOCIETY_API AAocietyPlayerCharacter : public ACharacter
@@ -33,6 +34,8 @@ private:
     void MoveForward(float Value);
     void MoveRight(float Value);
     void Interact();
+    void ToggleInbox();
+    void CloseConversation();
     void RunRuntimeAudit(float DeltaSeconds);
     void CaptureRuntimeAuditScreenshot(const TCHAR* FileName) const;
 
@@ -50,6 +53,9 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UIKRetargeter> EcyRetargeter;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UAocietyConversationWidget> ConversationWidget;
 
     TWeakObjectPtr<AAocietyNPCCharacter> NearbyNPC;
     float MotionEvidenceAccumulator = 0.0f;
