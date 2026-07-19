@@ -80,11 +80,29 @@ struct FAocietyNPCDialogue
     UPROPERTY(BlueprintReadOnly, Category="Aociety|NPC") FString ErrorCode;
 };
 
+USTRUCT(BlueprintType)
+struct FAocietyConversationEntry
+{
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly, Category="Aociety|Conversation") FString NpcId;
+    UPROPERTY(BlueprintReadOnly, Category="Aociety|Conversation") FString Sender;
+    UPROPERTY(BlueprintReadOnly, Category="Aociety|Conversation") FString Text;
+    UPROPERTY(BlueprintReadOnly, Category="Aociety|Conversation") FString Source;
+    UPROPERTY(BlueprintReadOnly, Category="Aociety|Conversation") FString Model;
+    UPROPERTY(BlueprintReadOnly, Category="Aociety|Conversation") FString Timestamp;
+    UPROPERTY(BlueprintReadOnly, Category="Aociety|Conversation") bool bFromPlayer = false;
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAocietyEmotion, FAocietyEmotion, Emotion);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAocietyCare, FNpcCareAudio, Care);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAocietyWorld, FAocietyWorldSnapshot, World);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnAocietyTranscript, FString, Text, FString, Source);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAocietyNPCDialogue, FAocietyNPCDialogue, Dialogue);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+    FOnAocietyConversationUpdated,
+    FString, NpcId,
+    FAocietyConversationEntry, Entry);
 
 UCLASS()
 class AOCIETY_API UAocietyClientSubsystem : public UGameInstanceSubsystem
@@ -132,6 +150,9 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Aociety|Events")
     FOnAocietyNPCDialogue OnNPCDialogue;
 
+    UPROPERTY(BlueprintAssignable, Category="Aociety|Events")
+    FOnAocietyConversationUpdated OnConversationUpdated;
+
     // ─── 连接管理 ───
     UFUNCTION(BlueprintCallable, Category="Aociety|Network")
     bool Connect();
@@ -171,6 +192,13 @@ public:
     void RequestNPCDialogue(const FString& NpcId, const FString& PlayerInput,
                             const FString& District = TEXT(""),
                             const FString& TopicId = TEXT(""));
+
+    UFUNCTION(BlueprintCallable, Category="Aociety|Conversation")
+    TArray<FAocietyConversationEntry> GetConversationHistory(
+        const FString& NpcId) const;
+
+    UFUNCTION(BlueprintCallable, Category="Aociety|Conversation")
+    TArray<FString> GetConversationNpcIds() const;
 
     UFUNCTION(BlueprintCallable, Category="Aociety|World")
     void RequestWorldAction(const FString& ActionType, const FString& District,
@@ -212,6 +240,7 @@ private:
 
     FString CurrentSessionId;
     bool bIsConnected = false;
+    TMap<FString, TArray<FAocietyConversationEntry>> ConversationHistory;
 
     FTimerHandle Timer_Heartbeat;
     FTimerHandle Timer_Reconnect;
@@ -226,6 +255,9 @@ private:
     void EmitCareFromJson(const TSharedPtr<class FJsonObject>& Json);
     void StartTimer();
     void StopTimer();
+    void AppendConversationEntry(const FAocietyConversationEntry& Entry);
+    void LoadConversationHistory();
+    void SaveConversationHistory() const;
 
     static TArray<uint8> DecodeBase64(const FString& B64);
 };
