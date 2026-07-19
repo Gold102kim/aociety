@@ -2,82 +2,71 @@
 
 #include "AocietyNPCBubbleWidget.h"
 
-#include "Engine/Texture2D.h"
 #include "Styling/CoreStyle.h"
-#include "Widgets/Images/SImage.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/SBoxPanel.h"
-#include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
 
 TSharedRef<SWidget> UAocietyNPCBubbleWidget::RebuildWidget()
 {
-    BubbleTexture = LoadObject<UTexture2D>(
-        nullptr, TEXT("/Game/Aociety/UI/T_SpeechBubble_Ivory.T_SpeechBubble_Ivory"));
-    BubbleBrush.SetResourceObject(BubbleTexture);
-    BubbleBrush.ImageSize = FVector2D(512.0f, 256.0f);
-    BubbleBrush.DrawAs = ESlateBrushDrawType::Image;
-
     return SNew(SBox)
         .WidthOverride(512.0f)
-        .HeightOverride(256.0f)
+        .HeightOverride(210.0f)
         [
-            SNew(SOverlay)
-            + SOverlay::Slot()
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot()
+            .AutoHeight()
             [
-                SNew(SImage)
-                .Image(&BubbleBrush)
-            ]
-            + SOverlay::Slot()
-            .Padding(FMargin(50.0f, 30.0f, 50.0f, 66.0f))
-            [
-                SNew(SVerticalBox)
-                + SVerticalBox::Slot()
-                .AutoHeight()
-                [
-                    SNew(SHorizontalBox)
-                    + SHorizontalBox::Slot()
-                    .FillWidth(1.0f)
-                    .VAlign(VAlign_Center)
-                    [
-                        SAssignNew(NameText, STextBlock)
-                        .Text(FText::FromString(DisplayName))
-                        .ColorAndOpacity(FLinearColor(0.20f, 0.15f, 0.11f, 1.0f))
-                        .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 19))
-                    ]
-                    + SHorizontalBox::Slot()
-                    .AutoWidth()
-                    .VAlign(VAlign_Center)
-                    [
-                        SAssignNew(StatusText, STextBlock)
-                        .Text(FText::FromString(GetStatusLabel()))
-                        .ColorAndOpacity(GetStatusColor())
-                        .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 13))
-                    ]
-                ]
-                + SVerticalBox::Slot()
-                .FillHeight(1.0f)
-                .Padding(FMargin(0.0f, 9.0f, 0.0f, 6.0f))
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot()
+                .FillWidth(1.0f)
                 .VAlign(VAlign_Center)
                 [
-                    SAssignNew(MessageText, STextBlock)
-                    .Text(FText::FromString(Message))
-                    .ColorAndOpacity(FLinearColor(0.23f, 0.18f, 0.14f, 1.0f))
-                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 19))
-                    .AutoWrapText(true)
-                    .WrapTextAt(402.0f)
-                    .Justification(ETextJustify::Center)
+                    SAssignNew(NameText, STextBlock)
+                    .Text(FText::FromString(DisplayName))
+                    .ColorAndOpacity(FLinearColor(1.0f, 0.96f, 0.88f, 1.0f))
+                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 22))
+                    .ShadowOffset(FVector2D(2.0f, 2.0f))
+                    .ShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.95f))
                 ]
-                + SVerticalBox::Slot()
-                .AutoHeight()
-                .HAlign(HAlign_Center)
+                + SHorizontalBox::Slot()
+                .AutoWidth()
+                .VAlign(VAlign_Center)
                 [
-                    SAssignNew(MetadataText, STextBlock)
-                    .Text(FText::FromString(FString::Printf(
-                        TEXT("source=%s  ·  model=%s"), *Source, *Model)))
-                    .ColorAndOpacity(FLinearColor(0.48f, 0.42f, 0.35f, 1.0f))
-                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 12))
+                    SAssignNew(StatusText, STextBlock)
+                    .Text(FText::FromString(GetStatusLabel()))
+                    .ColorAndOpacity(GetStatusColor())
+                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 15))
+                    .ShadowOffset(FVector2D(1.5f, 1.5f))
+                    .ShadowColorAndOpacity(FLinearColor::Black)
                 ]
+            ]
+            + SVerticalBox::Slot()
+            .FillHeight(1.0f)
+            .Padding(FMargin(0.0f, 8.0f, 0.0f, 5.0f))
+            .VAlign(VAlign_Center)
+            [
+                SAssignNew(MessageText, STextBlock)
+                .Text(FText::FromString(Message))
+                .ColorAndOpacity(FLinearColor::White)
+                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 21))
+                .AutoWrapText(true)
+                .WrapTextAt(500.0f)
+                .Justification(ETextJustify::Center)
+                .ShadowOffset(FVector2D(2.0f, 2.0f))
+                .ShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 1.0f))
+            ]
+            + SVerticalBox::Slot()
+            .AutoHeight()
+            .HAlign(HAlign_Center)
+            [
+                SAssignNew(MetadataText, STextBlock)
+                .Text(FText::FromString(FString::Printf(
+                    TEXT("source=%s  ·  model=%s"), *Source, *Model)))
+                .ColorAndOpacity(FLinearColor(0.86f, 0.88f, 0.92f, 1.0f))
+                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 13))
+                .ShadowOffset(FVector2D(1.5f, 1.5f))
+                .ShadowColorAndOpacity(FLinearColor::Black)
             ]
         ];
 }
@@ -187,20 +176,20 @@ FLinearColor UAocietyNPCBubbleWidget::GetStatusColor() const
 {
     if (bIsThinking)
     {
-        return FLinearColor(0.76f, 0.43f, 0.16f, 1.0f);
+        return FLinearColor(1.0f, 0.58f, 0.16f, 1.0f);
     }
     if (bIsListening)
     {
-        return FLinearColor(0.42f, 0.50f, 0.32f, 1.0f);
+        return FLinearColor(0.56f, 0.90f, 0.48f, 1.0f);
     }
     if (bIsRealtimeResponse)
     {
-        return FLinearColor(0.35f, 0.52f, 0.38f, 1.0f);
+        return FLinearColor(0.32f, 1.0f, 0.58f, 1.0f);
     }
     if (Source.Equals(TEXT("error"), ESearchCase::IgnoreCase) ||
         Model.Equals(TEXT("unavailable"), ESearchCase::IgnoreCase))
     {
-        return FLinearColor(0.68f, 0.29f, 0.25f, 1.0f);
+        return FLinearColor(1.0f, 0.32f, 0.28f, 1.0f);
     }
-    return FLinearColor(0.51f, 0.43f, 0.34f, 1.0f);
+    return FLinearColor(0.86f, 0.78f, 0.66f, 1.0f);
 }

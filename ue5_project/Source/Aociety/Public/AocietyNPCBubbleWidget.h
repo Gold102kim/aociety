@@ -3,12 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Styling/SlateBrush.h"
 #include "Blueprint/UserWidget.h"
 #include "AocietyNPCBubbleWidget.generated.h"
 
 class STextBlock;
-class UTexture2D;
 
 UCLASS()
 class AOCIETY_API UAocietyNPCBubbleWidget : public UUserWidget
@@ -47,8 +45,4 @@ private:
     TSharedPtr<STextBlock> StatusText;
     TSharedPtr<STextBlock> MessageText;
     TSharedPtr<STextBlock> MetadataText;
-    FSlateBrush BubbleBrush;
-
-    UPROPERTY(Transient)
-    TObjectPtr<UTexture2D> BubbleTexture;
 };

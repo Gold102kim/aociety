@@ -44,13 +44,12 @@ AAocietyPlayerCharacter::AAocietyPlayerCharacter()
     CameraBoom->SetupAttachment(RootComponent);
     CameraBoom->SetRelativeLocation(FVector(0.0f, 0.0f, 105.0f));
     CameraBoom->TargetArmLength = 360.0f;
-    CameraBoom->SocketOffset = FVector(0.0f, 48.0f, 20.0f);
+    CameraBoom->SocketOffset = FVector(0.0f, 0.0f, 20.0f);
     CameraBoom->bUsePawnControlRotation = true;
     CameraBoom->bDoCollisionTest = true;
     CameraBoom->ProbeSize = 18.0f;
     CameraBoom->ProbeChannel = ECC_Camera;
-    CameraBoom->bEnableCameraLag = true;
-    CameraBoom->CameraLagSpeed = 15.0f;
+    CameraBoom->bEnableCameraLag = false;
 
     FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
     FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
