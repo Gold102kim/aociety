@@ -17,9 +17,6 @@
 #include "Engine/SkyLight.h"
 #include "Engine/GameInstance.h"
 #include "EngineUtils.h"
-#include "NiagaraComponent.h"
-#include "NiagaraFunctionLibrary.h"
-#include "NiagaraSystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
@@ -162,6 +159,8 @@ void AAocietyGameMode::InitializeWorldEnvironment()
         WorldClockMinutes = FMath::Fmod(
             FMath::Max(0.0f, RequestedStartHour), 24.0f) * 60.0f;
     }
+    FParse::Value(FCommandLine::Get(), TEXT("AocietyWeatherState="), WeatherState);
+    WeatherState = FMath::Clamp(WeatherState, 0, 2);
 
     TArray<AActor*> Directionals;
     UGameplayStatics::GetAllActorsOfClass(World, ADirectionalLight::StaticClass(), Directionals);
@@ -265,19 +264,6 @@ void AAocietyGameMode::InitializeWorldEnvironment()
         }
     }
     bWorldEnvironmentInitialized = true;
-    if (UNiagaraSystem* RainSystem = LoadObject<UNiagaraSystem>(
-            nullptr, TEXT("/Niagara/DefaultAssets/Templates/Systems/FountainLightweight.FountainLightweight")))
-    {
-        WeatherParticles = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-            World, RainSystem, FVector(0.0f, 0.0f, 1800.0f),
-            FRotator(180.0f, 0.0f, 0.0f), FVector(10.0f), true, true,
-            ENCPoolMethod::None, true);
-        if (WeatherParticles)
-        {
-            WeatherParticles->SetVisibility(false, true);
-            WeatherParticles->SetComponentTickEnabled(false);
-        }
-    }
     UE_LOG(LogTemp, Display, TEXT("[AocietyEnvironment] initialized sun=%s skylight=%s fog=%s night_lights=%d"),
         *GetNameSafe(SunLight.Get()), *GetNameSafe(SkyLight.Get()), *GetNameSafe(HeightFog.Get()), NightLights.Num());
 }
@@ -295,6 +281,17 @@ void AAocietyGameMode::UpdateWorldEnvironment(float DeltaSeconds)
     {
         WorldClockMinutes += 1440.0f;
     }
+    WeatherElapsedSeconds += DeltaSeconds;
+    if (WeatherElapsedSeconds > 75.0f)
+    {
+        WeatherElapsedSeconds = 0.0f;
+        WeatherState = (WeatherState + 1) % 3; // clear -> overcast -> rain
+        UE_LOG(LogTemp, Display, TEXT("[AocietyEnvironment] weather=%s"),
+            WeatherState == 0 ? TEXT("clear") : WeatherState == 1 ? TEXT("overcast") : TEXT("rain"));
+    }
+
+    const float WeatherLightScale = WeatherState == 0
+        ? 1.0f : WeatherState == 1 ? 0.72f : 0.48f;
     const float SunAngle = (WorldClockMinutes / 1440.0f) * 360.0f - 90.0f;
     const float SolarElevation = FMath::Sin(FMath::DegreesToRadians(SunAngle));
     const bool bNight = SolarElevation < -0.08f;
@@ -308,53 +305,38 @@ void AAocietyGameMode::UpdateWorldEnvironment(float DeltaSeconds)
         if (UDirectionalLightComponent* Light = Cast<UDirectionalLightComponent>(
                 SunLight->GetLightComponent()))
         {
-            Light->SetIntensity(FMath::Lerp(0.35f, 4.2f, DayBlend));
+            Light->SetIntensity(
+                FMath::Lerp(0.35f, 4.2f, DayBlend) * WeatherLightScale);
+            const FLinearColor DayColor = WeatherState == 0
+                ? FLinearColor(1.0f, 0.88f, 0.68f)
+                : FLinearColor(0.72f, 0.76f, 0.82f);
             Light->SetLightColor(FLinearColor::LerpUsingHSV(
-                FLinearColor(0.18f, 0.24f, 0.42f), FLinearColor(1.0f, 0.88f, 0.68f), DayBlend));
+                FLinearColor(0.18f, 0.24f, 0.42f), DayColor, DayBlend));
         }
     }
     if (SkyLight.IsValid())
     {
         USkyLightComponent* Light = SkyLight->GetLightComponent();
-        Light->SetIntensity(FMath::Lerp(0.62f, 1.0f, DayBlend));
+        Light->SetIntensity(
+            FMath::Lerp(0.62f, 1.0f, DayBlend) * FMath::Lerp(0.9f, 1.0f, WeatherLightScale));
+        Light->SetLightColor(WeatherState == 0
+            ? FLinearColor::White
+            : FLinearColor(0.62f, 0.68f, 0.76f));
         if (FMath::IsNearlyEqual(FMath::Fmod(WorldClockMinutes, 30.0f), 0.0f, 0.2f))
         {
             Light->RecaptureSky();
         }
     }
 
-    WeatherElapsedSeconds += DeltaSeconds;
-    if (WeatherElapsedSeconds > 75.0f)
-    {
-        WeatherElapsedSeconds = 0.0f;
-        WeatherState = (WeatherState + 1) % 3; // clear -> overcast -> rain
-        UE_LOG(LogTemp, Display, TEXT("[AocietyEnvironment] weather=%s"),
-            WeatherState == 0 ? TEXT("clear") : WeatherState == 1 ? TEXT("overcast") : TEXT("rain"));
-    }
-
     if (HeightFog.IsValid())
     {
         UExponentialHeightFogComponent* Fog = HeightFog->GetComponent();
-        const float WeatherFog = WeatherState == 0 ? 0.0015f : WeatherState == 1 ? 0.006f : 0.012f;
+        const float WeatherFog = WeatherState == 0 ? 0.0008f : WeatherState == 1 ? 0.0022f : 0.0045f;
         Fog->FogDensity = FMath::Lerp(WeatherFog, WeatherFog * 1.35f, bNight ? 1.0f : 0.0f);
         Fog->FogHeightFalloff = 0.18f;
         Fog->SetFogInscatteringColor(bNight
             ? FLinearColor(0.025f, 0.04f, 0.10f)
             : FLinearColor(0.72f, 0.82f, 1.0f));
-    }
-    if (WeatherParticles)
-    {
-        const bool bRain = WeatherState == 2;
-        if (bRain)
-        {
-            if (APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0))
-            {
-                WeatherParticles->SetWorldLocation(
-                    Player->GetActorLocation() + FVector(0.0f, 0.0f, 1100.0f));
-            }
-        }
-        WeatherParticles->SetVisibility(bRain, true);
-        WeatherParticles->SetComponentTickEnabled(bRain);
     }
     for (const TWeakObjectPtr<ULightComponent>& WeakLight : NightLights)
     {
