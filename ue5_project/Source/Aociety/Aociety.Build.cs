@@ -33,7 +33,8 @@ public class Aociety : ModuleRules
             "IKRig",
             "AnimationWarpingRuntime",
             "OpenCV",
-            "OpenCVHelper"
+            "OpenCVHelper",
+            "Niagara"
         });
 
     }

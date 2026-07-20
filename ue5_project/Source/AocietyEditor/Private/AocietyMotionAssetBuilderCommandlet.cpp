@@ -416,8 +416,25 @@ UAnimSequence* BuildRootMotionSequence(
         SourceModel->GetBoneTrackTransforms(RootBone, ExistingTransforms);
     }
 
+    // Preserve the authored root-motion path. Adding a second synthetic XY
+    // translation turns forward clips into diagonal movement.
     Direction = Direction.GetSafeNormal();
     const float Distance = Speed * static_cast<float>(SourceModel->GetPlayLength());
+    const FVector SourceRootStart = ExistingTransforms.IsEmpty()
+        ? FVector::ZeroVector
+        : ExistingTransforms[0].GetTranslation();
+    const FVector SourceRootEnd = ExistingTransforms.IsEmpty()
+        ? FVector::ZeroVector
+        : ExistingTransforms.Last().GetTranslation();
+    const FVector SourceRootDelta = SourceRootEnd - SourceRootStart;
+    const FVector SourceRootHorizontal(
+        SourceRootDelta.X,
+        SourceRootDelta.Y,
+        0.0f);
+    const FVector SourceDirection = SourceRootHorizontal.IsNearlyZero()
+        ? FVector(Direction.X, Direction.Y, 0.0f)
+        : SourceRootHorizontal.GetSafeNormal();
+    const float SourceDistanceSquared = SourceRootHorizontal.SizeSquared();
     TArray<FVector> Positions;
     TArray<FQuat> Rotations;
     TArray<FVector> Scales;
@@ -453,10 +470,46 @@ UAnimSequence* BuildRootMotionSequence(
         default:
             break;
         }
+        const FVector SourceDelta = Base.GetTranslation() - SourceRootStart;
+        float SourceProgress = Alpha;
+        if (SourceDistanceSquared > UE_SMALL_NUMBER)
+        {
+            SourceProgress = FMath::Clamp(
+                FVector::DotProduct(
+                    FVector(SourceDelta.X, SourceDelta.Y, 0.0f),
+                    SourceRootHorizontal)
+                    / SourceDistanceSquared,
+                0.0f,
+                1.0f);
+        }
+        float RootMotionProgress = SourceProgress;
+        if (Profile == ERootMotionProfile::Accelerate)
+        {
+            RootMotionProgress = SourceProgress * SourceProgress;
+        }
+        else if (Profile == ERootMotionProfile::Decelerate)
+        {
+            RootMotionProgress =
+                1.0f - FMath::Square(1.0f - SourceProgress);
+        }
+
+        FVector HorizontalTranslation = FVector::ZeroVector;
+        if (Profile != ERootMotionProfile::TurnLeft
+            && Profile != ERootMotionProfile::TurnRight
+            && Distance > UE_SMALL_NUMBER)
+        {
+            HorizontalTranslation = SourceDirection
+                * Distance
+                * (SourceDistanceSquared > UE_SMALL_NUMBER
+                    ? RootMotionProgress
+                    : DistanceAlpha);
+        }
+
         Positions.Add(
-            Base.GetTranslation()
-            + FVector(Direction.X, Direction.Y, 0.0f)
-                * Distance * DistanceAlpha);
+            FVector(
+                SourceRootStart.X + HorizontalTranslation.X,
+                SourceRootStart.Y + HorizontalTranslation.Y,
+                Base.GetTranslation().Z));
         Rotations.Add(
             FQuat(FVector::UpVector, FMath::DegreesToRadians(YawDegrees))
             * Base.GetRotation());
@@ -703,30 +756,8 @@ int32 UAocietyMotionAssetBuilderCommandlet::Main(const FString& Params)
             Entry.Direction,
             Entry.Speed));
     }
-    DatabaseAnimations.Add(BuildRootMotionSequence(
-        TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Jog/MF_Unarmed_Jog_Fwd.MF_Unarmed_Jog_Fwd"),
-        TEXT("MM_Ecy_Start_Fwd_RM"),
-        FVector2D(1.0f, 0.0f),
-        420.0f,
-        ERootMotionProfile::Accelerate));
-    DatabaseAnimations.Add(BuildRootMotionSequence(
-        TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Jog/MF_Unarmed_Jog_Fwd.MF_Unarmed_Jog_Fwd"),
-        TEXT("MM_Ecy_Stop_Fwd_RM"),
-        FVector2D(1.0f, 0.0f),
-        420.0f,
-        ERootMotionProfile::Decelerate));
-    DatabaseAnimations.Add(BuildRootMotionSequence(
-        TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Walk/MF_Unarmed_Walk_Left.MF_Unarmed_Walk_Left"),
-        TEXT("MM_Ecy_Turn_Left_RM"),
-        FVector2D::ZeroVector,
-        0.0f,
-        ERootMotionProfile::TurnLeft));
-    DatabaseAnimations.Add(BuildRootMotionSequence(
-        TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Walk/MF_Unarmed_Walk_Right.MF_Unarmed_Walk_Right"),
-        TEXT("MM_Ecy_Turn_Right_RM"),
-        FVector2D::ZeroVector,
-        0.0f,
-        ERootMotionProfile::TurnRight));
+    // Keep only genuine locomotion clips until authored start, stop and pivot
+    // animations are available.
     UAnimSequence* JumpAnimation = BuildRootMotionSequence(
         TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Jump/MM_Jump.MM_Jump"),
         TEXT("MM_Ecy_Jump_RM"),

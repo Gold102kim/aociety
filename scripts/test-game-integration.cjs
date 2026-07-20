@@ -40,6 +40,12 @@ assert.ok(mainMenuMode.includes('[AocietyMainMenu] ready'));
 assert.ok(mainMenuMode.includes('/Game/Aociety/Maps/Aociety_ForestSnowTown'));
 assert.ok(mainMenuMode.includes('game=/Script/Aociety.AocietyGameMode'));
 
+const gameMode = read('ue5_project/Source/Aociety/Private/AocietyGameMode.cpp');
+assert.ok(gameMode.includes('[AocietyEnvironment] initialized'));
+assert.ok(gameMode.includes('[AocietyScene] ready'));
+assert.ok(gameMode.includes('[AocietyExpansion] player relocated to city approach'));
+assert.ok(gameMode.includes('AAocietyWorldBoundary'));
+
 const launcher = read('electron/main.ts');
 assert.ok(launcher.includes('startGameServices(config)'));
 assert.ok(launcher.includes('game.service_started'));

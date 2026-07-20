@@ -3,6 +3,7 @@
 #include "AocietyPlayerCharacter.h"
 #include "AocietyClientSubsystem.h"
 #include "AocietyConversationWidget.h"
+#include "AocietyPauseMenuWidget.h"
 #include "AocietyEcyRetargetAnimInstance.h"
 #include "AocietyMotionMatchingAnimInstance.h"
 #include "AocietyNPCCharacter.h"
@@ -119,24 +120,25 @@ void AAocietyPlayerCharacter::BeginPlay()
             World ? static_cast<int32>(World->WorldType) : -1);
     }
 
-    const bool bStandaloneRuntime = FApp::IsGame();
-    USkeletalMesh* MannyDriverAsset = bStandaloneRuntime
+    const bool bMotionMatchingEnabled = !FApp::IsGame()
+        || FParse::Param(FCommandLine::Get(), TEXT("AocietyEnableMotionMatching"));
+    USkeletalMesh* MannyDriverAsset = !bMotionMatchingEnabled
         ? nullptr
         : LoadObject<USkeletalMesh>(
             nullptr,
             TEXT("/Game/Aociety/MotionMatching/SKM_Manny_Aociety.SKM_Manny_Aociety"));
-    MotionDatabase = bStandaloneRuntime
+    MotionDatabase = !bMotionMatchingEnabled
         ? nullptr
         : LoadObject<UPoseSearchDatabase>(
             nullptr,
             TEXT("/Game/Aociety/MotionMatching/PSDB_EcyLocomotion.PSDB_EcyLocomotion"));
-    EcyRetargeter = bStandaloneRuntime
+    EcyRetargeter = !bMotionMatchingEnabled
         ? nullptr
         : LoadObject<UIKRetargeter>(
             nullptr,
             TEXT("/Game/Aociety/MotionMatching/RTG_MannyToEcy.RTG_MannyToEcy"));
     MotionDriverMesh->SetSkeletalMeshAsset(MannyDriverAsset);
-    const int32 RuntimePoseCount = !bStandaloneRuntime && MotionDatabase
+    const int32 RuntimePoseCount = bMotionMatchingEnabled && MotionDatabase
         ? MotionDatabase->GetSearchIndex().GetNumPoses()
         : 0;
     const bool bMotionMatchingReady = MannyDriverAsset
@@ -185,6 +187,14 @@ void AAocietyPlayerCharacter::BeginPlay()
     {
         ConversationWidget->AddToViewport(100);
         ConversationWidget->SetVisibility(ESlateVisibility::Collapsed);
+    }
+
+    PauseMenuWidget = CreateWidget<UAocietyPauseMenuWidget>(
+        GetWorld(), UAocietyPauseMenuWidget::StaticClass());
+    if (PauseMenuWidget)
+    {
+        PauseMenuWidget->AddToViewport(200);
+        PauseMenuWidget->SetVisibility(ESlateVisibility::Collapsed);
     }
 
     PreviousActorLocation = GetActorLocation();
@@ -331,16 +341,16 @@ void AAocietyPlayerCharacter::RunRuntimeAudit(float DeltaSeconds)
     {
         bRuntimeAuditNPCViewSet = true;
         GetCharacterMovement()->StopMovementImmediately();
-        SetActorLocation(FVector(-650.0f, 1130.0f, 228.0f));
-        SetActorRotation(FRotator(0.0f, -90.0f, 0.0f));
+        SetActorLocation(FVector(5600.0f, 0.0f, 140.0f));
+        SetActorRotation(FRotator(0.0f, 0.0f, 0.0f));
         if (AController* PlayerController = GetController())
         {
-            PlayerController->SetControlRotation(FRotator(-12.0f, -90.0f, 0.0f));
+            PlayerController->SetControlRotation(FRotator(-12.0f, 0.0f, 0.0f));
         }
         UE_LOG(
             LogTemp,
             Display,
-            TEXT("[AocietyRuntimeAudit] npc_view player=%s yaw=-90"),
+            TEXT("[AocietyRuntimeAudit] npc_view player=%s yaw=0"),
             *GetActorLocation().ToCompactString());
         for (TActorIterator<AAocietyNPCCharacter> It(GetWorld()); It; ++It)
         {
@@ -356,8 +366,8 @@ void AAocietyPlayerCharacter::RunRuntimeAudit(float DeltaSeconds)
             NPC->GetCharacterMovement()->StopMovementImmediately();
             NPC->SetActorLocation(
                 NPC->NpcId == TEXT("npc_01")
-                    ? FVector(-450.0f, 980.0f, 228.0f)
-                    : FVector(-850.0f, 980.0f, 228.0f));
+                    ? FVector(6200.0f, -300.0f, 115.0f)
+                    : FVector(6200.0f, 300.0f, 115.0f));
 
             const FBoxSphereBounds& NPCBounds = NPCMesh->Bounds;
             UE_LOG(
@@ -476,8 +486,10 @@ void AAocietyPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerI
         &AAocietyPlayerCharacter::Interact);
     PlayerInputComponent->BindAction(TEXT("Inbox"), IE_Pressed, this,
         &AAocietyPlayerCharacter::ToggleInbox);
-    PlayerInputComponent->BindAction(TEXT("CloseConversation"), IE_Pressed, this,
-        &AAocietyPlayerCharacter::CloseConversation);
+    FInputActionBinding& EscapeBinding = PlayerInputComponent->BindAction(
+        TEXT("CloseConversation"), IE_Pressed, this,
+        &AAocietyPlayerCharacter::HandleEscape);
+    EscapeBinding.bExecuteWhenPaused = true;
 }
 
 void AAocietyPlayerCharacter::SetNearbyNPC(AAocietyNPCCharacter* NPC)
@@ -566,17 +578,31 @@ void AAocietyPlayerCharacter::ToggleInbox()
     }
 }
 
-void AAocietyPlayerCharacter::CloseConversation()
+void AAocietyPlayerCharacter::HandleEscape()
 {
     if (ConversationWidget && ConversationWidget->IsPanelOpen())
     {
         ConversationWidget->ClosePanel();
+        return;
+    }
+    if (!PauseMenuWidget)
+    {
+        return;
+    }
+    if (PauseMenuWidget->IsMenuOpen())
+    {
+        PauseMenuWidget->Close();
+    }
+    else
+    {
+        PauseMenuWidget->Open(Cast<APlayerController>(Controller));
     }
 }
 
 void AAocietyPlayerCharacter::MoveForward(float Value)
 {
-    if (ConversationWidget && ConversationWidget->IsPanelOpen())
+    if ((ConversationWidget && ConversationWidget->IsPanelOpen())
+        || (PauseMenuWidget && PauseMenuWidget->IsMenuOpen()))
     {
         return;
     }
@@ -589,7 +615,8 @@ void AAocietyPlayerCharacter::MoveForward(float Value)
 
 void AAocietyPlayerCharacter::MoveRight(float Value)
 {
-    if (ConversationWidget && ConversationWidget->IsPanelOpen())
+    if ((ConversationWidget && ConversationWidget->IsPanelOpen())
+        || (PauseMenuWidget && PauseMenuWidget->IsMenuOpen()))
     {
         return;
     }

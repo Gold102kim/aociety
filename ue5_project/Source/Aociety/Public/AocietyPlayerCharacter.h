@@ -13,6 +13,7 @@ class UPoseSearchDatabase;
 class UIKRetargeter;
 class AAocietyNPCCharacter;
 class UAocietyConversationWidget;
+class UAocietyPauseMenuWidget;
 
 UCLASS()
 class AOCIETY_API AAocietyPlayerCharacter : public ACharacter
@@ -35,7 +36,7 @@ private:
     void MoveRight(float Value);
     void Interact();
     void ToggleInbox();
-    void CloseConversation();
+    void HandleEscape();
     void RunRuntimeAudit(float DeltaSeconds);
     void CaptureRuntimeAuditScreenshot(const TCHAR* FileName) const;
 
@@ -56,6 +57,9 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UAocietyConversationWidget> ConversationWidget;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UAocietyPauseMenuWidget> PauseMenuWidget;
 
     TWeakObjectPtr<AAocietyNPCCharacter> NearbyNPC;
     float MotionEvidenceAccumulator = 0.0f;

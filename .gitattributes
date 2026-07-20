@@ -10,3 +10,4 @@
 
 # Large official Motion Matching assets are stored in Git LFS.
 ue5_project/Content/Aociety/MotionMatching/** filter=lfs diff=lfs merge=lfs -text
+SourceAssets/ImportedScene/*.umap filter=lfs diff=lfs merge=lfs -text

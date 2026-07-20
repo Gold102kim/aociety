@@ -28,7 +28,35 @@ void FAocietyMotionMatchingAnimInstanceProxy::ConfigureGraph()
 {
     MotionMatchingNode.SetMaxActiveBlends(6);
 
-    GroundAirBlendNode.A.SetLinkNode(&MotionMatchingNode);
+    GroundLocalToComponentNode.LocalPose.SetLinkNode(&MotionMatchingNode);
+    StrideWarpingNode.ComponentPose.SetLinkNode(&GroundLocalToComponentNode);
+    StrideWarpingNode.Mode = EWarpingEvaluationMode::Manual;
+    StrideWarpingNode.StrideDirection = FVector::YAxisVector;
+    StrideWarpingNode.PelvisBone.BoneName = TEXT("pelvis");
+    StrideWarpingNode.IKFootRootBone.BoneName = TEXT("ik_foot_root");
+    StrideWarpingNode.FootDefinitions.Reset();
+    for (const TTuple<FName, FName, FName>& Foot : {
+             TTuple<FName, FName, FName>(
+                 TEXT("ik_foot_l"), TEXT("foot_l"), TEXT("thigh_l")),
+             TTuple<FName, FName, FName>(
+                 TEXT("ik_foot_r"), TEXT("foot_r"), TEXT("thigh_r")),
+         })
+    {
+        FStrideWarpingFootDefinition Definition;
+        Definition.IKFootBone.BoneName = Foot.Get<0>();
+        Definition.FKFootBone.BoneName = Foot.Get<1>();
+        Definition.ThighBone.BoneName = Foot.Get<2>();
+        StrideWarpingNode.FootDefinitions.Add(Definition);
+    }
+    StrideWarpingNode.StrideScaleModifier.bClampResult = true;
+    StrideWarpingNode.StrideScaleModifier.ClampMin = 0.55f;
+    StrideWarpingNode.StrideScaleModifier.ClampMax = 1.10f;
+    StrideWarpingNode.StrideScaleModifier.bInterpResult = true;
+    StrideWarpingNode.StrideScaleModifier.InterpSpeedIncreasing = 8.0f;
+    StrideWarpingNode.StrideScaleModifier.InterpSpeedDecreasing = 10.0f;
+    GroundComponentToLocalNode.ComponentPose.SetLinkNode(&StrideWarpingNode);
+
+    GroundAirBlendNode.A.SetLinkNode(&GroundComponentToLocalNode);
     GroundAirBlendNode.B.SetLinkNode(&AirSequenceNode);
     GroundAirBlendNode.AlphaInputType = EAnimAlphaInputType::Bool;
     GroundAirBlendNode.bAlphaBoolEnabled =
@@ -64,9 +92,33 @@ void FAocietyMotionMatchingAnimInstanceProxy::GetCustomNodes(
     TArray<FAnimNode_Base*>& OutNodes)
 {
     OutNodes.Add(&MotionMatchingNode);
+    OutNodes.Add(&GroundLocalToComponentNode);
+    OutNodes.Add(&StrideWarpingNode);
+    OutNodes.Add(&GroundComponentToLocalNode);
     OutNodes.Add(&AirSequenceNode);
     OutNodes.Add(&GroundAirBlendNode);
     OutNodes.Add(&PoseHistoryNode);
+}
+
+void FAocietyMotionMatchingAnimInstanceProxy::SetLocomotionSpeed(float InSpeed)
+{
+    const UObject* SelectedAnimation =
+        MotionMatchingNode.GetMotionMatchingState().SearchResult.SelectedAnim;
+    const FString SelectedName = GetNameSafe(SelectedAnimation);
+    float AuthoredPoseSpeed = 0.0f;
+    if (SelectedName.Contains(TEXT("Jog")))
+    {
+        AuthoredPoseSpeed = 600.0f;
+    }
+    else if (SelectedName.Contains(TEXT("Walk")))
+    {
+        AuthoredPoseSpeed = 300.0f;
+    }
+
+    StrideWarpingNode.StrideScale = AuthoredPoseSpeed > UE_SMALL_NUMBER
+        && InSpeed > 8.0f
+        ? FMath::Clamp(InSpeed / AuthoredPoseSpeed, 0.55f, 1.10f)
+        : 1.0f;
 }
 
 void FAocietyMotionMatchingAnimInstanceProxy::SetDatabase(
@@ -158,13 +210,14 @@ FString FAocietyMotionMatchingAnimInstanceProxy::DescribeState() const
         break;
     }
     return FString::Printf(
-        TEXT("database=%s indexed_poses=%d selected=%s time=%.3f cost=%.4f continuing=%s air_state=%s air_sequence=%s"),
+        TEXT("database=%s indexed_poses=%d selected=%s time=%.3f cost=%.4f continuing=%s stride_scale=%.2f air_state=%s air_sequence=%s"),
         *GetNameSafe(Database.Get()),
         GetIndexedPoseCount(),
         *GetNameSafe(Result.SelectedAnim),
         Result.SelectedTime,
         Result.SearchCost,
         Result.bIsContinuingPoseSearch ? TEXT("true") : TEXT("false"),
+        StrideWarpingNode.StrideScale,
         AirStateName,
         *GetNameSafe(AirSequenceNode.GetSequence()));
 }
@@ -248,8 +301,11 @@ void UAocietyMotionMatchingAnimInstance::NativeUpdateAnimation(float DeltaSecond
     }
 
     bWasFalling = bIsFalling;
-    GetProxyOnGameThread<FAocietyMotionMatchingAnimInstanceProxy>()
-        .SetAirState(DesiredState);
+    FAocietyMotionMatchingAnimInstanceProxy& Proxy =
+        GetProxyOnGameThread<FAocietyMotionMatchingAnimInstanceProxy>();
+    Proxy.SetLocomotionSpeed(
+        Character ? Character->GetVelocity().Size2D() : 0.0f);
+    Proxy.SetAirState(DesiredState);
 }
 
 void UAocietyMotionMatchingAnimInstance::ConfigureDatabase(

@@ -82,6 +82,14 @@
 			"Enabled": true
 		},
 		{
+			"Name": "PCGPrimitives",
+			"Enabled": true
+		},
+		{
+			"Name": "PCGBiomeCore",
+			"Enabled": true
+		},
+		{
 			"Name": "PoseSearch",
 			"Enabled": true
 		},
@@ -111,6 +119,18 @@
 		},
 		{
 			"Name": "StructUtils",
+			"Enabled": true
+		},
+		{
+			"Name": "DaySequence",
+			"Enabled": true
+		},
+		{
+			"Name": "SunPosition",
+			"Enabled": true
+		},
+		{
+			"Name": "Niagara",
 			"Enabled": true
 		}
 	],

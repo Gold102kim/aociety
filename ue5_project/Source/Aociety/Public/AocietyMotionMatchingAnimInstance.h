@@ -6,7 +6,9 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimInstanceProxy.h"
 #include "Animation/AnimNode_SequencePlayer.h"
+#include "Animation/AnimNodeSpaceConversions.h"
 #include "AnimNodes/AnimNode_TwoWayBlend.h"
+#include "BoneControllers/AnimNode_StrideWarping.h"
 #include "PoseSearch/AnimNode_MotionMatching.h"
 #include "PoseSearch/AnimNode_PoseSearchHistoryCollector.h"
 #include "AocietyMotionMatchingAnimInstance.generated.h"
@@ -39,6 +41,7 @@ struct AOCIETY_API FAocietyMotionMatchingAnimInstanceProxy : public FAnimInstanc
         UAnimSequenceBase* InJumpAnimation,
         UAnimSequenceBase* InFallAnimation,
         UAnimSequenceBase* InLandAnimation);
+    void SetLocomotionSpeed(float InSpeed);
     void SetAirState(EAocietyAirLocomotionState InState);
     FString DescribeState() const;
     int32 GetIndexedPoseCount() const;
@@ -47,6 +50,9 @@ private:
     void ConfigureGraph();
 
     FAnimNode_MotionMatching MotionMatchingNode;
+    FAnimNode_ConvertLocalToComponentSpace GroundLocalToComponentNode;
+    FAnimNode_StrideWarping StrideWarpingNode;
+    FAnimNode_ConvertComponentToLocalSpace GroundComponentToLocalNode;
     FAnimNode_SequencePlayer_Standalone AirSequenceNode;
     FAnimNode_TwoWayBlend GroundAirBlendNode;
     FAnimNode_PoseSearchHistoryCollector PoseHistoryNode;

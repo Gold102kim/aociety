@@ -125,6 +125,9 @@ async function main() {
         return currentLaunchLog.includes('[AocietyMainMenu] entering world')
           && currentLaunchLog.includes('Browse: /Game/Aociety/Maps/Aociety_ForestSnowTown')
           && currentLaunchLog.includes('UEngine::LoadMap Load map complete /Game/Aociety/Maps/Aociety_ForestSnowTown')
+          && currentLaunchLog.includes('[AocietyScene] ready')
+          && currentLaunchLog.includes('[AocietyExpansion] player relocated to city approach')
+          && currentLaunchLog.includes('[AocietyEnvironment] initialized')
           && currentLaunchLog.includes('[AocietyViewport]');
       }, 120_000, 'UE 主菜单进入森林地图验证');
       console.log('UE main menu entered forest map successfully.');

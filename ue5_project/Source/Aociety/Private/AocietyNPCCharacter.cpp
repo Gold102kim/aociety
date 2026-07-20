@@ -148,6 +148,23 @@ void AAocietyNPCCharacter::BeginPlay()
 {
     Super::BeginPlay();
 
+    if (NpcId == TEXT("npc_01"))
+    {
+        SetActorLocation(
+            FVector(6200.0f, -300.0f, 115.0f),
+            false,
+            nullptr,
+            ETeleportType::TeleportPhysics);
+    }
+    else if (NpcId == TEXT("npc_02"))
+    {
+        SetActorLocation(
+            FVector(7000.0f, 450.0f, 115.0f),
+            false,
+            nullptr,
+            ETeleportType::TeleportPhysics);
+    }
+
     ResidentVisual->SetReceivesDecals(false);
     GetMesh()->SetReceivesDecals(false);
 

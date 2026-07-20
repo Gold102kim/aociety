@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- 综合完整场景分支：加入动态昼夜与天气、夜间灯光、世界边界、游戏内暂停菜单和运动资源更新。
+- 完整地图缺少未上传的 Marketplace 依赖；保存原始扩展地图，并增加 UE 基础形状城镇回退，正常运行不再出现白色空场景或资源加载错误。
+- Motion Matching 资源仍缺少有效 Skeleton，默认保持安全回退；可在资源修复后用 `-AocietyEnableMotionMatching` 开启验证。
 - 新增 UE 原生主菜单：启动器先进入主菜单，再由“进入世界”加载森林场景。
 - 启用 UE 5.8 官方 MCP、MCP Client Toolset 与 AI Assistant 编辑器插件；运行游戏时禁用开发插件，避免拖慢启动。
 - 修复开发版游戏启动黑屏：启动 UnrealEditor 游戏模式时禁用 Python 初始化，避免自动 pip 安装阻塞地图加载。
