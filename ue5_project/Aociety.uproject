@@ -68,6 +68,14 @@
 			"Enabled": true
 		},
 		{
+			"Name": "PCGPrimitives",
+			"Enabled": true
+		},
+		{
+			"Name": "PCGBiomeCore",
+			"Enabled": true
+		},
+		{
 			"Name": "PoseSearch",
 			"Enabled": true
 		},
