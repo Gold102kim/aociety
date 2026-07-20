@@ -17,6 +17,21 @@ function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+async function removeTemporaryDirectory(directory) {
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    try {
+      await fs.promises.rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      return;
+    } catch (error) {
+      if (attempt === 5) {
+        console.warn(`临时测试目录稍后由系统清理：${error instanceof Error ? error.message : String(error)}`);
+        return;
+      }
+      await delay(attempt * 500);
+    }
+  }
+}
+
 async function waitUntil(check, timeoutMs, label) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -57,7 +72,7 @@ async function main() {
       ECHO_SMOKE_EMAIL: email,
       ECHO_SMOKE_PASSWORD: password,
       ECHO_SMOKE_RESULT_PATH: resultPath,
-      ECHO_SMOKE_AUTOQUIT_MS: '20000',
+      ECHO_SMOKE_AUTOQUIT_MS: '60000',
     },
     stdio: 'ignore',
     windowsHide: false,
@@ -73,10 +88,17 @@ async function main() {
 
     await waitUntil(() => {
       if (!fs.existsSync(gameLogPath)) return false;
-      return fs.readFileSync(gameLogPath, 'utf8').includes(`Launcher session accepted: launch=${result.launchId}`);
-    }, 120_000, 'UE 接收启动器会话');
+      const log = fs.readFileSync(gameLogPath, 'utf8');
+      const sessionIndex = log.indexOf(`Launcher session accepted: launch=${result.launchId}`);
+      if (sessionIndex < 0) return false;
+      const currentLaunchLog = log.slice(sessionIndex);
+      return currentLaunchLog.includes('LogInit: Display: Starting Game.')
+        && currentLaunchLog.includes('Browse: /Game/Aociety/Maps/Aociety_ForestSnowTown')
+        && currentLaunchLog.includes('UEngine::LoadMap Load map complete /Game/Aociety/Maps/Aociety_ForestSnowTown')
+        && currentLaunchLog.includes('[AocietyViewport]');
+    }, 120_000, 'UE 接收启动器会话并加载森林地图');
 
-    console.log(`Packaged launcher opened UE successfully: ${result.launchId}`);
+    console.log(`Packaged launcher opened forest map successfully: ${result.launchId}`);
   } finally {
     await new Promise((resolve) => {
       if (launcher.exitCode !== null) return resolve();
@@ -87,7 +109,8 @@ async function main() {
       });
     });
     if (launcher.exitCode === null) launcher.kill();
-    fs.rmSync(smokeRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    await delay(500);
+    await removeTemporaryDirectory(smokeRoot);
   }
 }
 

@@ -39,6 +39,7 @@ async function main() {
   const startedServices = [];
   let game = null;
   const launchId = randomUUID();
+  const runtimeAudit = process.env.AOCIETY_RUNTIME_AUDIT === '1';
   const sessionPath = path.join(os.tmpdir(), `aociety-smoke-${launchId}.json`);
   const issuedAt = new Date();
   const session = {
@@ -73,6 +74,7 @@ async function main() {
 
     const args = [
       ...(config.additionalArgs || []),
+      ...(runtimeAudit ? ['-AocietyRuntimeAudit', '-unattended'] : []),
       `-LauncherSessionFile=${sessionPath}`,
       '-LauncherContractVersion=1.0',
       `-LauncherLaunchId=${launchId}`,
@@ -89,11 +91,22 @@ async function main() {
 
     await waitUntil(() => {
       if (!fs.existsSync(gameLogPath)) return false;
-      return fs.readFileSync(gameLogPath, 'utf8').includes(`Launcher session accepted: launch=${launchId}`);
-    }, 120_000, 'UE 启动器会话验证');
+      const log = fs.readFileSync(gameLogPath, 'utf8');
+      const sessionIndex = log.indexOf(`Launcher session accepted: launch=${launchId}`);
+      if (sessionIndex < 0) return false;
+      const currentLaunchLog = log.slice(sessionIndex);
+      return currentLaunchLog.includes('LogInit: Display: Starting Game.')
+        && currentLaunchLog.includes('Browse: /Game/Aociety/Maps/Aociety_ForestSnowTown')
+        && currentLaunchLog.includes('UEngine::LoadMap Load map complete /Game/Aociety/Maps/Aociety_ForestSnowTown')
+        && currentLaunchLog.includes('[AocietyViewport]');
+    }, 120_000, 'UE 启动器会话与森林地图验证');
 
-    console.log(`UE launcher session accepted: ${launchId}`);
+    console.log(`UE started game and loaded forest map: ${launchId}`);
     console.log(`Resident health ready: ${(config.services || []).every((service) => fs.existsSync(service.executablePath))}`);
+    if (runtimeAudit) {
+      await waitUntil(() => game.exitCode !== null, 90_000, 'UE 运行时画面审计');
+      console.log('UE runtime visual audit completed.');
+    }
   } finally {
     if (game && game.exitCode === null) game.kill();
     for (const service of startedServices) {

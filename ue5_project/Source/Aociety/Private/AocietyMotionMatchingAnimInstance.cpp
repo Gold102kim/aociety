@@ -5,6 +5,7 @@
 #include "Animation/AnimSequence.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Misc/App.h"
 #include "PoseSearch/PoseSearchDatabase.h"
 #if WITH_EDITOR
 #include "PoseSearch/PoseSearchDerivedData.h"
@@ -177,13 +178,16 @@ int32 FAocietyMotionMatchingAnimInstanceProxy::GetIndexedPoseCount() const
     }
 
 #if WITH_EDITOR
-    using namespace UE::PoseSearch;
-    if (FAsyncPoseSearchDatabasesManagement::RequestAsyncBuildIndex(
-            CurrentDatabase,
-            ERequestAsyncBuildFlag::ContinueRequest)
-        != EAsyncBuildIndexResult::Success)
+    if (!FApp::IsGame())
     {
-        return 0;
+        using namespace UE::PoseSearch;
+        if (FAsyncPoseSearchDatabasesManagement::RequestAsyncBuildIndex(
+                CurrentDatabase,
+                ERequestAsyncBuildFlag::ContinueRequest)
+            != EAsyncBuildIndexResult::Success)
+        {
+            return 0;
+        }
     }
 #endif
 

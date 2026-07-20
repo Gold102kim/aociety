@@ -13,6 +13,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
+#include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "HAL/FileManager.h"
 #include "Engine/GameInstance.h"
@@ -118,34 +119,65 @@ void AAocietyPlayerCharacter::BeginPlay()
             World ? static_cast<int32>(World->WorldType) : -1);
     }
 
-    USkeletalMesh* MannyDriverAsset = LoadObject<USkeletalMesh>(
-        nullptr,
-        TEXT("/Game/Aociety/MotionMatching/SKM_Manny_Aociety.SKM_Manny_Aociety"));
-    MotionDatabase = LoadObject<UPoseSearchDatabase>(
-        nullptr,
-        TEXT("/Game/Aociety/MotionMatching/PSDB_EcyLocomotion.PSDB_EcyLocomotion"));
-    EcyRetargeter = LoadObject<UIKRetargeter>(
-        nullptr,
-        TEXT("/Game/Aociety/MotionMatching/RTG_MannyToEcy.RTG_MannyToEcy"));
+    const bool bStandaloneRuntime = FApp::IsGame();
+    USkeletalMesh* MannyDriverAsset = bStandaloneRuntime
+        ? nullptr
+        : LoadObject<USkeletalMesh>(
+            nullptr,
+            TEXT("/Game/Aociety/MotionMatching/SKM_Manny_Aociety.SKM_Manny_Aociety"));
+    MotionDatabase = bStandaloneRuntime
+        ? nullptr
+        : LoadObject<UPoseSearchDatabase>(
+            nullptr,
+            TEXT("/Game/Aociety/MotionMatching/PSDB_EcyLocomotion.PSDB_EcyLocomotion"));
+    EcyRetargeter = bStandaloneRuntime
+        ? nullptr
+        : LoadObject<UIKRetargeter>(
+            nullptr,
+            TEXT("/Game/Aociety/MotionMatching/RTG_MannyToEcy.RTG_MannyToEcy"));
     MotionDriverMesh->SetSkeletalMeshAsset(MannyDriverAsset);
-    MotionDriverMesh->SetAnimationMode(EAnimationMode::AnimationBlueprint);
-    MotionDriverMesh->SetAnimInstanceClass(
-        UAocietyMotionMatchingAnimInstance::StaticClass());
-    MotionDriverMesh->InitAnim(true);
-    GetMesh()->InitAnim(true);
+    const int32 RuntimePoseCount = !bStandaloneRuntime && MotionDatabase
+        ? MotionDatabase->GetSearchIndex().GetNumPoses()
+        : 0;
+    const bool bMotionMatchingReady = MannyDriverAsset
+        && MotionDatabase
+        && EcyRetargeter
+        && RuntimePoseCount > 0;
 
-    UAocietyMotionMatchingAnimInstance* MotionInstance =
-        Cast<UAocietyMotionMatchingAnimInstance>(
-            MotionDriverMesh->GetAnimInstance());
-    if (MotionInstance)
+    UAocietyMotionMatchingAnimInstance* MotionInstance = nullptr;
+    UAocietyEcyRetargetAnimInstance* EcyInstance = nullptr;
+    bool bRetargetReady = false;
+    if (bMotionMatchingReady)
     {
-        MotionInstance->ConfigureDatabase(MotionDatabase);
-    }
+        MotionDriverMesh->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+        MotionDriverMesh->SetAnimInstanceClass(
+            UAocietyMotionMatchingAnimInstance::StaticClass());
+        MotionDriverMesh->InitAnim(true);
+        GetMesh()->InitAnim(true);
 
-    UAocietyEcyRetargetAnimInstance* EcyInstance =
-        Cast<UAocietyEcyRetargetAnimInstance>(GetMesh()->GetAnimInstance());
-    const bool bRetargetReady = EcyInstance
-        && EcyInstance->ConfigureRetarget(EcyRetargeter, MotionDriverMesh);
+        MotionInstance = Cast<UAocietyMotionMatchingAnimInstance>(
+            MotionDriverMesh->GetAnimInstance());
+        if (MotionInstance)
+        {
+            MotionInstance->ConfigureDatabase(MotionDatabase);
+        }
+
+        EcyInstance = Cast<UAocietyEcyRetargetAnimInstance>(
+            GetMesh()->GetAnimInstance());
+        bRetargetReady = EcyInstance
+            && EcyInstance->ConfigureRetarget(EcyRetargeter, MotionDriverMesh);
+    }
+    else
+    {
+        MotionDriverMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+        MotionDriverMesh->SetComponentTickEnabled(false);
+        GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+        GetMesh()->InitAnim(true);
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("[AocietyMotionMatching] runtime fallback enabled: motion assets require repair"));
+    }
 
     ConversationWidget = CreateWidget<UAocietyConversationWidget>(
         GetWorld(), UAocietyConversationWidget::StaticClass());
@@ -191,6 +223,19 @@ void AAocietyPlayerCharacter::Tick(float DeltaSeconds)
         FRotator ViewRotation = Controller->GetControlRotation();
         ViewRotation.Pitch = -10.0f;
         Controller->SetControlRotation(ViewRotation);
+        FollowCamera->SetActive(true);
+        if (APlayerController* PlayerController =
+                Cast<APlayerController>(Controller))
+        {
+            PlayerController->SetViewTarget(this);
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT("[AocietyViewport] pawn=%s camera=%s view_target=%s"),
+                *GetActorLocation().ToCompactString(),
+                *FollowCamera->GetComponentLocation().ToCompactString(),
+                *GetNameSafe(PlayerController->GetViewTarget()));
+        }
         bInitialCameraPitchApplied = true;
     }
 

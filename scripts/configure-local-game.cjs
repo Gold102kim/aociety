@@ -64,7 +64,9 @@ const gameConfig = {
   authExchangeUrl: '',
   additionalArgs: [
     projectFile,
+    '/Game/Aociety/Maps/Aociety_ForestSnowTown',
     '-game',
+    '-DisablePython',
     '-log',
     '-windowed',
     '-ResX=1280',
