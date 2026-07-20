@@ -188,7 +188,7 @@ class MicCapture:
 class AocietyCapture:
     """统一采集器 — 摄像头 + 麦克风 → 情感分析"""
 
-    def __init__(self, backend_url: str = "http://127.0.0.1:8000"):
+    def __init__(self, backend_url: str = "http://127.0.0.1:8010"):
         self.backend_url = backend_url.rstrip("/")
         self.camera = CameraCapture()
         self.mic = MicCapture()
@@ -252,7 +252,7 @@ class AocietyCapture:
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Aociety 采集调试工具")
-    parser.add_argument("--backend", default="http://127.0.0.1:8000", help="后端地址")
+    parser.add_argument("--backend", default="http://127.0.0.1:8010", help="硬件情感后端地址")
     parser.add_argument("--no-camera", action="store_true", help="禁用摄像头")
     parser.add_argument("--no-mic", action="store_true", help="禁用麦克风")
     args = parser.parse_args()

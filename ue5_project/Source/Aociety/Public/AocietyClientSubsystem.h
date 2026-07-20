@@ -117,6 +117,11 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Aociety|Config")
     FString BackendURL = TEXT("http://127.0.0.1:8000");
 
+    // Hardware-side emotion, TTS and assessment service. Keep this separate
+    // from the forest resident service exposed through BackendURL.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Aociety|Config")
+    FString CareBackendURL = TEXT("http://127.0.0.1:8010");
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Aociety|Config")
     float HeartbeatInterval = 2.0f;
 

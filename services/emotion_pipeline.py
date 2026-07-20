@@ -31,7 +31,7 @@ from .tts_service import TTSService
 class EmotionPipeline:
     """全模态情感计算管线 — 多线程协同"""
 
-    def __init__(self, backend_url: str = "http://127.0.0.1:8000"):
+    def __init__(self, backend_url: str = "http://127.0.0.1:8010"):
         self.backend_url = backend_url.rstrip("/")
         self._http = httpx.Client(base_url=self.backend_url, timeout=15.0)
 
@@ -209,7 +209,7 @@ class EmotionPipeline:
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="情感计算全管线 (视频+音频+姿态+ASR+GLM+TTS)")
-    parser.add_argument("--backend", default="http://127.0.0.1:8000")
+    parser.add_argument("--backend", default="http://127.0.0.1:8010")
     parser.add_argument("--no-vision", action="store_true", help="禁用摄像头")
     parser.add_argument("--no-audio", action="store_true", help="禁用麦克风")
     parser.add_argument("--no-pose", action="store_true", help="禁用姿态检测")

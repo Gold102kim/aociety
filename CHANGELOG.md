@@ -2,6 +2,21 @@
 
 All notable launcher changes are recorded here. The project follows semantic versioning for engineering baselines; a version number does not imply production readiness.
 
+## [0.4.0] - 2026-07-20
+
+### Added
+
+- Launcher-managed resident service startup and health checks before opening the game.
+- Local setup command for UnrealEditor, the isolated Python runtime and ignored machine configuration.
+- UE Launcher Contract 1.0 parsing with expiry, launch ID, account and Agent validation.
+- Game integration regression checks and a local UE runtime smoke test.
+
+### Changed
+
+- Split UE networking into resident/world port `8000` and hardware care/TTS/assessment port `8010`.
+- Aligned hardware helper scripts and OpenClaw fallback port defaults.
+- Made Windows build cleanup resilient to Desktop filesystem filters.
+
 ## [0.3.0] - 2026-07-17
 
 ### Added

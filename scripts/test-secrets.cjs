@@ -3,7 +3,19 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
-const excludedDirectories = new Set(['.git', 'node_modules', 'dist', 'dist-electron', 'release', '.vite', '.doc_review']);
+const excludedDirectories = new Set([
+  '.git',
+  'node_modules',
+  'dist',
+  'dist-electron',
+  'release',
+  '.vite',
+  '.doc_review',
+  'Binaries',
+  'DerivedDataCache',
+  'Intermediate',
+  'Saved',
+]);
 const scannedExtensions = new Set(['.cjs', '.cs', '.env', '.js', '.json', '.md', '.py', '.ts', '.tsx', '.txt', '.yaml', '.yml']);
 const findings = [];
 const secretPatterns = [

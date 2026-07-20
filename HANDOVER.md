@@ -122,6 +122,15 @@ ue5_project/Source/Aociety/Private/AocietyNPCBubbleWidget.cpp
 
 当前居民服务没有 `/ws/emotion`，因此 `bEnableEmotionWebSocket=false` 是默认值。HTTP 情绪轮询仍可保留；只有连接到真正提供该 WebSocket 的硬件服务时才应显式启用。
 
+UE 当前使用两个明确地址：
+
+```text
+BackendURL     = http://127.0.0.1:8000   # 居民、世界、NPC
+CareBackendURL = http://127.0.0.1:8010   # 情感、TTS、评估、WebSocket
+```
+
+`UAocietyGameInstance` 已实现 Launcher Contract 1.0，读取并校验 `LauncherSessionFile`、`LauncherContractVersion` 和 `LauncherLaunchId`。开发版允许没有启动器参数时直接调试；Shipping 构建会拒绝无效或过期会话。
+
 ## 5. 验收清单
 
 后端：

@@ -1,10 +1,30 @@
 {
   "contractVersion": "1.0",
-  "executablePath": "D:\\EchoVerseGame\\Windows\\EchoVerse.exe",
-  "workingDirectory": "D:\\EchoVerseGame\\Windows",
-  "channel": "development",
-  "authExchangeUrl": "https://api.example.com/v1/game-session/exchange",
+  "executablePath": "D:\\UE_5.8\\Engine\\Binaries\\Win64\\UnrealEditor.exe",
+  "workingDirectory": "D:\\UE_5.8\\Engine\\Binaries\\Win64",
+  "channel": "development-editor",
+  "authExchangeUrl": "",
   "additionalArgs": [
+    "D:\\Aociety\\ue5_project\\Aociety.uproject",
+    "-game",
     "-log"
+  ],
+  "services": [
+    {
+      "name": "forest-residents",
+      "executablePath": "D:\\AocietyRuntime\\Scripts\\python.exe",
+      "workingDirectory": "D:\\Aociety",
+      "args": [
+        "-m",
+        "uvicorn",
+        "services.app:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      "healthUrl": "http://127.0.0.1:8000/health",
+      "startupTimeoutMs": 30000
+    }
   ]
 }

@@ -28,7 +28,7 @@ FParse::Value(FCommandLine::Get(), TEXT("LauncherContractVersion="), ContractVer
 FParse::Value(FCommandLine::Get(), TEXT("LauncherLaunchId="), LaunchId);
 ```
 
-建议将解析和验证逻辑放入 `UGameInstanceSubsystem`，例如 `ULauncherSessionSubsystem`，保证切换地图后会话仍然存在。
+当前解析和验证逻辑位于 `UAocietyGameInstance::LoadLauncherSession()`，切换地图后会话字段仍由 GameInstance 保存。后续若会话功能继续扩大，可再迁移为独立 `ULauncherSessionSubsystem`。
 
 ## 2. 会话文件格式
 
@@ -141,7 +141,7 @@ FParse::Value(FCommandLine::Get(), TEXT("LauncherLaunchId="), LaunchId);
 6. SHA-256 文件清单，后续用于启动器校验和更新。
 7. 已知问题、最低系统要求和必要运行库。
 
-启动器端收到版本后，将 `config/game.example.json` 复制为 `config/game.local.json`，填写实际的 `executablePath` 和 `workingDirectory` 即可联调。
+本机开发环境运行 `pnpm configure:local-game` 可自动生成启动器配置；其他电脑可复制 `config/game.example.json`，填写实际的 UnrealEditor/打包 EXE、项目路径、Python 运行时和服务目录。
 
 ## 6. 第一轮联调验收标准
 

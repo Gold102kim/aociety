@@ -93,9 +93,17 @@ pnpm dist:win
 
 ## 接入 UE5 游戏
 
-1. 将 `config/game.example.json` 复制为 `config/game.local.json`。
-2. 填写 UE5 开发构建的绝对路径和可选参数。
-3. 重启 Launcher，点击“启动游戏”。
+本机首次配置：
+
+```powershell
+python -m venv ..\runtime\aociety-python
+..\runtime\aociety-python\Scripts\python.exe -m pip install -r requirements-resident.txt
+pnpm configure:local-game
+```
+
+该命令会复用启动器本地 AI 配置，生成被 Git 忽略的 `.env`、`config/game.local.json` 和 `%APPDATA%/echoverse-launcher/game.json`。随后重启 Launcher，点击“进入游戏完善分身”。
+
+当前开发入口使用 UnrealEditor 5.8 的 `-game` 模式。启动器会先检查并启动居民服务 `127.0.0.1:8000`，再把短时账户会话传入 UE。情感、TTS 和评估服务固定预留在 `127.0.0.1:8010`。
 
 游戏端要求见 [UE5 交接文档](docs/UE5_GAME_HANDOFF.md)，机器可读格式见 [Launcher Session Schema](contracts/launcher-session.schema.json)。`prototype-local` ticket 只允许开发联调，Shipping 构建必须拒绝。
 

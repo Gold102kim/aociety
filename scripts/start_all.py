@@ -3,7 +3,7 @@
 启动顺序:
   1. R1-Omni-0.5B  (端口 8001) — 文本情感推理
   2. Arousal Service (端口 8002) — 唤醒度/效价分析
-  3. 主后端服务      (端口 8000) — 统一FastAPI
+  3. 硬件情感后端    (端口 8010) — 情感、TTS 与评估 API
 
 用法:
   python scripts/start_all.py              # 启动所有服务
@@ -25,7 +25,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # 端口配置
 PORTS = {
-    "main": int(os.environ.get("AOCIETY_PORT", "8000")),
+    "main": int(os.environ.get("HARDWARE_CARE_PORT", "8010")),
     "r1_omni": int(os.environ.get("R1_OMNI_PORT", "8001")),
     "arousal": int(os.environ.get("AROUSAL_PORT", "8002")),
 }

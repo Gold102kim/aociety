@@ -4,7 +4,7 @@
   UE5 ←→ REST API + WebSocket ←→ Python Backend ←→ GLM 5.2 API (云端)
                                                      ←→ 本地模型 (R1-Omni, Arousal, FER+)
 
-端口: 8000 (主API), 8001 (R1-Omni), 8002 (Arousal)
+端口: 8010 (硬件情感API), 8001 (R1-Omni), 8002 (Arousal)
 """
 
 from __future__ import annotations
@@ -791,5 +791,5 @@ async def world_websocket(ws: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("AOCIETY_PORT", "8000"))
+    port = int(os.environ.get("HARDWARE_CARE_PORT", "8010"))
     uvicorn.run("backend.main:app", host="0.0.0.0", port=port, reload=True)

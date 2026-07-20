@@ -233,7 +233,7 @@ class OpenClawGatewayClient:
         device_json = self._read_json(state_dir / "identity" / "device.json")
         auth_path = state_dir / "identity" / "device-auth.json"
         auth_json = self._read_json(auth_path) if auth_path.exists() else {}
-        gateway_port = int(openclaw_json.get("gateway", {}).get("port", 18789))
+        gateway_port = int(openclaw_json.get("gateway", {}).get("port", 18890))
         url = self.config.url.strip() or f"ws://127.0.0.1:{gateway_port}"
         origin = self.config.origin.strip() or f"http://127.0.0.1:{gateway_port}"
         gateway_token = str(openclaw_json.get("gateway", {}).get("auth", {}).get("token", "") or "").strip()

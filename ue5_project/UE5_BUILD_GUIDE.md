@@ -91,6 +91,7 @@ start "" "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.
 
 Project Settings → Custom Settings → Aociety:
 - [x] Default Backend URL = http://127.0.0.1:8000
+- [x] Default Care Backend URL = http://127.0.0.1:8010
 - [x] Default TTS Voice = xiaoxiao
 
 ## 默认蓝图继承
@@ -104,20 +105,20 @@ Project Settings → Custom Settings → Aociety:
 
 | 依赖 | 端口 | 作用 |
 |------|------|------|
-| Python Backend | 8000 | 全部情感计算服务 |
+| Forest Resident Service | 8000 | 居民对话、世界、NPC |
+| Hardware Care Backend | 8010 | 情感、TTS、评估、WebSocket |
 | (可选) R1-Omni | 8001 | 本地情感推理 (如果不用GLM) |
 | (可选) Arousal | 8002 | 本地唤醒度 |
 | GLM 5.2 | Cloud | 主对话 + 情感推理 (tokenhub.market) |
 
 启动后端:
 ```bash
-cd E:/Aociety-NEW
-uvicorn backend.main:app --reload --port 8000
+start_full.bat
 ```
 
 ## 测试流程
 
-1. 启动后端: `uvicorn backend.main:app --reload --port 8000`
+1. 启动后端: `start_full.bat`
 2. 启动UE5编辑器
 3. 打开 Aociety.uproject
 4. 按 Play 按钮

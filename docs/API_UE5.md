@@ -1,7 +1,8 @@
 # Aociety 情感计算系统 — UE5 API 接口文档
 
 > 本文档定义 Unreal Engine 5.8 客户端与 Python 后端之间的所有通信接口。
-> 基础地址：`http://127.0.0.1:8000`
+> 居民/世界基础地址：`http://127.0.0.1:8000`；情感/TTS/评估基础地址：`http://127.0.0.1:8010`。
+> 旧示例中的单一 `BackendURL` 应分别替换为 `BackendURL`（8000）和 `CareBackendURL`（8010）。
 
 ---
 

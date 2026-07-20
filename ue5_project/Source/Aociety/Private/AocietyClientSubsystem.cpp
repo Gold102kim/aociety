@@ -81,7 +81,7 @@ bool UAocietyClientSubsystem::Connect()
         return true;
     }
 
-    FString WSURL = BackendURL.Replace(TEXT("http://"), TEXT("ws://")).Replace(TEXT("https://"), TEXT("wss://"));
+    FString WSURL = CareBackendURL.Replace(TEXT("http://"), TEXT("ws://")).Replace(TEXT("https://"), TEXT("wss://"));
     WSURL += TEXT("/ws/emotion");
 
     if (!FModuleManager::Get().IsModuleLoaded(TEXT("WebSockets")))
@@ -215,7 +215,7 @@ void UAocietyClientSubsystem::PushCameraFrame(const TArray<uint8>& JPEGBytes, co
     FString Escaped = TextHint.Replace(TEXT("\""), TEXT("\\\""));
 
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
-    Req->SetURL(BackendURL + TEXT("/emotion/analyze"));
+    Req->SetURL(CareBackendURL + TEXT("/emotion/analyze"));
     Req->SetVerb(TEXT("POST"));
     Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
     Req->SetContentAsString(
@@ -230,7 +230,7 @@ void UAocietyClientSubsystem::PushAudioChunk(const TArray<uint8>& PCM16Bytes)
     FString B64 = FBase64::Encode(PCM16Bytes);
 
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
-    Req->SetURL(BackendURL + TEXT("/emotion/analyze"));
+    Req->SetURL(CareBackendURL + TEXT("/emotion/analyze"));
     Req->SetVerb(TEXT("POST"));
     Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
     Req->SetContentAsString(FString::Printf(TEXT("{\"audio_base64\":\"%s\"}"), *B64));
@@ -243,7 +243,7 @@ void UAocietyClientSubsystem::PushTextHint(const FString& Text)
     FString Esc = Text.Replace(TEXT("\""), TEXT("\\\""));
 
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
-    Req->SetURL(BackendURL + TEXT("/emotion/analyze"));
+    Req->SetURL(CareBackendURL + TEXT("/emotion/analyze"));
     Req->SetVerb(TEXT("POST"));
     Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
     Req->SetContentAsString(FString::Printf(TEXT("{\"text_hint\":\"%s\"}"), *Esc));
@@ -257,7 +257,7 @@ void UAocietyClientSubsystem::PushTextHint(const FString& Text)
 void UAocietyClientSubsystem::RequestCurrentEmotion()
 {
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
-    Req->SetURL(BackendURL + TEXT("/emotion/state"));
+    Req->SetURL(CareBackendURL + TEXT("/emotion/state"));
     Req->SetVerb(TEXT("GET"));
     Req->OnProcessRequestComplete().BindUObject(this, &UAocietyClientSubsystem::OnHttpDone, FName("emotion"));
     Req->ProcessRequest();
@@ -283,7 +283,7 @@ void UAocietyClientSubsystem::RequestNPCList()
 void UAocietyClientSubsystem::RequestNPCCare(const FString& NpcId)
 {
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
-    Req->SetURL(BackendURL + TEXT("/emotion/care_with_voice"));
+    Req->SetURL(CareBackendURL + TEXT("/emotion/care_with_voice"));
     Req->SetVerb(TEXT("POST"));
     Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
     Req->SetContentAsString(FString::Printf(TEXT("{\"npc_id\":\"%s\"}"), *NpcId));
@@ -542,7 +542,7 @@ FString UAocietyClientSubsystem::GetVoiceCNName(const FString& VoiceKey) const
 void UAocietyClientSubsystem::SetTTSVoice(const FString& VoiceName)
 {
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
-    Req->SetURL(BackendURL + TEXT("/tts/voices/") + VoiceName);
+    Req->SetURL(CareBackendURL + TEXT("/tts/voices/") + VoiceName);
     Req->SetVerb(TEXT("POST"));
     Req->ProcessRequest();
     PreferredTTSVoice = VoiceName;
@@ -554,7 +554,7 @@ void UAocietyClientSubsystem::SynthesizeTTS(const FString& Text, const FString& 
     FString UseVoice = VoiceName.IsEmpty() ? PreferredTTSVoice : VoiceName;
 
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
-    Req->SetURL(BackendURL + TEXT("/tts/synthesize"));
+    Req->SetURL(CareBackendURL + TEXT("/tts/synthesize"));
     Req->SetVerb(TEXT("POST"));
     Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
     Req->SetContentAsString(FString::Printf(
@@ -570,7 +570,7 @@ void UAocietyClientSubsystem::SynthesizeTTS(const FString& Text, const FString& 
 void UAocietyClientSubsystem::StartAssessment()
 {
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
-    Req->SetURL(BackendURL + TEXT("/assessment/start"));
+    Req->SetURL(CareBackendURL + TEXT("/assessment/start"));
     Req->SetVerb(TEXT("POST"));
     Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
     Req->SetContentAsString(TEXT("{}"));
@@ -583,7 +583,7 @@ void UAocietyClientSubsystem::SubmitAssessmentTurn(const FString& SessionId, con
     if (SessionId.IsEmpty()) return;
     FString Esc = UserInput.Replace(TEXT("\""), TEXT("\\\""));
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
-    Req->SetURL(BackendURL + TEXT("/assessment/turn"));
+    Req->SetURL(CareBackendURL + TEXT("/assessment/turn"));
     Req->SetVerb(TEXT("POST"));
     Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
     Req->SetContentAsString(FString::Printf(
@@ -595,7 +595,7 @@ void UAocietyClientSubsystem::FinishAssessment(const FString& SessionId)
 {
     if (SessionId.IsEmpty()) return;
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
-    Req->SetURL(BackendURL + TEXT("/assessment/finish/") + SessionId);
+    Req->SetURL(CareBackendURL + TEXT("/assessment/finish/") + SessionId);
     Req->SetVerb(TEXT("POST"));
     Req->ProcessRequest();
 }
