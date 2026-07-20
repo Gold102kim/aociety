@@ -416,8 +416,30 @@ UAnimSequence* BuildRootMotionSequence(
         SourceModel->GetBoneTrackTransforms(RootBone, ExistingTransforms);
     }
 
+    // The source mannequin clips already contain root motion.  The previous
+    // implementation added a second synthetic XY translation on top of that
+    // track, turning forward clips into diagonals (and making Ecy appear to
+    // side-step).  Keep the source path shape, normalize it to the requested
+    // locomotion distance, and only use Direction when a clip has no horizontal
+    // root motion of its own.
     Direction = Direction.GetSafeNormal();
     const float Distance = Speed * static_cast<float>(SourceModel->GetPlayLength());
+    const FVector SourceRootStart = ExistingTransforms.IsEmpty()
+        ? FVector::ZeroVector
+        : ExistingTransforms[0].GetTranslation();
+    const FVector SourceRootEnd = ExistingTransforms.IsEmpty()
+        ? FVector::ZeroVector
+        : ExistingTransforms.Last().GetTranslation();
+    const FVector SourceRootDelta = SourceRootEnd - SourceRootStart;
+    const FVector SourceRootHorizontal = FVector(
+        SourceRootDelta.X,
+        SourceRootDelta.Y,
+        0.0f);
+    const FVector SourceDirection = SourceRootHorizontal.IsNearlyZero()
+        ? FVector(Direction.X, Direction.Y, 0.0f)
+        : SourceRootHorizontal.GetSafeNormal();
+    const float SourceDistanceSquared =
+        SourceRootHorizontal.SizeSquared();
     TArray<FVector> Positions;
     TArray<FQuat> Rotations;
     TArray<FVector> Scales;
@@ -453,10 +475,51 @@ UAnimSequence* BuildRootMotionSequence(
         default:
             break;
         }
+        const FVector SourceDelta = Base.GetTranslation() - SourceRootStart;
+        float SourceProgress = Alpha;
+        if (SourceDistanceSquared > UE_SMALL_NUMBER)
+        {
+            SourceProgress = FMath::Clamp(
+                FVector::DotProduct(
+                    FVector(SourceDelta.X, SourceDelta.Y, 0.0f),
+                    SourceRootHorizontal)
+                    / SourceDistanceSquared,
+                0.0f,
+                1.0f);
+        }
+        float RootMotionProgress = SourceProgress;
+        if (Profile == ERootMotionProfile::Accelerate)
+        {
+            RootMotionProgress = SourceProgress * SourceProgress;
+        }
+        else if (Profile == ERootMotionProfile::Decelerate)
+        {
+            RootMotionProgress =
+                1.0f - FMath::Square(1.0f - SourceProgress);
+        }
+
+        FVector HorizontalTranslation = FVector::ZeroVector;
+        if (Profile == ERootMotionProfile::TurnLeft
+            || Profile == ERootMotionProfile::TurnRight)
+        {
+            // Turn clips are intentionally in-place.  They must not inherit
+            // the lateral root motion of the source side-walk clip.
+            HorizontalTranslation = FVector::ZeroVector;
+        }
+        else if (Distance > UE_SMALL_NUMBER)
+        {
+            HorizontalTranslation = SourceDirection
+                * Distance
+                * (SourceDistanceSquared > UE_SMALL_NUMBER
+                       ? RootMotionProgress
+                       : DistanceAlpha);
+        }
+
         Positions.Add(
-            Base.GetTranslation()
-            + FVector(Direction.X, Direction.Y, 0.0f)
-                * Distance * DistanceAlpha);
+            FVector(
+                SourceRootStart.X + HorizontalTranslation.X,
+                SourceRootStart.Y + HorizontalTranslation.Y,
+                Base.GetTranslation().Z));
         Rotations.Add(
             FQuat(FVector::UpVector, FMath::DegreesToRadians(YawDegrees))
             * Base.GetRotation());
@@ -703,30 +766,11 @@ int32 UAocietyMotionAssetBuilderCommandlet::Main(const FString& Params)
             Entry.Direction,
             Entry.Speed));
     }
-    DatabaseAnimations.Add(BuildRootMotionSequence(
-        TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Jog/MF_Unarmed_Jog_Fwd.MF_Unarmed_Jog_Fwd"),
-        TEXT("MM_Ecy_Start_Fwd_RM"),
-        FVector2D(1.0f, 0.0f),
-        420.0f,
-        ERootMotionProfile::Accelerate));
-    DatabaseAnimations.Add(BuildRootMotionSequence(
-        TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Jog/MF_Unarmed_Jog_Fwd.MF_Unarmed_Jog_Fwd"),
-        TEXT("MM_Ecy_Stop_Fwd_RM"),
-        FVector2D(1.0f, 0.0f),
-        420.0f,
-        ERootMotionProfile::Decelerate));
-    DatabaseAnimations.Add(BuildRootMotionSequence(
-        TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Walk/MF_Unarmed_Walk_Left.MF_Unarmed_Walk_Left"),
-        TEXT("MM_Ecy_Turn_Left_RM"),
-        FVector2D::ZeroVector,
-        0.0f,
-        ERootMotionProfile::TurnLeft));
-    DatabaseAnimations.Add(BuildRootMotionSequence(
-        TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Walk/MF_Unarmed_Walk_Right.MF_Unarmed_Walk_Right"),
-        TEXT("MM_Ecy_Turn_Right_RM"),
-        FVector2D::ZeroVector,
-        0.0f,
-        ERootMotionProfile::TurnRight));
+    // The available sample pack has no authored starts, stops, or pivots.
+    // The previous database fabricated them from looping jog/side-walk clips,
+    // so motion matching could select a sideways step even at full speed.
+    // Keep only genuine locomotion clips until dedicated transition assets are
+    // available.
     UAnimSequence* JumpAnimation = BuildRootMotionSequence(
         TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Jump/MM_Jump.MM_Jump"),
         TEXT("MM_Ecy_Jump_RM"),

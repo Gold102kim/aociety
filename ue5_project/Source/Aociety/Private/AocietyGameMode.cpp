@@ -4,8 +4,25 @@
 #include "AocietyClientSubsystem.h"
 #include "AocietyPlayerCharacter.h"
 #include "AocietyNPCCharacter.h"
+#include "AocietyWorldBoundary.h"
+#include "Components/ExponentialHeightFogComponent.h"
+#include "Components/DirectionalLightComponent.h"
+#include "Components/LightComponent.h"
+#include "Components/PointLightComponent.h"
+#include "Components/SkyLightComponent.h"
+#include "Components/SpotLightComponent.h"
+#include "Engine/DirectionalLight.h"
+#include "Engine/ExponentialHeightFog.h"
+#include "Engine/PointLight.h"
+#include "Engine/SkyLight.h"
 #include "Engine/GameInstance.h"
+#include "EngineUtils.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "TimerManager.h"
 
 namespace
@@ -55,11 +72,40 @@ FString GetResidentDisplayName(
 AAocietyGameMode::AAocietyGameMode()
 {
     DefaultPawnClass = AAocietyPlayerCharacter::StaticClass();
+    PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.TickInterval = 0.1f;
 }
 
 void AAocietyGameMode::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (UWorld* World = GetWorld())
+    {
+        if (!World->GetAuthGameMode())
+        {
+            return;
+        }
+        AAocietyWorldBoundary* Boundary = nullptr;
+        for (TActorIterator<AAocietyWorldBoundary> It(World); It; ++It)
+        {
+            Boundary = *It;
+            break;
+        }
+        if (!Boundary)
+        {
+            Boundary = World->SpawnActor<AAocietyWorldBoundary>(
+                AAocietyWorldBoundary::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator);
+        }
+        if (Boundary)
+        {
+            // Authored cabin diorama and plaza occupy this rectangle; the generous
+            // margin prevents edge falls without clipping the town paths.
+            Boundary->Configure(FVector2D(-4200.0f, -3600.0f), FVector2D(4200.0f, 4200.0f));
+        }
+    }
+
+    InitializeWorldEnvironment();
 
     TArray<AActor*> DialogueTriggers;
     UGameplayStatics::GetAllActorsWithTag(
@@ -93,6 +139,235 @@ void AAocietyGameMode::BeginPlay()
         AmbientConversationTimer, this,
         &AAocietyGameMode::StartAmbientNPCConversation,
         32.0f, true, 14.0f);
+}
+
+void AAocietyGameMode::Tick(float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+    UpdateWorldEnvironment(DeltaSeconds);
+}
+
+void AAocietyGameMode::InitializeWorldEnvironment()
+{
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return;
+    }
+
+    float RequestedStartHour = 0.0f;
+    if (FParse::Value(
+            FCommandLine::Get(), TEXT("AocietyStartHour="), RequestedStartHour))
+    {
+        WorldClockMinutes = FMath::Fmod(
+            FMath::Max(0.0f, RequestedStartHour), 24.0f) * 60.0f;
+    }
+
+    TArray<AActor*> Directionals;
+    UGameplayStatics::GetAllActorsOfClass(World, ADirectionalLight::StaticClass(), Directionals);
+    ADirectionalLight* FallbackSun = nullptr;
+    for (AActor* Actor : Directionals)
+    {
+        if (ADirectionalLight* Candidate = Cast<ADirectionalLight>(Actor))
+        {
+            if (!FallbackSun)
+            {
+                FallbackSun = Candidate;
+            }
+            if (const UDirectionalLightComponent* Component = Cast<UDirectionalLightComponent>(
+                    Candidate->GetLightComponent()); Component && Component->bAtmosphereSunLight)
+            {
+                SunLight = Candidate;
+            }
+        }
+    }
+    if (!SunLight.IsValid())
+    {
+        SunLight = FallbackSun;
+    }
+    for (AActor* Actor : Directionals)
+    {
+        if (ADirectionalLight* Candidate = Cast<ADirectionalLight>(Actor))
+        {
+            if (Candidate == SunLight.Get())
+            {
+                Candidate->GetLightComponent()->SetMobility(EComponentMobility::Movable);
+            }
+            else
+            {
+                Candidate->GetLightComponent()->SetVisibility(false);
+            }
+        }
+    }
+
+    TArray<AActor*> Skies;
+    UGameplayStatics::GetAllActorsOfClass(World, ASkyLight::StaticClass(), Skies);
+    if (Skies.Num() > 0)
+    {
+        SkyLight = Cast<ASkyLight>(Skies[0]);
+        if (SkyLight.IsValid())
+        {
+            SkyLight->GetLightComponent()->SetMobility(EComponentMobility::Movable);
+        }
+    }
+
+    TArray<AActor*> Fogs;
+    UGameplayStatics::GetAllActorsOfClass(World, AExponentialHeightFog::StaticClass(), Fogs);
+    if (Fogs.Num() > 0)
+    {
+        HeightFog = Cast<AExponentialHeightFog>(Fogs[0]);
+    }
+
+    for (TActorIterator<AActor> It(World); It; ++It)
+    {
+        TArray<ULightComponent*> Components;
+        It->GetComponents<ULightComponent>(Components);
+        for (ULightComponent* Component : Components)
+        {
+            if (!Component || !Component->IsA<UPointLightComponent>() && !Component->IsA<USpotLightComponent>())
+            {
+                continue;
+            }
+            NightLights.Add(Component);
+            OriginalLightIntensities.Add(Component, Component->Intensity);
+        }
+    }
+    if (NightLights.Num() == 0)
+    {
+        // The authored cabin pack uses emissive meshes rather than light actors.
+        // Add a restrained set of warm, movable window/porch lights so the
+        // dusk-to-night transition is visible in the playable demo.
+        const FVector LightLocations[] = {
+            FVector(-980.0f, -260.0f, 420.0f),
+            FVector(720.0f, -180.0f, 420.0f),
+            FVector(-760.0f, 1080.0f, 420.0f),
+            FVector(1120.0f, 1120.0f, 420.0f),
+            FVector(0.0f, 320.0f, 520.0f)};
+        for (const FVector& Location : LightLocations)
+        {
+            if (APointLight* Actor = World->SpawnActor<APointLight>(
+                    APointLight::StaticClass(), Location, FRotator::ZeroRotator))
+            {
+                UPointLightComponent* Component = Cast<UPointLightComponent>(
+                    Actor->GetLightComponent());
+                if (!Component)
+                {
+                    continue;
+                }
+                Component->SetMobility(EComponentMobility::Movable);
+                Component->SetIntensity(8000.0f);
+                Component->SetAttenuationRadius(1100.0f);
+                Component->SetLightColor(FLinearColor(1.0f, 0.56f, 0.24f));
+                Component->SetCastShadows(true);
+                NightLights.Add(Component);
+                OriginalLightIntensities.Add(Component, Component->Intensity);
+            }
+        }
+    }
+    bWorldEnvironmentInitialized = true;
+    if (UNiagaraSystem* RainSystem = LoadObject<UNiagaraSystem>(
+            nullptr, TEXT("/Niagara/DefaultAssets/Templates/Systems/FountainLightweight.FountainLightweight")))
+    {
+        WeatherParticles = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+            World, RainSystem, FVector(0.0f, 0.0f, 1800.0f),
+            FRotator(180.0f, 0.0f, 0.0f), FVector(10.0f), true, true,
+            ENCPoolMethod::None, true);
+        if (WeatherParticles)
+        {
+            WeatherParticles->SetVisibility(false, true);
+            WeatherParticles->SetComponentTickEnabled(false);
+        }
+    }
+    UE_LOG(LogTemp, Display, TEXT("[AocietyEnvironment] initialized sun=%s skylight=%s fog=%s night_lights=%d"),
+        *GetNameSafe(SunLight.Get()), *GetNameSafe(SkyLight.Get()), *GetNameSafe(HeightFog.Get()), NightLights.Num());
+}
+
+void AAocietyGameMode::UpdateWorldEnvironment(float DeltaSeconds)
+{
+    if (!bWorldEnvironmentInitialized)
+    {
+        return;
+    }
+
+    WorldClockMinutes = FMath::Fmod(
+        WorldClockMinutes + DeltaSeconds * (1440.0f / WorldDayLengthSeconds), 1440.0f);
+    if (WorldClockMinutes < 0.0f)
+    {
+        WorldClockMinutes += 1440.0f;
+    }
+    const float SunAngle = (WorldClockMinutes / 1440.0f) * 360.0f - 90.0f;
+    const float SolarElevation = FMath::Sin(FMath::DegreesToRadians(SunAngle));
+    const bool bNight = SolarElevation < -0.08f;
+    const float DayBlend = FMath::Clamp((SolarElevation + 0.12f) / 0.45f, 0.0f, 1.0f);
+
+    if (SunLight.IsValid())
+    {
+        // UE directional lights point along local -X; a negative pitch puts the
+        // morning/noon sun toward the authored ground instead of above the sky.
+        SunLight->SetActorRotation(FRotator(-SunAngle, -35.0f, 0.0f));
+        if (UDirectionalLightComponent* Light = Cast<UDirectionalLightComponent>(
+                SunLight->GetLightComponent()))
+        {
+            Light->SetIntensity(FMath::Lerp(0.35f, 4.2f, DayBlend));
+            Light->SetLightColor(FLinearColor::LerpUsingHSV(
+                FLinearColor(0.18f, 0.24f, 0.42f), FLinearColor(1.0f, 0.88f, 0.68f), DayBlend));
+        }
+    }
+    if (SkyLight.IsValid())
+    {
+        USkyLightComponent* Light = SkyLight->GetLightComponent();
+        Light->SetIntensity(FMath::Lerp(0.62f, 1.0f, DayBlend));
+        if (FMath::IsNearlyEqual(FMath::Fmod(WorldClockMinutes, 30.0f), 0.0f, 0.2f))
+        {
+            Light->RecaptureSky();
+        }
+    }
+
+    WeatherElapsedSeconds += DeltaSeconds;
+    if (WeatherElapsedSeconds > 75.0f)
+    {
+        WeatherElapsedSeconds = 0.0f;
+        WeatherState = (WeatherState + 1) % 3; // clear -> overcast -> rain
+        UE_LOG(LogTemp, Display, TEXT("[AocietyEnvironment] weather=%s"),
+            WeatherState == 0 ? TEXT("clear") : WeatherState == 1 ? TEXT("overcast") : TEXT("rain"));
+    }
+
+    if (HeightFog.IsValid())
+    {
+        UExponentialHeightFogComponent* Fog = HeightFog->GetComponent();
+        const float WeatherFog = WeatherState == 0 ? 0.0015f : WeatherState == 1 ? 0.006f : 0.012f;
+        Fog->FogDensity = FMath::Lerp(WeatherFog, WeatherFog * 1.35f, bNight ? 1.0f : 0.0f);
+        Fog->FogHeightFalloff = 0.18f;
+        Fog->SetFogInscatteringColor(bNight
+            ? FLinearColor(0.025f, 0.04f, 0.10f)
+            : FLinearColor(0.72f, 0.82f, 1.0f));
+    }
+    if (WeatherParticles)
+    {
+        const bool bRain = WeatherState == 2;
+        if (bRain)
+        {
+            if (APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0))
+            {
+                WeatherParticles->SetWorldLocation(
+                    Player->GetActorLocation() + FVector(0.0f, 0.0f, 1100.0f));
+            }
+        }
+        WeatherParticles->SetVisibility(bRain, true);
+        WeatherParticles->SetComponentTickEnabled(bRain);
+    }
+    for (const TWeakObjectPtr<ULightComponent>& WeakLight : NightLights)
+    {
+        if (ULightComponent* Light = WeakLight.Get())
+        {
+            const float* Original = OriginalLightIntensities.Find(WeakLight);
+            Light->SetVisibility(bNight);
+            if (Original)
+            {
+                Light->SetIntensity(bNight ? *Original : 0.0f);
+            }
+        }
+    }
 }
 
 void AAocietyGameMode::HandleDialogueTrigger(AActor* TriggerActor, AActor* OtherActor)

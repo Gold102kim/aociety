@@ -3,6 +3,7 @@
 #include "AocietyPlayerCharacter.h"
 #include "AocietyClientSubsystem.h"
 #include "AocietyConversationWidget.h"
+#include "AocietyPauseMenuWidget.h"
 #include "AocietyEcyRetargetAnimInstance.h"
 #include "AocietyMotionMatchingAnimInstance.h"
 #include "AocietyNPCCharacter.h"
@@ -153,6 +154,14 @@ void AAocietyPlayerCharacter::BeginPlay()
     {
         ConversationWidget->AddToViewport(100);
         ConversationWidget->SetVisibility(ESlateVisibility::Collapsed);
+    }
+
+    PauseMenuWidget = CreateWidget<UAocietyPauseMenuWidget>(
+        GetWorld(), UAocietyPauseMenuWidget::StaticClass());
+    if (PauseMenuWidget)
+    {
+        PauseMenuWidget->AddToViewport(200);
+        PauseMenuWidget->SetVisibility(ESlateVisibility::Collapsed);
     }
 
     PreviousActorLocation = GetActorLocation();
@@ -431,8 +440,10 @@ void AAocietyPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerI
         &AAocietyPlayerCharacter::Interact);
     PlayerInputComponent->BindAction(TEXT("Inbox"), IE_Pressed, this,
         &AAocietyPlayerCharacter::ToggleInbox);
-    PlayerInputComponent->BindAction(TEXT("CloseConversation"), IE_Pressed, this,
-        &AAocietyPlayerCharacter::CloseConversation);
+    FInputActionBinding& EscapeBinding = PlayerInputComponent->BindAction(
+        TEXT("CloseConversation"), IE_Pressed, this,
+        &AAocietyPlayerCharacter::HandleEscape);
+    EscapeBinding.bExecuteWhenPaused = true;
 }
 
 void AAocietyPlayerCharacter::SetNearbyNPC(AAocietyNPCCharacter* NPC)
@@ -521,17 +532,31 @@ void AAocietyPlayerCharacter::ToggleInbox()
     }
 }
 
-void AAocietyPlayerCharacter::CloseConversation()
+void AAocietyPlayerCharacter::HandleEscape()
 {
     if (ConversationWidget && ConversationWidget->IsPanelOpen())
     {
         ConversationWidget->ClosePanel();
+        return;
+    }
+    if (!PauseMenuWidget)
+    {
+        return;
+    }
+    if (PauseMenuWidget->IsMenuOpen())
+    {
+        PauseMenuWidget->Close();
+    }
+    else
+    {
+        PauseMenuWidget->Open(Cast<APlayerController>(Controller));
     }
 }
 
 void AAocietyPlayerCharacter::MoveForward(float Value)
 {
-    if (ConversationWidget && ConversationWidget->IsPanelOpen())
+    if ((ConversationWidget && ConversationWidget->IsPanelOpen())
+        || (PauseMenuWidget && PauseMenuWidget->IsMenuOpen()))
     {
         return;
     }
@@ -544,7 +569,8 @@ void AAocietyPlayerCharacter::MoveForward(float Value)
 
 void AAocietyPlayerCharacter::MoveRight(float Value)
 {
-    if (ConversationWidget && ConversationWidget->IsPanelOpen())
+    if ((ConversationWidget && ConversationWidget->IsPanelOpen())
+        || (PauseMenuWidget && PauseMenuWidget->IsMenuOpen()))
     {
         return;
     }
