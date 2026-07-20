@@ -8,8 +8,9 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 const example = JSON.parse(read('config/game.example.json'));
 assert.equal(example.contractVersion, '1.0');
 assert.ok(Array.isArray(example.additionalArgs) && example.additionalArgs.includes('-game'));
-assert.ok(example.additionalArgs.includes('/Game/Aociety/Maps/Aociety_ForestSnowTown'));
+assert.ok(example.additionalArgs.includes('/Engine/Maps/Entry'));
 assert.ok(example.additionalArgs.includes('-DisablePython'));
+assert.ok(example.additionalArgs.includes('-DisablePlugins=AIAssistant,MCPClientToolset,ModelContextProtocol'));
 assert.ok(Array.isArray(example.services) && example.services.length > 0);
 assert.equal(example.services[0].healthUrl, 'http://127.0.0.1:8000/health');
 assert.ok(example.services[0].args.includes('services.app:app'));
@@ -33,6 +34,11 @@ for (const argument of ['LauncherSessionFile=', 'LauncherContractVersion=', 'Lau
 }
 assert.ok(gameInstance.includes('SessionArgumentMismatch'));
 assert.ok(gameInstance.includes('SessionExpired'));
+
+const mainMenuMode = read('ue5_project/Source/Aociety/Private/AocietyMainMenuGameMode.cpp');
+assert.ok(mainMenuMode.includes('[AocietyMainMenu] ready'));
+assert.ok(mainMenuMode.includes('/Game/Aociety/Maps/Aociety_ForestSnowTown'));
+assert.ok(mainMenuMode.includes('game=/Script/Aociety.AocietyGameMode'));
 
 const launcher = read('electron/main.ts');
 assert.ok(launcher.includes('startGameServices(config)'));

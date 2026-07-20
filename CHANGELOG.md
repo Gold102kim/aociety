@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 新增 UE 原生主菜单：启动器先进入主菜单，再由“进入世界”加载森林场景。
+- 启用 UE 5.8 官方 MCP、MCP Client Toolset 与 AI Assistant 编辑器插件；运行游戏时禁用开发插件，避免拖慢启动。
 - 修复开发版游戏启动黑屏：启动 UnrealEditor 游戏模式时禁用 Python 初始化，避免自动 pip 安装阻塞地图加载。
 - 强制初始化玩家相机，并在损坏的 Motion Matching 资源修复前启用安全回退，避免动画构建错误阻塞画面。
 - 强化启动冒烟测试：必须确认地图完成加载、玩家 ViewTarget 生效，并支持游戏内截图审计。

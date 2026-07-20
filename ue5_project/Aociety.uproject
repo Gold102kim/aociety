@@ -36,6 +36,20 @@
 			"Enabled": true
 		},
 		{
+			"Name": "MCPClientToolset",
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
+			]
+		},
+		{
+			"Name": "AIAssistant",
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
+			]
+		},
+		{
 			"Name": "ToolsetRegistry",
 			"Enabled": true
 		},

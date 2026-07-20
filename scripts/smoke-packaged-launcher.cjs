@@ -93,12 +93,12 @@ async function main() {
       if (sessionIndex < 0) return false;
       const currentLaunchLog = log.slice(sessionIndex);
       return currentLaunchLog.includes('LogInit: Display: Starting Game.')
-        && currentLaunchLog.includes('Browse: /Game/Aociety/Maps/Aociety_ForestSnowTown')
-        && currentLaunchLog.includes('UEngine::LoadMap Load map complete /Game/Aociety/Maps/Aociety_ForestSnowTown')
-        && currentLaunchLog.includes('[AocietyViewport]');
-    }, 120_000, 'UE 接收启动器会话并加载森林地图');
+        && currentLaunchLog.includes('Browse: /Engine/Maps/Entry')
+        && currentLaunchLog.includes('UEngine::LoadMap Load map complete /Engine/Maps/Entry')
+        && currentLaunchLog.includes('[AocietyMainMenu] ready');
+    }, 120_000, 'UE 接收启动器会话并打开主菜单');
 
-    console.log(`Packaged launcher opened forest map successfully: ${result.launchId}`);
+    console.log(`Packaged launcher opened main menu successfully: ${result.launchId}`);
   } finally {
     await new Promise((resolve) => {
       if (launcher.exitCode !== null) return resolve();

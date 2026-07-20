@@ -7,6 +7,7 @@ const { spawn } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const configPath = path.join(root, 'config', 'game.local.json');
 const gameLogPath = path.join(root, 'ue5_project', 'Saved', 'Logs', 'Aociety.log');
+const mainMenuScreenshotPath = path.join(root, 'artifacts', 'main_menu.png');
 
 function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -40,6 +41,8 @@ async function main() {
   let game = null;
   const launchId = randomUUID();
   const runtimeAudit = process.env.AOCIETY_RUNTIME_AUDIT === '1';
+  const mainMenuAudit = process.env.AOCIETY_MAIN_MENU_AUDIT === '1';
+  const autoEnterWorld = runtimeAudit || process.env.AOCIETY_AUTO_ENTER_WORLD === '1';
   const sessionPath = path.join(os.tmpdir(), `aociety-smoke-${launchId}.json`);
   const issuedAt = new Date();
   const session = {
@@ -75,6 +78,8 @@ async function main() {
     const args = [
       ...(config.additionalArgs || []),
       ...(runtimeAudit ? ['-AocietyRuntimeAudit', '-unattended'] : []),
+      ...(mainMenuAudit ? ['-AocietyMainMenuAudit'] : []),
+      ...(autoEnterWorld ? ['-AocietyAutoEnterWorld'] : []),
       `-LauncherSessionFile=${sessionPath}`,
       '-LauncherContractVersion=1.0',
       `-LauncherLaunchId=${launchId}`,
@@ -96,13 +101,34 @@ async function main() {
       if (sessionIndex < 0) return false;
       const currentLaunchLog = log.slice(sessionIndex);
       return currentLaunchLog.includes('LogInit: Display: Starting Game.')
-        && currentLaunchLog.includes('Browse: /Game/Aociety/Maps/Aociety_ForestSnowTown')
-        && currentLaunchLog.includes('UEngine::LoadMap Load map complete /Game/Aociety/Maps/Aociety_ForestSnowTown')
-        && currentLaunchLog.includes('[AocietyViewport]');
-    }, 120_000, 'UE 启动器会话与森林地图验证');
+        && currentLaunchLog.includes('Browse: /Engine/Maps/Entry')
+        && currentLaunchLog.includes('UEngine::LoadMap Load map complete /Engine/Maps/Entry')
+        && currentLaunchLog.includes('[AocietyMainMenu] ready');
+    }, 120_000, 'UE 启动器会话与主菜单验证');
 
-    console.log(`UE started game and loaded forest map: ${launchId}`);
+    console.log(`UE opened main menu: ${launchId}`);
     console.log(`Resident health ready: ${(config.services || []).every((service) => fs.existsSync(service.executablePath))}`);
+    if (mainMenuAudit) {
+      await waitUntil(() => {
+        if (!fs.existsSync(mainMenuScreenshotPath)) return false;
+        return fs.statSync(mainMenuScreenshotPath).mtimeMs >= issuedAt.getTime();
+      }, 30_000, 'UE 主菜单截图审计');
+      console.log(`UE main menu visual audit: ${mainMenuScreenshotPath}`);
+    }
+    if (autoEnterWorld) {
+      await waitUntil(() => {
+        if (!fs.existsSync(gameLogPath)) return false;
+        const log = fs.readFileSync(gameLogPath, 'utf8');
+        const sessionIndex = log.indexOf(`Launcher session accepted: launch=${launchId}`);
+        if (sessionIndex < 0) return false;
+        const currentLaunchLog = log.slice(sessionIndex);
+        return currentLaunchLog.includes('[AocietyMainMenu] entering world')
+          && currentLaunchLog.includes('Browse: /Game/Aociety/Maps/Aociety_ForestSnowTown')
+          && currentLaunchLog.includes('UEngine::LoadMap Load map complete /Game/Aociety/Maps/Aociety_ForestSnowTown')
+          && currentLaunchLog.includes('[AocietyViewport]');
+      }, 120_000, 'UE 主菜单进入森林地图验证');
+      console.log('UE main menu entered forest map successfully.');
+    }
     if (runtimeAudit) {
       await waitUntil(() => game.exitCode !== null, 90_000, 'UE 运行时画面审计');
       console.log('UE runtime visual audit completed.');

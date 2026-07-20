@@ -6,9 +6,10 @@
   "authExchangeUrl": "",
   "additionalArgs": [
     "D:\\Aociety\\ue5_project\\Aociety.uproject",
-    "/Game/Aociety/Maps/Aociety_ForestSnowTown",
+    "/Engine/Maps/Entry",
     "-game",
     "-DisablePython",
+    "-DisablePlugins=AIAssistant,MCPClientToolset,ModelContextProtocol",
     "-log"
   ],
   "services": [
