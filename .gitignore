@@ -25,6 +25,8 @@ ue5_project/.vs/
 ue5_project/Content/*
 !ue5_project/Content/Aociety/
 !ue5_project/Content/Aociety/**
+!ue5_project/Content/Modular_Rural_Cabin/
+!ue5_project/Content/Modular_Rural_Cabin/**
 !ue5_project/Content/Python/
 !ue5_project/Content/Python/**
 ue5_project/Content/Python/__pycache__/
