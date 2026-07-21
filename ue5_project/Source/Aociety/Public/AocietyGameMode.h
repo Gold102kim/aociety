@@ -48,4 +48,7 @@ private:
     TArray<TWeakObjectPtr<class ULightComponent>> NightLights;
     TMap<TWeakObjectPtr<class ULightComponent>, float> OriginalLightIntensities;
 
+    UPROPERTY(Transient)
+    TObjectPtr<class UNiagaraComponent> WeatherParticles;
+
 };

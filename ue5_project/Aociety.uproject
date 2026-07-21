@@ -118,6 +118,10 @@
 		{
 			"Name": "Niagara",
 			"Enabled": true
+		},
+		{
+			"Name": "DynamicSkySystem",
+			"Enabled": true
 		}
 	],
 	"TargetPlatforms": [

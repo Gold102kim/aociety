@@ -19,6 +19,9 @@ ue5_project/DerivedDataCache/
 ue5_project/Intermediate/
 ue5_project/Saved/
 ue5_project/.vs/
+ue5_project/Plugins/**/Binaries/
+ue5_project/Plugins/**/Intermediate/
+ue5_project/Plugins/**/Saved/
 
 # Third-party environment packs are local dependencies. Track only Aociety
 # authored assets and automation scripts.

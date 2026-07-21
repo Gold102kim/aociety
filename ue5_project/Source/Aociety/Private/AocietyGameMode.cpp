@@ -17,6 +17,9 @@
 #include "Engine/SkyLight.h"
 #include "Engine/GameInstance.h"
 #include "EngineUtils.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
@@ -263,6 +266,21 @@ void AAocietyGameMode::InitializeWorldEnvironment()
             }
         }
     }
+
+    if (UNiagaraSystem* RainSystem = LoadObject<UNiagaraSystem>(
+            nullptr, TEXT("/DynamicSkySystem/Niagara/Rain/NS_Rain.NS_Rain")))
+    {
+        WeatherParticles = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+            World, RainSystem, FVector::ZeroVector, FRotator::ZeroRotator,
+            FVector::OneVector, false, false, ENCPoolMethod::None, true);
+        if (WeatherParticles)
+        {
+            WeatherParticles->SetVisibility(false, true);
+            WeatherParticles->SetComponentTickEnabled(false);
+            WeatherParticles->SetAutoActivate(false);
+        }
+    }
+
     bWorldEnvironmentInitialized = true;
     UE_LOG(LogTemp, Display, TEXT("[AocietyEnvironment] initialized sun=%s skylight=%s fog=%s night_lights=%d"),
         *GetNameSafe(SunLight.Get()), *GetNameSafe(SkyLight.Get()), *GetNameSafe(HeightFog.Get()), NightLights.Num());
@@ -337,6 +355,25 @@ void AAocietyGameMode::UpdateWorldEnvironment(float DeltaSeconds)
         Fog->SetFogInscatteringColor(bNight
             ? FLinearColor(0.025f, 0.04f, 0.10f)
             : FLinearColor(0.72f, 0.82f, 1.0f));
+    }
+    const bool bRain = WeatherState == 2;
+    if (WeatherParticles)
+    {
+        if (APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0))
+        {
+            WeatherParticles->SetWorldLocation(
+                Player->GetActorLocation() + FVector(0.0f, 0.0f, 1200.0f));
+        }
+        if (bRain && !WeatherParticles->IsActive())
+        {
+            WeatherParticles->Activate(true);
+        }
+        else if (!bRain && WeatherParticles->IsActive())
+        {
+            WeatherParticles->DeactivateImmediate();
+        }
+        WeatherParticles->SetVisibility(bRain, true);
+        WeatherParticles->SetComponentTickEnabled(bRain);
     }
     for (const TWeakObjectPtr<ULightComponent>& WeakLight : NightLights)
     {
