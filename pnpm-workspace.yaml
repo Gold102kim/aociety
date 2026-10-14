@@ -2,3 +2,22 @@ allowBuilds:
   electron: true
   electron-winstaller: false
   esbuild: true
+
+# Security patches verified against official npm metadata (2026-10-14).
+# Normal and targeted compatible-range updates left these vulnerable versions
+# selected; pin only the affected families, without upgrading their major APIs.
+overrides:
+  # concurrently 10.0.3 pins the vulnerable shell-quote release exactly.
+  "concurrently@10.0.3>shell-quote": "1.11.0"
+  # plist's 0.8.x XML parser: injection and quadratic resource-use fixes.
+  "@xmldom/xmldom@0.8": "0.8.15"
+  # Preserve all three major families required by different minimatch versions.
+  "brace-expansion@1": "1.1.21"
+  "brace-expansion@2": "2.1.7"
+  "brace-expansion@5": "5.0.12"
+  # Builder/download tooling: cached-response disclosure and parser/DoS fixes.
+  "http-cache-semantics@4": "4.3.0"
+  "js-yaml@4": "4.3.2"
+  "tar@7": "7.5.21"
+  # Node-gyp uses undici 6; retain the normally updated undici 7 family.
+  "undici@6": "6.28.1"
