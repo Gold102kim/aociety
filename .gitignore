@@ -1,4 +1,6 @@
 node_modules/
+.pnpm-store/
+runtime/
 dist/
 dist-electron/
 release/
@@ -14,6 +16,23 @@ release/
 Thumbs.db
 config/game.local.json
 config/ai.local.json
+config/*.local.json
+userData/
+assistant_data/
+codex_home/
+.openclaw/
+.codex/
+.agents/
+accounts.json*
+ai.json
+auth.json
+device-auth.json
+cap_sid
+*.sqlite*
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
 
 # Python services and generated artifacts
 __pycache__/
@@ -32,14 +51,6 @@ ue5_project/DerivedDataCache/
 ue5_project/Intermediate/
 ue5_project/Saved/
 ue5_project/.vs/
-
-# Keep third-party environment packs local and track Aociety content.
-ue5_project/Content/*
-!ue5_project/Content/Aociety/
-!ue5_project/Content/Aociety/**
-!ue5_project/Content/Python/
-!ue5_project/Content/Python/**
-ue5_project/Content/Python/__pycache__/
 
 # Editor and local experiment state
 .vs/
@@ -60,3 +71,20 @@ ue5_project/Content/Aociety/Characters/GeneratedMaterials/MF3_Ecy_OutlineHidden.
 ue5_project/Content/Python/import_ecy_fixed_test.py
 tools/render_ecy_*.py
 data/test_*
+
+# Public source distribution: unverified model/scene binaries remain local.
+SourceAssets/
+ue5_project/SourceAssets/
+ue5_project/Content/**
+!ue5_project/Content/Python/
+!ue5_project/Content/Python/**
+ue5_project/Content/Python/__pycache__/
+!public/models/
+public/models/*
+!public/models/README.md
+test*.mp3
+test*.wav
+
+# One-shot local design/deployment records are not portable source code.
+scripts/deploy-*.ps1
+scripts/figma-ui-*.js
