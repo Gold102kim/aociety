@@ -62,4 +62,4 @@ pnpm audit --audit-level high
 
 本机 `pnpm check` 完整通过，包括新增 session、secret-scanner、asset-policy 回归及原有所有测试；默认严格资产模式使用仍在本机的授权资产，没有放宽门禁。生产构建为 10 个前端资源，初始 JS 为 `209.1 KiB`。`pnpm install --frozen-lockfile --ignore-scripts --offline` 也通过，用于验证本地 store 中的锁文件一致性，不替代上述 Electron 二进制安装。
 
-实际验证工具为 Node.js `24.4.1`、宿主提供的 pnpm `11.25.0`，符合 `engines` 范围；仓库 `packageManager` 仍固定为 `pnpm@11.9.0`，CI 使用该固定版本独立复核。此记录不声明尚未运行的 GitHub CI 或 portable 发布已通过。
+初次验证工具为 Node.js `24.4.1`、宿主提供的 pnpm `11.25.0`，符合 `engines` 范围。收尾另外从官方 npm 下载项目固定 `pnpm@11.9.0` 到临时工具缓存，冻结离线安装及完整 `pnpm check` 也实际通过；没有替换全局工具。纯源码副本已成功打包 portable 并检查 ASAR 分发清单，详见 [整体验证](PROJECT_REVIEW_0.6.0.md)。此记录不声明尚未运行的 GitHub CI、代码签名或完整游戏验收已通过。
