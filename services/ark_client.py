@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 import json
+import math
 import os
 import re
 import sys
+import threading
 import time
 from typing import Any, Callable
 
@@ -38,6 +40,16 @@ FOREST_LEGACY_TERMS = (
 )
 
 
+def _bounded_env_number(name: str, default: float, minimum: float, maximum: float) -> float:
+    try:
+        value = float(os.getenv(name, "").strip() or default)
+    except ValueError:
+        value = default
+    if not math.isfinite(value):
+        value = default
+    return max(minimum, min(maximum, value))
+
+
 class ArkClient:
     def __init__(self) -> None:
         # The in-game residents have one auditable route. Never fall through to
@@ -56,27 +68,24 @@ class ArkClient:
         self.model_label = self.model_id
         self.provider = DEEPSEEK_PROVIDER
         # Timeouts
-        self.timeout_seconds = float(
-            os.getenv("DEEPSEEK_TIMEOUT_SECONDS", "8.0").strip() or "8.0"
-        )
-        self.hard_timeout_seconds = float(
-            os.getenv("DEEPSEEK_HARD_TIMEOUT_SECONDS", "10.0").strip() or "10.0"
-        )
-        self.cooldown_seconds = float(
-            os.getenv("DEEPSEEK_FAILURE_COOLDOWN_SECONDS", "15").strip() or "15"
-        )
-        self.dialogue_workers = max(
-            1, int(os.getenv("DEEPSEEK_DIALOGUE_WORKERS", "2").strip() or "2")
-        )
-        self.background_workers = max(
-            1, int(os.getenv("DEEPSEEK_BACKGROUND_WORKERS", "4").strip() or "4")
-        )
+        self.timeout_seconds = _bounded_env_number("DEEPSEEK_TIMEOUT_SECONDS", 8.0, 0.05, 120.0)
+        self.hard_timeout_seconds = _bounded_env_number("DEEPSEEK_HARD_TIMEOUT_SECONDS", 10.0, 0.05, 120.0)
+        self.cooldown_seconds = _bounded_env_number("DEEPSEEK_FAILURE_COOLDOWN_SECONDS", 15.0, 0.0, 300.0)
+        self.dialogue_workers = int(_bounded_env_number("DEEPSEEK_DIALOGUE_WORKERS", 2, 1, 8))
+        self.background_workers = int(_bounded_env_number("DEEPSEEK_BACKGROUND_WORKERS", 4, 1, 8))
         self._dialogue_executor = ThreadPoolExecutor(
             max_workers=self.dialogue_workers, thread_name_prefix="deepseek-dialogue"
         )
         self._background_executor = ThreadPoolExecutor(
             max_workers=self.background_workers, thread_name_prefix="deepseek-background"
         )
+        # A timed-out Future cannot stop a running HTTP request. Retain its slot
+        # until it really finishes so subsequent requests cannot build a queue.
+        self._dialogue_slots = threading.BoundedSemaphore(self.dialogue_workers)
+        self._background_slots = threading.BoundedSemaphore(self.background_workers)
+        self._state_lock = threading.Lock()
+        self._closed = False
+        self._failure_epoch = 0
         self._client = None
         self._disabled_until = 0.0
         self._last_error = ""
@@ -86,19 +95,56 @@ class ArkClient:
         )
         has_key = bool(self.api_key)
         if has_key and OpenAI is not None and not disable_for_unittest:
-            self._client = OpenAI(api_key=self.api_key, base_url=self.base_url, timeout=self.timeout_seconds)
+            self._client = OpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url,
+                timeout=min(self.timeout_seconds, self.hard_timeout_seconds),
+                # SDK retries otherwise outlive the caller's hard deadline and
+                # can duplicate paid requests after the UI reports an error.
+                max_retries=0,
+            )
 
     @property
     def enabled(self) -> bool:
-        return self._client is not None and time.time() >= self._disabled_until
+        return not self._closed and self._client is not None and time.monotonic() >= self._disabled_until
 
     @property
     def configured(self) -> bool:
-        return self._client is not None
+        return not self._closed and self._client is not None
 
     def _disable_temporarily(self, reason: str) -> None:
-        self._last_error = str(reason or "").strip()
-        self._disabled_until = max(self._disabled_until, time.time() + self.cooldown_seconds)
+        with self._state_lock:
+            self._last_error = str(reason or "").strip()
+            self._failure_epoch += 1
+            self._disabled_until = max(self._disabled_until, time.monotonic() + self.cooldown_seconds)
+
+    @staticmethod
+    def _public_error_message(error: Exception) -> str:
+        # Provider exceptions may contain a key fragment, request body or local
+        # path. Return a fixed hint, never the upstream exception's text.
+        status = getattr(error, "status_code", None)
+        if type(status) is int and 400 <= status <= 599:
+            return f"DeepSeek 请求失败（HTTP {status}），请检查配置或稍后重试。"
+        if isinstance(error, TimeoutError):
+            return "DeepSeek 请求超时，请稍后重试。"
+        return "DeepSeek 请求失败，请检查连接和配置或稍后重试。"
+
+    def close(self) -> None:
+        """Reject new work and close resources without waiting on remote I/O.
+
+        Running Python threads cannot be forcibly cancelled. HTTP timeouts still
+        bound their I/O; closing the transport is best-effort, not an immediate
+        cancellation guarantee.
+        """
+        with self._state_lock:
+            if self._closed:
+                return
+            self._closed = True
+            client = self._client
+        self._dialogue_executor.shutdown(wait=False, cancel_futures=True)
+        self._background_executor.shutdown(wait=False, cancel_futures=True)
+        if client is not None:
+            client.close()
 
     def _executor_for_task(self, task_type: str) -> ThreadPoolExecutor:
         if task_type == "dialogue_turn":
@@ -106,22 +152,35 @@ class ArkClient:
         return self._background_executor
 
     def _create_completion(self, task_type: str, **kwargs: Any) -> Any:
-        if self._client is None:
-            raise RuntimeError("ark client disabled")
-        if time.time() < self._disabled_until:
-            raise RuntimeError("ark client cooling down")
-        future = self._executor_for_task(task_type).submit(self._client.chat.completions.create, **kwargs)
+        slots = self._dialogue_slots if task_type == "dialogue_turn" else self._background_slots
+        with self._state_lock:
+            if self._closed or self._client is None:
+                raise RuntimeError("ark client disabled")
+            if time.monotonic() < self._disabled_until:
+                raise RuntimeError("ark client cooling down")
+            if not slots.acquire(blocking=False):
+                raise RuntimeError("ark client busy; retry when the current request finishes")
+            failure_epoch = self._failure_epoch
+            try:
+                future = self._executor_for_task(task_type).submit(self._client.chat.completions.create, **kwargs)
+            except Exception:
+                slots.release()
+                raise
+        future.add_done_callback(lambda _future: slots.release())
         try:
             response = future.result(timeout=self.hard_timeout_seconds)
-            self._disabled_until = 0.0
-            self._last_error = ""
+            with self._state_lock:
+                # A parallel success must not undo a newer failure's cooldown.
+                if failure_epoch == self._failure_epoch:
+                    self._disabled_until = 0.0
+                    self._last_error = ""
             return response
         except FuturesTimeoutError as exc:
             future.cancel()
             self._disable_temporarily(f"ark hard timeout after {self.hard_timeout_seconds:.1f}s")
             raise TimeoutError(f"ark hard timeout after {self.hard_timeout_seconds:.1f}s") from exc
         except Exception as exc:
-            self._disable_temporarily(str(exc))
+            self._disable_temporarily(self._public_error_message(exc))
             raise
 
     @staticmethod
@@ -484,7 +543,7 @@ class ArkClient:
                 "model": self.model_id,
             }
         if not self.enabled:
-            cooldown_left = max(0, int(round(self._disabled_until - time.time())))
+            cooldown_left = max(0, int(round(self._disabled_until - time.monotonic())))
             reason = self._last_error or "DeepSeek 链路暂时冷却中"
             return {
                 "ok": False,
@@ -521,7 +580,7 @@ class ArkClient:
                     "model": model_name,
                 }
             except Exception as exc:
-                errors.append(f"{model_name}: {exc}")
+                errors.append(self._public_error_message(exc))
         return {
             "ok": False,
             "message": " | ".join(errors),

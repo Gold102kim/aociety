@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, useEffect, useRef, useState } from 'react';
 import { LauncherUser } from '../auth';
 import { Icon } from '../components/LauncherUi';
 import { AiChatPage } from './AiChatPage';
-import { AvatarPage } from './AvatarPage';
-import { ProfilePage } from './ProfilePage';
-import { SocialPage } from './SocialPage';
-import { WorldPage } from './WorldPage';
+import { PageLoadBoundary } from '../components/PageLoadBoundary';
+import { version as buildVersion } from '../../package.json';
+
+const AvatarPage = lazy(() => import('./AvatarPage').then((module) => ({ default: module.AvatarPage })));
+const ProfilePage = lazy(() => import('./ProfilePage').then((module) => ({ default: module.ProfilePage })));
+const SocialPage = lazy(() => import('./SocialPage').then((module) => ({ default: module.SocialPage })));
+const WorldPage = lazy(() => import('./WorldPage').then((module) => ({ default: module.WorldPage })));
 
 type LauncherPage = 'home' | 'world' | 'avatar' | 'chat' | 'social' | 'profile';
 
@@ -15,8 +18,9 @@ export function LauncherHome({ user, onLogout, onUserUpdated }: { user: Launcher
     return import.meta.env.DEV && (preview === 'world' || preview === 'avatar' || preview === 'chat' || preview === 'social' || preview === 'profile') ? preview : 'home';
   });
   const [launchState, setLaunchState] = useState<'idle' | 'launching'>('idle');
+  const [chatOpened, setChatOpened] = useState(page === 'chat');
   const [toast, setToast] = useState('');
-  const [version, setVersion] = useState('0.3.0');
+  const [version, setVersion] = useState(buildVersion);
   const toastTimer = useRef<number | null>(null);
   const mounted = useRef(true);
   const launchInFlight = useRef(false);
@@ -57,39 +61,58 @@ export function LauncherHome({ user, onLogout, onUserUpdated }: { user: Launcher
     }
   };
 
-  const navigate = (nextPage: LauncherPage) => setPage(nextPage);
+  const navigate = (nextPage: LauncherPage) => {
+    if (nextPage === 'chat') setChatOpened(true);
+    setPage(nextPage);
+  };
   return (
     <main className="launcher-shell">
       <aside className="sidebar">
+        <div className="sidebar-heading"><span>你的空间</span><small>PERSONAL SPACE</small></div>
         <nav aria-label="主要导航">
           <button type="button" className={`nav-item ${page === 'home' ? 'active' : ''}`} aria-current={page === 'home' ? 'page' : undefined} onClick={() => navigate('home')}><Icon name="home"/><span>首页</span></button>
           <button type="button" className={`nav-item ${page === 'world' ? 'active' : ''}`} aria-current={page === 'world' ? 'page' : undefined} onClick={() => navigate('world')}><Icon name="world"/><span>世界</span></button>
-          <button type="button" className={`nav-item ${page === 'avatar' || page === 'chat' ? 'active' : ''}`} aria-current={page === 'avatar' || page === 'chat' ? 'page' : undefined} onClick={() => navigate('avatar')}><Icon name="avatar"/><span>虚拟分身</span></button>
+          <button type="button" className={`nav-item ${page === 'avatar' ? 'active' : ''}`} aria-current={page === 'avatar' ? 'page' : undefined} onClick={() => navigate('avatar')}><Icon name="avatar"/><span>虚拟分身</span></button>
+          <button type="button" className={`nav-item ${page === 'chat' ? 'active' : ''}`} aria-current={page === 'chat' ? 'page' : undefined} onClick={() => navigate('chat')}><Icon name="chat"/><span>AI 对话</span></button>
           <button type="button" className={`nav-item ${page === 'social' ? 'active' : ''}`} aria-current={page === 'social' ? 'page' : undefined} onClick={() => navigate('social')}><Icon name="friends"/><span>社交</span></button>
         </nav>
         <div className="sidebar-bottom">
-          <button type="button" className="nav-item"><Icon name="download"/><span>下载管理</span></button>
-          <button type="button" className="nav-item"><Icon name="settings"/><span>设置</span></button>
-          <button type="button" className={`profile ${page === 'profile' ? 'active' : ''}`} aria-current={page === 'profile' ? 'page' : undefined} onClick={() => navigate('profile')} title="打开个人主页"><span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><span className="profile-copy"><strong>{user.displayName}</strong><small>在线 · 查看个人主页</small></span><span className="profile-chevron" aria-hidden="true">›</span></button>
+          <button type="button" className="nav-item" onClick={() => showToast('当前版本使用本地游戏文件，暂不提供在线下载。')}><Icon name="download"/><span>下载管理</span></button>
+          <button type="button" className="nav-item" onClick={() => showToast('游戏画面设置可在游戏主菜单的“游戏设置”中调整。')}><Icon name="settings"/><span>设置</span></button>
+          <button type="button" className={`profile ${page === 'profile' ? 'active' : ''}`} aria-current={page === 'profile' ? 'page' : undefined} onClick={() => navigate('profile')} title="打开个人主页"><span className="avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><span className="profile-copy"><strong>{user.displayName}</strong><small>查看个人档案</small></span><span className="profile-chevron" aria-hidden="true">›</span></button>
         </div>
       </aside>
 
-      {page === 'profile' ? <ProfilePage user={user} onBack={() => navigate('home')} onLogout={onLogout} onUserUpdated={onUserUpdated}/>
-        : page === 'world' ? <WorldPage user={user} onLaunch={() => { void launchGame(); }}/>
+      <PageLoadBoundary>{page === 'profile' ? <ProfilePage user={user} onBack={() => navigate('home')} onLogout={onLogout} onUserUpdated={onUserUpdated}/>
+        : page === 'world' ? <WorldPage user={user} launching={launchState === 'launching'} onLaunch={() => { void launchGame(); }}/>
           : page === 'avatar' ? <AvatarPage user={user} launching={launchState === 'launching'} onLaunch={() => { void launchGame(); }} onChat={() => navigate('chat')}/>
-            : page === 'chat' ? <AiChatPage user={user} onBack={() => navigate('avatar')}/>
+            : page === 'chat' ? null
               : page === 'social' ? <SocialPage user={user}/>
-                : <HomeDashboard version={version} launching={launchState === 'launching'} onLaunch={() => { void launchGame(); }}/>} 
-      {toast && <div className="toast" role="status" aria-live="polite">{toast}</div>}
+                : <HomeDashboard user={user} version={version} launching={launchState === 'launching'} onLaunch={() => { void launchGame(); }} onNavigate={navigate}/>}</PageLoadBoundary>
+      {chatOpened && <AiChatPage key={user.id} user={user} active={page === 'chat'} onBack={() => navigate('avatar')}/>}
+      {toast && <div className="toast" role="status" aria-live="polite"><span>{toast}</span><button type="button" aria-label="关闭提示" onClick={() => setToast('')}>×</button></div>}
     </main>
   );
 }
 
-function HomeDashboard({ version, launching, onLaunch }: { version: string; launching: boolean; onLaunch: () => void }) {
+function HomeDashboard({ user, version, launching, onLaunch, onNavigate }: { user: LauncherUser; version: string; launching: boolean; onLaunch: () => void; onNavigate: (page: LauncherPage) => void }) {
+  const shortcuts = [
+    { page: 'avatar' as const, icon: 'avatar' as const, title: '我的虚拟分身', description: '查看形象与性格，认识另一个你。', tag: 'PERSONA' },
+    { page: 'chat' as const, icon: 'chat' as const, title: '与 AI 对话', description: '分享今天的想法，让了解从交流开始。', tag: 'CONVERSATION' },
+    { page: 'world' as const, icon: 'world' as const, title: '探索世界', description: '了解森林小镇和当前的开发进度。', tag: 'DISCOVERY' },
+  ];
   return (
     <section className="home-content">
-      <div className="hero-game"><div className="hero-noise" aria-hidden="true"/><div className="planet" aria-hidden="true"/><div className="silhouette" aria-hidden="true"/><div className="hero-copy"><div className="status-pill"><span/> PRE-ALPHA EXPERIENCE</div><h1>ECHO<span>VERSE</span></h1><p className="hero-cn">在世界的另一边，成为另一个你。</p><p className="hero-description">你的数字分身正在等待第一次苏醒。创建性格、探索小镇，并让每一次相遇成为只属于你的故事。</p><div className="hero-actions"><button type="button" className="play-button" onClick={onLaunch} disabled={launching}><span className="play-triangle"/>{launching ? '正在启动…' : '启动游戏'}</button><button type="button" className="secondary-button">查看详情</button></div><div className="game-meta"><span>版本 {version}</span><span>Windows</span><span>简体中文</span></div></div></div>
-      <section className="dashboard-row" aria-label="平台动态"><article className="news-card featured"><div className="card-tag">开发日志</div><div><h3>世界正在形成</h3><p>首个主题街区、数字分身系统与离线观察模式进入原型阶段。</p><span>阅读开发进度 →</span></div></article><article className="news-card community"><div className="card-tag">社区</div><div><h3>成为世界的第一批居民</h3><p>关注测试资格、开发者活动与共创计划。</p><span>了解更多 →</span></div></article><article className="activity-card"><div className="activity-head"><h3>分身动态</h3><span>原型模拟</span></div><div className="home-activity-feed"><div><i/><p><strong>人格档案保持在线</strong><span>AI Agent 已准备接收新的经历。</span></p><time>刚刚</time></div><div><i/><p><strong>中央小镇传来微弱信号</strong><span>发现一条尚未解锁的探索路线。</span></p><time>12m</time></div><div><i/><p><strong>伴生模式可以使用</strong><span>点击右上角菱形按钮召唤桌宠。</span></p><time>系统</time></div></div></article></section>
+      <div className="home-container">
+        <header className="welcome-header"><div><span className="eyebrow">AOCIETY · ECHOVERSE</span><h1>欢迎回来，{user.displayName}<span className="welcome-dot">。</span></h1><p>一个属于你的分身，一段慢慢发生的故事。</p></div><span className="release-badge">体验版 <b>v{version}</b></span></header>
+        <article className="town-hero">
+          <img className="town-illustration" src="./illustrations/forest-town.svg" alt=""/>
+          <div className="town-hero-copy"><span className="hero-label"><i aria-hidden="true"/> 你的下一站</span><h2>走进森林小镇</h2><p>沿着林间的小路，找到一处停留的地方。<br/>带上你的数字分身，开始探索世界。</p><div className="town-actions"><button type="button" className="play-button" onClick={onLaunch} disabled={launching}><span className="play-triangle"/>{launching ? '正在启动…' : '进入森林小镇'}</button><button type="button" className="secondary-button" onClick={() => onNavigate('world')}>了解世界 <span aria-hidden="true">↗</span></button></div><div className="town-footnote"><span>本地游戏 · Windows</span><span>开发中原型</span></div></div>
+          <span className="illustration-caption">森林小镇 · 场景概念图</span>
+        </article>
+        <section className="quick-section" aria-labelledby="quick-title"><div className="section-heading"><h2 id="quick-title">从这里开始</h2><span>让你的世界更像你</span></div><div className="quick-grid">{shortcuts.map((item) => <button type="button" className="quick-card" key={item.page} onClick={() => onNavigate(item.page)}><div className="quick-card-top"><span className="quick-icon"><Icon name={item.icon}/></span><span className="quick-tag">{item.tag}</span><span className="quick-arrow" aria-hidden="true">↗</span></div><h3>{item.title}</h3><p>{item.description}</p></button>)}</div></section>
+        <footer className="home-footer"><span><i aria-hidden="true"/>人格档案{user.aiAgent.status === 'READY' ? '已创建' : '待初始化'} · {user.basicQuestionnaire?.mbti || '尚未填写性格'}</span><button type="button" onClick={() => onNavigate('profile')}>完善个人档案 <span aria-hidden="true">→</span></button><span className="companion-hint">右上角 ◇ 可切换伴生模式</span></footer>
+      </div>
     </section>
   );
 }

@@ -18,16 +18,10 @@ UMicCaptureComponent::UMicCaptureComponent()
 
 bool UMicCaptureComponent::StartCapture()
 {
-    if (bCapturing) return true;
-
-    bCapturing = true;
-    if (UWorld* World = GetWorld())
-    {
-        World->GetTimerManager().SetTimer(
-            MicTimer, this, &UMicCaptureComponent::TickChunk,
-            ChunkSeconds, true);
-    }
-    return true;
+    // The UE adapter is not implemented. Do not report a successful recording
+    // or send generated silence to the hardware emotion service as real audio.
+    UE_LOG(LogTemp, Warning, TEXT("[Mic] Game-side capture unavailable; use the external hardware capture service"));
+    return false;
 }
 
 void UMicCaptureComponent::StopCapture()
@@ -56,15 +50,5 @@ void UMicCaptureComponent::TickChunk()
 
 TArray<uint8> UMicCaptureComponent::CapturePCMChunk()
 {
-    int32 NumSamples = SampleRate * ChunkSeconds;
-    TArray<uint8> PCM;
-    PCM.SetNumZeroed(NumSamples * 2); // 16-bit mono
-
-#if defined(WITH_RTAUDIO) && WITH_RTAUDIO
-    // 通过 UE AudioCapture 录制
-    // 实际实现需要 RAudio::FAudioCapture 实例化
-    // 这一段请根据项目实际使用的捕获方式完成
-#endif
-
-    return PCM;
+    return {};
 }

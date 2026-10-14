@@ -178,6 +178,46 @@ try {
   assert.equal((await firstRequest).text, '首条回复');
   assert.equal((await concurrentService.chat(user, '下一条', [])).text, '释放后的回复');
 
+  const cancellable = new AiChatService(directory, directory, {});
+  const pendingReplies = [];
+  global.fetch = async (_url, options) => new Promise((resolve) => {
+    pendingReplies.push({ signal: options.signal, resolve });
+  });
+  const oldReply = cancellable.chat(user, '退出前的消息', []);
+  const oldRejected = assert.rejects(oldReply, /已取消/);
+  cancellable.cancelAccount(user.id);
+  assert.equal(pendingReplies[0].signal.aborted, true, 'Logout must abort the actual HTTP signal.');
+  const freshReply = cancellable.chat(user, '重新登录后的消息', [null, { role: 'system', content: 'unsafe history' }, { role: 'assistant', content: 'valid history' }]);
+  pendingReplies[0].resolve({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: '旧的私密回复' } }] }) });
+  await oldRejected;
+  await assert.rejects(cancellable.chat(user, '仍在等待新消息', []), /上一条消息仍在处理中/, 'Old cleanup must not release the new request slot.');
+  pendingReplies[1].resolve({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: '新的回复' } }] }) });
+  assert.equal((await freshReply).text, '新的回复');
+  assert.equal(cancellable.getStatus().connection, 'connected');
+  const cancelAllReply = cancellable.chat(user, '应用关闭前的消息', []);
+  const cancelAllRejected = assert.rejects(cancelAllReply, /已取消/);
+  cancellable.cancelAll();
+  assert.equal(pendingReplies[2].signal.aborted, true);
+  pendingReplies[2].resolve({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: '不应返回' } }] }) });
+  await cancelAllRejected;
+  assert.equal(cancellable.getStatus().connection, 'connected', 'Intentional cancellation must not mark the service disconnected.');
+
+  let cleanedHistory;
+  global.fetch = async (_url, options) => {
+    cleanedHistory = JSON.parse(options.body).messages;
+    return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: '合法回复' } }] }) };
+  };
+  await new AiChatService(directory, directory, {}).chat(user, '测试异常历史', [null, false, { role: 'system', content: 'ignored' }, { role: 'assistant', content: '合法历史' }]);
+  assert.equal(cleanedHistory.length, 3, 'Only system persona, valid history and latest message may be forwarded.');
+  assert.equal(cleanedHistory[1].content, '合法历史');
+  global.fetch = async () => ({ ok: false, status: 401, json: async () => ({ error: { message: 'Bearer deepseek-test-key internal private data' } }) });
+  const safeErrorService = new AiChatService(directory, directory, {});
+  await assert.rejects(safeErrorService.chat(user, '测试安全错误', []), /HTTP 401/);
+  assert.doesNotMatch(safeErrorService.getStatus().message, /deepseek-test-key|private data/);
+  global.fetch = async () => { throw new Error('transport included deepseek-test-key'); };
+  await assert.rejects(safeErrorService.chat(user, '测试凭据掩码', []), /已隐藏凭据/);
+  assert.doesNotMatch(safeErrorService.getStatus().message, /deepseek-test-key/);
+
   let failOnce = true;
   global.fetch = async () => {
     if (failOnce) {

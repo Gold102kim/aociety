@@ -3,227 +3,269 @@
 #include "AocietyMainMenuWidget.h"
 
 #include "AocietyMainMenuGameMode.h"
+#include "Brushes/SlateColorBrush.h"
+#include "Brushes/SlateDynamicImageBrush.h"
+#include "Engine/Engine.h"
+#include "GameFramework/GameUserSettings.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Misc/Paths.h"
 #include "Styling/CoreStyle.h"
+#include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
-#include "Widgets/SOverlay.h"
+#include "Widgets/Layout/SScaleBox.h"
+#include "Widgets/Layout/SWidgetSwitcher.h"
 #include "Widgets/SBoxPanel.h"
+#include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
 
 namespace
 {
-const FLinearColor BackgroundColor(0.012f, 0.020f, 0.034f, 1.0f);
-const FLinearColor PanelColor(0.025f, 0.045f, 0.065f, 0.94f);
-const FLinearColor AccentColor(0.20f, 0.92f, 0.78f, 1.0f);
-const FLinearColor MutedColor(0.56f, 0.64f, 0.70f, 1.0f);
+const FLinearColor MenuTextColor(0.96f, 0.88f, 0.70f, 1.0f);
+const FLinearColor MutedTextColor(0.75f, 0.66f, 0.54f, 1.0f);
+const FLinearColor SelectionColor(0.38f, 0.16f, 0.055f, 0.88f);
+const FLinearColor SelectionHoverColor(0.62f, 0.34f, 0.10f, 0.92f);
 }
 
 TSharedRef<SWidget> UAocietyMainMenuWidget::RebuildWidget()
 {
+    const FString MenuImagePath = FPaths::ConvertRelativePathToFull(
+        FPaths::ProjectContentDir() / TEXT("Slate/AocietyMenuBackdrop.jpg"));
+    MenuBackgroundBrush = MakeShared<FSlateDynamicImageBrush>(
+        FName(*MenuImagePath),
+        FVector2D(1920.0f, 1080.0f));
+
+    const FString MenuLogoPath = FPaths::ConvertRelativePathToFull(
+        FPaths::ProjectContentDir() / TEXT("Slate/AocietyLogoOverlay.png"));
+    MenuLogoBrush = MakeShared<FSlateDynamicImageBrush>(
+        FName(*MenuLogoPath),
+        FVector2D(987.0f, 500.0f));
+
+    NormalMenuButtonStyle = FButtonStyle()
+        .SetNormal(FSlateColorBrush(FLinearColor(0.0f, 0.0f, 0.0f, 0.04f)))
+        .SetHovered(FSlateColorBrush(SelectionColor))
+        .SetPressed(FSlateColorBrush(SelectionHoverColor));
+
+    SelectedMenuButtonStyle = FButtonStyle()
+        .SetNormal(FSlateColorBrush(SelectionColor))
+        .SetHovered(FSlateColorBrush(SelectionHoverColor))
+        .SetPressed(FSlateColorBrush(SelectionHoverColor));
+
+    auto MakeMenuButton = [this](
+        const FString& Label,
+        const FOnClicked& OnClicked,
+        const bool bSelected = false)
+    {
+        return SNew(SButton)
+            .ButtonStyle(bSelected ? &SelectedMenuButtonStyle : &NormalMenuButtonStyle)
+            .ContentPadding(FMargin(12.0f, 5.0f))
+            .OnClicked(OnClicked)
+            [
+                SNew(STextBlock)
+                .Text(FText::FromString(Label))
+                .Justification(ETextJustify::Center)
+                .ColorAndOpacity(MenuTextColor)
+                .ShadowOffset(FVector2D(1.0f, 1.0f))
+                .ShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.9f))
+                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 18))
+            ];
+    };
+
+    const TSharedRef<SWidget> MainMenuPanel =
+        SNew(SVerticalBox)
+        + SVerticalBox::Slot()
+        .AutoHeight()
+        .Padding(FMargin(0.0f, 0.0f, 0.0f, 7.0f))
+        [
+            SNew(STextBlock)
+            .Text(FText::FromString(TEXT("MAIN MENU")))
+            .Justification(ETextJustify::Center)
+            .ColorAndOpacity(MutedTextColor)
+            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 12))
+        ]
+        + SVerticalBox::Slot()
+        .AutoHeight()
+        [
+            MakeMenuButton(
+                TEXT("进入世界"),
+                FOnClicked::CreateUObject(this, &UAocietyMainMenuWidget::HandleEnterWorld),
+                true)
+        ]
+        + SVerticalBox::Slot()
+        .AutoHeight()
+        [
+            MakeMenuButton(
+                TEXT("游戏设置"),
+                FOnClicked::CreateUObject(this, &UAocietyMainMenuWidget::HandleOpenSettings))
+        ]
+        + SVerticalBox::Slot()
+        .AutoHeight()
+        [
+            MakeMenuButton(
+                TEXT("世界档案"),
+                FOnClicked::CreateUObject(this, &UAocietyMainMenuWidget::HandleOpenArchive))
+        ]
+        + SVerticalBox::Slot()
+        .AutoHeight()
+        [
+            MakeMenuButton(
+                TEXT("退出游戏"),
+                FOnClicked::CreateUObject(this, &UAocietyMainMenuWidget::HandleQuitGame))
+        ];
+
+    const TSharedRef<SWidget> SettingsPanel =
+        SNew(SVerticalBox)
+        + SVerticalBox::Slot()
+        .AutoHeight()
+        .Padding(FMargin(0.0f, 0.0f, 0.0f, 8.0f))
+        [
+            SNew(STextBlock)
+            .Text(FText::FromString(TEXT("游戏设置")))
+            .Justification(ETextJustify::Center)
+            .ColorAndOpacity(MenuTextColor)
+            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 22))
+        ]
+        + SVerticalBox::Slot()
+        .AutoHeight()
+        [
+            SNew(SButton)
+            .ButtonStyle(&SelectedMenuButtonStyle)
+            .ContentPadding(FMargin(12.0f, 7.0f))
+            .OnClicked(FOnClicked::CreateUObject(
+                this,
+                &UAocietyMainMenuWidget::HandleToggleFullscreen))
+            [
+                SAssignNew(DisplayModeText, STextBlock)
+                .Text(GetDisplayModeText())
+                .Justification(ETextJustify::Center)
+                .ColorAndOpacity(MenuTextColor)
+                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 17))
+            ]
+        ]
+        + SVerticalBox::Slot()
+        .AutoHeight()
+        [
+            MakeMenuButton(
+                TEXT("返回主菜单"),
+                FOnClicked::CreateUObject(this, &UAocietyMainMenuWidget::HandleBackToMainMenu))
+        ];
+
+    const TSharedRef<SWidget> ArchivePanel =
+        SNew(SVerticalBox)
+        + SVerticalBox::Slot()
+        .AutoHeight()
+        .Padding(FMargin(0.0f, 0.0f, 0.0f, 10.0f))
+        [
+            SNew(STextBlock)
+            .Text(FText::FromString(TEXT("世界档案")))
+            .Justification(ETextJustify::Center)
+            .ColorAndOpacity(MenuTextColor)
+            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 22))
+        ]
+        + SVerticalBox::Slot()
+        .AutoHeight()
+        .Padding(FMargin(0.0f, 0.0f, 0.0f, 14.0f))
+        [
+            SNew(STextBlock)
+            .Text(FText::FromString(TEXT("AOCIETY · 城镇纪元\n世界连接状态：稳定\n居民服务：在线")))
+            .Justification(ETextJustify::Center)
+            .ColorAndOpacity(MutedTextColor)
+            .LineHeightPercentage(1.35f)
+            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 15))
+        ]
+        + SVerticalBox::Slot()
+        .AutoHeight()
+        [
+            MakeMenuButton(
+                TEXT("返回主菜单"),
+                FOnClicked::CreateUObject(this, &UAocietyMainMenuWidget::HandleBackToMainMenu),
+                true)
+        ];
+
     return SNew(SOverlay)
+        + SOverlay::Slot()
+        [
+            SNew(SScaleBox)
+            .Stretch(EStretch::ScaleToFill)
+            .StretchDirection(EStretchDirection::Both)
+            [
+                SNew(SImage)
+                .Image(MenuBackgroundBrush.Get())
+            ]
+        ]
         + SOverlay::Slot()
         [
             SNew(SBorder)
             .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-            .BorderBackgroundColor(BackgroundColor)
+            .BorderBackgroundColor(FLinearColor(0.05f, 0.018f, 0.008f, 0.14f))
         ]
         + SOverlay::Slot()
-        .HAlign(HAlign_Right)
+        .HAlign(HAlign_Center)
+        .VAlign(VAlign_Top)
+        .Padding(FMargin(0.0f, 22.0f, 0.0f, 0.0f))
         [
             SNew(SBox)
-            .WidthOverride(540.0f)
+            .WidthOverride(680.0f)
+            .HeightOverride(344.0f)
             [
-                SNew(SBorder)
-                .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-                .BorderBackgroundColor(FLinearColor(0.025f, 0.12f, 0.12f, 0.22f))
+                SNew(SScaleBox)
+                .Stretch(EStretch::ScaleToFit)
+                [
+                    SNew(SImage)
+                    .Image(MenuLogoBrush.Get())
+                ]
             ]
         ]
         + SOverlay::Slot()
-        .Padding(FMargin(72.0f, 52.0f))
+        .HAlign(HAlign_Center)
+        .VAlign(VAlign_Center)
+        .Padding(FMargin(0.0f, 255.0f, 0.0f, 0.0f))
         [
-            SNew(SVerticalBox)
-            + SVerticalBox::Slot()
-            .AutoHeight()
+            SNew(SBox)
+            .WidthOverride(380.0f)
+            .HeightOverride(260.0f)
             [
-                SNew(SHorizontalBox)
-                + SHorizontalBox::Slot()
-                .AutoWidth()
-                .VAlign(VAlign_Center)
+                SAssignNew(MenuSwitcher, SWidgetSwitcher)
+                + SWidgetSwitcher::Slot()
                 [
-                    SNew(SBorder)
-                    .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-                    .BorderBackgroundColor(AccentColor)
-                    .Padding(FMargin(10.0f, 5.0f))
-                    [
-                        SNew(STextBlock)
-                        .Text(FText::FromString(TEXT("E")))
-                        .ColorAndOpacity(BackgroundColor)
-                        .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 18))
-                    ]
+                    MainMenuPanel
                 ]
-                + SHorizontalBox::Slot()
-                .AutoWidth()
-                .Padding(FMargin(14.0f, 0.0f))
-                .VAlign(VAlign_Center)
+                + SWidgetSwitcher::Slot()
                 [
-                    SNew(STextBlock)
-                    .Text(FText::FromString(TEXT("ECHOVERSE")))
-                    .ColorAndOpacity(FLinearColor::White)
-                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 20))
+                    SettingsPanel
                 ]
-                + SHorizontalBox::Slot()
-                .FillWidth(1.0f)
-                + SHorizontalBox::Slot()
-                .AutoWidth()
-                .VAlign(VAlign_Center)
+                + SWidgetSwitcher::Slot()
                 [
-                    SNew(STextBlock)
-                    .Text(FText::FromString(TEXT("●  神经链接已就绪")))
-                    .ColorAndOpacity(AccentColor)
-                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 14))
+                    ArchivePanel
                 ]
             ]
-            + SVerticalBox::Slot()
-            .FillHeight(1.0f)
-            .Padding(FMargin(0.0f, 42.0f, 0.0f, 30.0f))
+        ]
+        + SOverlay::Slot()
+        .VAlign(VAlign_Bottom)
+        .Padding(FMargin(38.0f, 0.0f, 38.0f, 22.0f))
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot()
+            .FillWidth(1.0f)
             [
-                SNew(SHorizontalBox)
-                + SHorizontalBox::Slot()
-                .FillWidth(1.0f)
-                .VAlign(VAlign_Center)
-                [
-                    SNew(SVerticalBox)
-                    + SVerticalBox::Slot()
-                    .AutoHeight()
-                    [
-                        SNew(STextBlock)
-                        .Text(FText::FromString(TEXT("YOUR OTHER SELF\nIS WAITING")))
-                        .ColorAndOpacity(AccentColor)
-                        .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 15))
-                    ]
-                    + SVerticalBox::Slot()
-                    .AutoHeight()
-                    .Padding(FMargin(0.0f, 20.0f, 0.0f, 0.0f))
-                    [
-                        SNew(STextBlock)
-                        .Text(FText::FromString(TEXT("另一个世界，\n正在记住你。")))
-                        .ColorAndOpacity(FLinearColor(0.95f, 0.98f, 1.0f, 1.0f))
-                        .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 58))
-                        .LineHeightPercentage(0.92f)
-                    ]
-                    + SVerticalBox::Slot()
-                    .AutoHeight()
-                    .Padding(FMargin(0.0f, 24.0f, 0.0f, 0.0f))
-                    [
-                        SNew(STextBlock)
-                        .Text(FText::FromString(TEXT("进入属于你的数字世界。每一次选择、相遇与行动，\n都会成为虚拟分身继续成长的记忆。")))
-                        .ColorAndOpacity(MutedColor)
-                        .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 18))
-                        .LineHeightPercentage(1.35f)
-                    ]
-                ]
-                + SHorizontalBox::Slot()
-                .AutoWidth()
-                .VAlign(VAlign_Center)
-                [
-                    SNew(SBox)
-                    .WidthOverride(410.0f)
-                    [
-                        SNew(SBorder)
-                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-                        .BorderBackgroundColor(PanelColor)
-                        .Padding(FMargin(36.0f, 42.0f))
-                        [
-                            SNew(SVerticalBox)
-                            + SVerticalBox::Slot()
-                            .AutoHeight()
-                            [
-                                SNew(STextBlock)
-                                .Text(FText::FromString(TEXT("欢迎回来")))
-                                .ColorAndOpacity(FLinearColor::White)
-                                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 28))
-                            ]
-                            + SVerticalBox::Slot()
-                            .AutoHeight()
-                            .Padding(FMargin(0.0f, 8.0f, 0.0f, 30.0f))
-                            [
-                                SNew(STextBlock)
-                                .Text(FText::FromString(TEXT("世界连接稳定，居民服务在线。")))
-                                .ColorAndOpacity(MutedColor)
-                                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 15))
-                            ]
-                            + SVerticalBox::Slot()
-                            .AutoHeight()
-                            [
-                                SNew(SButton)
-                                .ContentPadding(FMargin(24.0f, 16.0f))
-                                .ButtonColorAndOpacity(AccentColor)
-                                .OnClicked(FOnClicked::CreateUObject(
-                                    this,
-                                    &UAocietyMainMenuWidget::HandleEnterWorld))
-                                [
-                                    SNew(STextBlock)
-                                    .Text(FText::FromString(TEXT("进入世界")))
-                                    .Justification(ETextJustify::Center)
-                                    .ColorAndOpacity(FLinearColor::White)
-                                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 20))
-                                ]
-                            ]
-                            + SVerticalBox::Slot()
-                            .AutoHeight()
-                            .Padding(FMargin(0.0f, 14.0f, 0.0f, 0.0f))
-                            [
-                                SNew(SButton)
-                                .ContentPadding(FMargin(24.0f, 13.0f))
-                                .ButtonColorAndOpacity(FLinearColor(0.12f, 0.16f, 0.20f, 1.0f))
-                                .OnClicked(FOnClicked::CreateUObject(
-                                    this,
-                                    &UAocietyMainMenuWidget::HandleQuitGame))
-                                [
-                                    SNew(STextBlock)
-                                    .Text(FText::FromString(TEXT("退出游戏")))
-                                    .Justification(ETextJustify::Center)
-                                    .ColorAndOpacity(FLinearColor(0.82f, 0.86f, 0.90f, 1.0f))
-                                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 16))
-                                ]
-                            ]
-                            + SVerticalBox::Slot()
-                            .AutoHeight()
-                            .Padding(FMargin(0.0f, 28.0f, 0.0f, 0.0f))
-                            [
-                                SNew(STextBlock)
-                                .Text(FText::FromString(TEXT("PRE-ALPHA  ·  LAUNCHER SESSION VERIFIED")))
-                                .ColorAndOpacity(FLinearColor(0.36f, 0.48f, 0.52f, 1.0f))
-                                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 11))
-                                .Justification(ETextJustify::Center)
-                            ]
-                        ]
-                    ]
-                ]
+                SNew(STextBlock)
+                .Text(FText::FromString(TEXT("鼠标选择  ·  点击确认")))
+                .ColorAndOpacity(MutedTextColor)
+                .ShadowOffset(FVector2D(1.0f, 1.0f))
+                .ShadowColorAndOpacity(FLinearColor::Black)
+                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 12))
             ]
-            + SVerticalBox::Slot()
-            .AutoHeight()
+            + SHorizontalBox::Slot()
+            .AutoWidth()
             [
-                SNew(SHorizontalBox)
-                + SHorizontalBox::Slot()
-                .FillWidth(1.0f)
-                [
-                    SNew(STextBlock)
-                    .Text(FText::FromString(TEXT("AOCIETY NETWORK  /  ECHOVERSE")))
-                    .ColorAndOpacity(FLinearColor(0.32f, 0.40f, 0.44f, 1.0f))
-                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 12))
-                ]
-                + SHorizontalBox::Slot()
-                .AutoWidth()
-                [
-                    SNew(STextBlock)
-                    .Text(FText::FromString(TEXT("BUILD 0.4  ·  简体中文")))
-                    .ColorAndOpacity(FLinearColor(0.32f, 0.40f, 0.44f, 1.0f))
-                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 12))
-                ]
+                SNew(STextBlock)
+                .Text(FText::FromString(TEXT("AOCIETY  PRE-ALPHA  ·  BUILD 0.4")))
+                .ColorAndOpacity(MutedTextColor)
+                .ShadowOffset(FVector2D(1.0f, 1.0f))
+                .ShadowColorAndOpacity(FLinearColor::Black)
+                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 12))
             ]
         ];
 }
@@ -239,6 +281,68 @@ FReply UAocietyMainMenuWidget::HandleEnterWorld()
         }
     }
     return FReply::Handled();
+}
+
+FReply UAocietyMainMenuWidget::HandleOpenSettings()
+{
+    if (MenuSwitcher.IsValid())
+    {
+        MenuSwitcher->SetActiveWidgetIndex(1);
+    }
+    return FReply::Handled();
+}
+
+FReply UAocietyMainMenuWidget::HandleOpenArchive()
+{
+    if (MenuSwitcher.IsValid())
+    {
+        MenuSwitcher->SetActiveWidgetIndex(2);
+    }
+    return FReply::Handled();
+}
+
+FReply UAocietyMainMenuWidget::HandleBackToMainMenu()
+{
+    if (MenuSwitcher.IsValid())
+    {
+        MenuSwitcher->SetActiveWidgetIndex(0);
+    }
+    return FReply::Handled();
+}
+
+FReply UAocietyMainMenuWidget::HandleToggleFullscreen()
+{
+    if (GEngine)
+    {
+        if (UGameUserSettings* UserSettings = GEngine->GetGameUserSettings())
+        {
+            const bool bIsWindowed =
+                UserSettings->GetFullscreenMode() == EWindowMode::Windowed;
+            UserSettings->SetFullscreenMode(
+                bIsWindowed ? EWindowMode::Fullscreen : EWindowMode::Windowed);
+            UserSettings->ApplySettings(false);
+            if (DisplayModeText.IsValid())
+            {
+                DisplayModeText->SetText(GetDisplayModeText());
+            }
+        }
+    }
+    return FReply::Handled();
+}
+
+FText UAocietyMainMenuWidget::GetDisplayModeText() const
+{
+    if (GEngine)
+    {
+        if (const UGameUserSettings* UserSettings = GEngine->GetGameUserSettings())
+        {
+            const bool bIsWindowed =
+                UserSettings->GetFullscreenMode() == EWindowMode::Windowed;
+            return FText::FromString(
+                bIsWindowed ? TEXT("显示模式  <  窗口化  >") : TEXT("显示模式  <  全屏  >"));
+        }
+    }
+    return FText::FromString(TEXT("显示模式  <  窗口化  >"));
 }
 
 FReply UAocietyMainMenuWidget::HandleQuitGame()

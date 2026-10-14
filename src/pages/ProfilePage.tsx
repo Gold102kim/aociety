@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { BasicQuestionnaire, LauncherUser, supplementProfile } from '../auth';
 import { Icon, PageTabs } from '../components/LauncherUi';
 import { emptyQuestionnaire, mbtiOptions } from '../profile';
@@ -17,6 +17,13 @@ export function ProfilePage({ user, onBack, onLogout, onUserUpdated }: { user: L
   const [supplementBusy, setSupplementBusy] = useState(false);
   const [supplementMessage, setSupplementMessage] = useState('');
   const [supplement, setSupplement] = useState<BasicQuestionnaire>(() => ({ ...emptyQuestionnaire, interests: ['', '', ''] }));
+  const mounted = useRef(true);
+  const inFlight = useRef(false);
+  const requestEpoch = useRef(0);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; requestEpoch.current += 1; };
+  }, []);
   const missingPersonal = ['fullName', 'gender', 'birthDate', 'residence', 'occupation'].some((field) => !profile?.[field as keyof BasicQuestionnaire]);
   const missingPreferences = ['mbti', 'favoriteColor', 'favoriteMusic', 'belief'].some((field) => !profile?.[field as keyof BasicQuestionnaire]) || (profile?.interests.length ?? 0) < 3;
   const canSupplement = section === 'personal' ? missingPersonal : section === 'preferences' ? missingPreferences : false;
@@ -26,17 +33,22 @@ export function ProfilePage({ user, onBack, onLogout, onUserUpdated }: { user: L
 
   const saveSupplement = async (event: FormEvent) => {
     event.preventDefault();
+    if (inFlight.current) return;
+    inFlight.current = true;
+    const epoch = ++requestEpoch.current;
     setSupplementBusy(true);
     setSupplementMessage('');
     try {
       const updatedUser = await supplementProfile(supplement);
+      if (!mounted.current || requestEpoch.current !== epoch || updatedUser.id !== user.id) return;
       onUserUpdated(updatedUser);
       setSupplement({ ...emptyQuestionnaire, interests: ['', '', ''] });
       setSupplementing(false);
     } catch (error) {
-      setSupplementMessage(error instanceof Error ? error.message : '资料补充失败，请稍后重试。');
+      if (mounted.current && requestEpoch.current === epoch) setSupplementMessage(error instanceof Error ? error.message : '资料补充失败，请稍后重试。');
     } finally {
-      setSupplementBusy(false);
+      inFlight.current = false;
+      if (mounted.current && requestEpoch.current === epoch) setSupplementBusy(false);
     }
   };
 
@@ -77,7 +89,7 @@ export function ProfilePage({ user, onBack, onLogout, onUserUpdated }: { user: L
 
         <aside className="profile-side-column">
           <article className="profile-card account-card"><div className="profile-card-heading compact"><div><span>{section === 'ai' ? 'AI ARCHIVE' : section === 'security' ? 'SECURITY' : 'ACCOUNT'}</span><h2>{section === 'ai' ? 'AI 档案' : section === 'security' ? '账户安全' : '账户信息'}</h2></div></div><dl><div className="account-field"><dt>玩家昵称</dt><dd>{user.displayName}</dd></div><div className="security-field"><dt>邮箱地址</dt><dd>{user.email}</dd></div><div className="account-field"><dt>注册日期</dt><dd>{formatProfileDate(user.createdAt)}</dd></div><div className="security-field"><dt>账户 ID</dt><dd className="account-id">{user.id}</dd></div><div className="ai-field"><dt>账户 AI 档案</dt><dd>{user.aiAgent.status === 'READY' ? '档案已就绪' : '等待个人资料'}</dd></div><div className="ai-field"><dt>AI Agent ID</dt><dd className="account-id">{user.aiAgent.agentId}</dd></div></dl></article>
-          <article className="profile-card logout-card"><div className="logout-icon"><Icon name="user"/></div><div><h3>退出当前账户</h3><p>退出后将返回登录界面。你的个人资料和账户信息会继续保存在本机。</p></div><button type="button" className="logout-button" onClick={onLogout}>退出登录</button></article>
+          <article className="profile-card logout-card"><div className="logout-icon"><Icon name="user"/></div><div><h3>退出当前账户</h3><p>退出后将返回登录界面。你的个人资料和账户信息会继续保存在本机。</p></div><button type="button" className="logout-button" onClick={() => { requestEpoch.current += 1; onLogout(); }}>退出登录</button></article>
         </aside>
       </div>
     </section>

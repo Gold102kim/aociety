@@ -3,6 +3,9 @@
 // 路径: Source/Aociety/Private/AocietyClientSubsystem.cpp
 
 #include "AocietyClientSubsystem.h"
+#include "AocietyRequestJson.h"
+#include "AocietyConversationScope.h"
+#include "AocietyDialogueValidation.h"
 #include "HttpModule.h"
 #include "Interfaces/IHttpResponse.h"
 #include "Json.h"
@@ -19,11 +22,18 @@
 #include "Sound/SoundWave.h"
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
+#include "Engine/GameInstance.h"
 #include "Engine/World.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogAociety, Log, All);
 
-#define AOCITY_T() GetWorld() ? GetWorld()->GetTimerManager() : GetGameInstance()->GetTimerManager()
+namespace
+{
+FString SerializeRequestBody(const TSharedRef<FJsonObject>& Object)
+{
+    return AocietyRequestJson::Serialize(Object);
+}
+}
 
 // ════════════════════════════════════════════════════════════════
 // 生命周期
@@ -32,7 +42,9 @@ DEFINE_LOG_CATEGORY_STATIC(LogAociety, Log, All);
 void UAocietyClientSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
     Super::Initialize(Collection);
-    LoadConversationHistory();
+    bShuttingDown = false;
+    ResidentConversationScope = FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    // GameInstance supplies the account/Agent scope after parsing its session.
     UE_LOG(LogAociety, Log, TEXT("[Aociety] Subsystem initialized"));
     if (bAutoConnect)
     {
@@ -42,6 +54,7 @@ void UAocietyClientSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UAocietyClientSubsystem::Deinitialize()
 {
+    bShuttingDown = true;
     SaveConversationHistory();
     Disconnect();
     Super::Deinitialize();
@@ -53,6 +66,7 @@ void UAocietyClientSubsystem::Deinitialize()
 
 bool UAocietyClientSubsystem::Connect()
 {
+    if (bShuttingDown) return false;
     if (bIsConnected) return true;
 
     if (WS.IsValid())
@@ -125,9 +139,9 @@ bool UAocietyClientSubsystem::Connect()
         UE_LOG(LogAociety, Warning, TEXT("[Aociety] WS 错误: %s"), *Err);
         if (Self->bEnableEmotionWebSocket)
         {
-            if (UWorld* World = Self->GetWorld())
+            if (UGameInstance* GameInstance = Self->GetGameInstance())
             {
-                World->GetTimerManager().SetTimer(
+                GameInstance->GetTimerManager().SetTimer(
                     Self->Timer_Reconnect,
                     [WeakThis]()
                     {
@@ -157,10 +171,17 @@ bool UAocietyClientSubsystem::Connect()
 void UAocietyClientSubsystem::Disconnect()
 {
     StopTimer();
-    if (UWorld* World = GetWorld())
+    if (UGameInstance* GameInstance = GetGameInstance())
     {
-        World->GetTimerManager().ClearTimer(Timer_Reconnect);
+        GameInstance->GetTimerManager().ClearTimer(Timer_Reconnect);
     }
+    // Unbind before cancelling: cancellation may complete synchronously.
+    for (const FHttpRequestPtr& Request : ActiveRequests)
+    {
+        Request->OnProcessRequestComplete().Unbind();
+        Request->CancelRequest();
+    }
+    ActiveRequests.Reset();
     if (WS.IsValid())
     {
         WS->OnConnected().Clear();
@@ -187,17 +208,17 @@ void UAocietyClientSubsystem::OnWSMessage(const FString& Msg)
     if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid()) return;
 
     FAocietyEmotion E;
-    E.Emotion = Json->GetStringField(TEXT("emotion"));
-    E.Valence = Json->GetNumberField(TEXT("valence"));
-    E.Arousal = Json->GetNumberField(TEXT("arousal"));
-    E.SupportNeed = Json->GetNumberField(TEXT("support_need"));
-    E.bDegraded = Json->HasField(TEXT("degraded")) && Json->GetBoolField(TEXT("degraded"));
-    TSharedPtr<FJsonObject> TrendObj = Json->GetObjectField(TEXT("trend"));
-    if (TrendObj.IsValid())
+    Json->TryGetStringField(TEXT("emotion"), E.Emotion);
+    Json->TryGetNumberField(TEXT("valence"), E.Valence);
+    Json->TryGetNumberField(TEXT("arousal"), E.Arousal);
+    Json->TryGetNumberField(TEXT("support_need"), E.SupportNeed);
+    Json->TryGetBoolField(TEXT("degraded"), E.bDegraded);
+    const TSharedPtr<FJsonObject>* TrendObj = nullptr;
+    if (Json->TryGetObjectField(TEXT("trend"), TrendObj) && TrendObj && TrendObj->IsValid())
     {
-        E.Trend = TrendObj->GetStringField(TEXT("label"));
-        E.ValenceDelta = TrendObj->HasField(TEXT("valence_delta")) ? TrendObj->GetNumberField(TEXT("valence_delta")) : 0.0f;
-        E.ArousalDelta = TrendObj->HasField(TEXT("arousal_delta")) ? TrendObj->GetNumberField(TEXT("arousal_delta")) : 0.0f;
+        (*TrendObj)->TryGetStringField(TEXT("label"), E.Trend);
+        (*TrendObj)->TryGetNumberField(TEXT("valence_delta"), E.ValenceDelta);
+        (*TrendObj)->TryGetNumberField(TEXT("arousal_delta"), E.ArousalDelta);
     }
     EmitEmotionIfChanged(E);
     LastEmotion = E;
@@ -211,48 +232,78 @@ void UAocietyClientSubsystem::PushCameraFrame(const TArray<uint8>& JPEGBytes, co
 {
     if (JPEGBytes.Num() == 0) return;
 
-    FString B64 = FBase64::Encode(JPEGBytes);
-    FString Escaped = TextHint.Replace(TEXT("\""), TEXT("\\\""));
+    TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
+    Body->SetStringField(TEXT("image_base64"), FBase64::Encode(JPEGBytes));
+    Body->SetStringField(TEXT("text_hint"), TextHint);
 
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
     Req->SetURL(CareBackendURL + TEXT("/emotion/analyze"));
     Req->SetVerb(TEXT("POST"));
     Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-    Req->SetContentAsString(
-        FString::Printf(TEXT("{\"image_base64\":\"%s\",\"text_hint\":\"%s\"}"), *B64, *Escaped)
-    );
-    Req->ProcessRequest();
+    Req->SetContentAsString(SerializeRequestBody(Body));
+    StartHttpRequest(Req);
 }
 
 void UAocietyClientSubsystem::PushAudioChunk(const TArray<uint8>& PCM16Bytes)
 {
     if (PCM16Bytes.Num() == 0) return;
-    FString B64 = FBase64::Encode(PCM16Bytes);
+    TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
+    Body->SetStringField(TEXT("audio_base64"), FBase64::Encode(PCM16Bytes));
 
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
     Req->SetURL(CareBackendURL + TEXT("/emotion/analyze"));
     Req->SetVerb(TEXT("POST"));
     Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-    Req->SetContentAsString(FString::Printf(TEXT("{\"audio_base64\":\"%s\"}"), *B64));
-    Req->ProcessRequest();
+    Req->SetContentAsString(SerializeRequestBody(Body));
+    StartHttpRequest(Req);
 }
 
 void UAocietyClientSubsystem::PushTextHint(const FString& Text)
 {
     if (Text.IsEmpty()) return;
-    FString Esc = Text.Replace(TEXT("\""), TEXT("\\\""));
+    TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
+    Body->SetStringField(TEXT("text_hint"), Text);
 
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
     Req->SetURL(CareBackendURL + TEXT("/emotion/analyze"));
     Req->SetVerb(TEXT("POST"));
     Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-    Req->SetContentAsString(FString::Printf(TEXT("{\"text_hint\":\"%s\"}"), *Esc));
-    Req->ProcessRequest();
+    Req->SetContentAsString(SerializeRequestBody(Body));
+    StartHttpRequest(Req);
 }
 
 // ════════════════════════════════════════════════════════════════
 // HTTP 调用
 // ════════════════════════════════════════════════════════════════
+
+void UAocietyClientSubsystem::StartHttpRequest(
+    const TSharedRef<IHttpRequest, ESPMode::ThreadSafe>& Request,
+    float TimeoutSeconds)
+{
+    const FHttpRequestCompleteDelegate Completion = Request->OnProcessRequestComplete();
+    if (bShuttingDown || ActiveRequests.Num() >= 32)
+    {
+        if (!bShuttingDown) Completion.ExecuteIfBound(Request, nullptr, false);
+        return;
+    }
+    Request->SetTimeout(FMath::Clamp(TimeoutSeconds, 1.0f, 60.0f));
+    Request->SetDelegateThreadPolicy(EHttpRequestDelegateThreadPolicy::CompleteOnGameThread);
+    const TWeakObjectPtr<UAocietyClientSubsystem> WeakThis(this);
+    Request->OnProcessRequestComplete().BindLambda(
+        [WeakThis, Completion](FHttpRequestPtr Completed, FHttpResponsePtr Response, bool bSuccess)
+        {
+            UAocietyClientSubsystem* Self = WeakThis.Get();
+            // Some transports complete a rejected ProcessRequest immediately;
+            // the removal guard makes that path and the fallback idempotent.
+            if (!Self || Self->bShuttingDown || Self->ActiveRequests.Remove(Completed) == 0) return;
+            Completion.ExecuteIfBound(Completed, Response, bSuccess);
+        });
+    ActiveRequests.Add(Request);
+    if (!Request->ProcessRequest())
+    {
+        Request->OnProcessRequestComplete().ExecuteIfBound(Request, nullptr, false);
+    }
+}
 
 void UAocietyClientSubsystem::RequestCurrentEmotion()
 {
@@ -260,7 +311,7 @@ void UAocietyClientSubsystem::RequestCurrentEmotion()
     Req->SetURL(CareBackendURL + TEXT("/emotion/state"));
     Req->SetVerb(TEXT("GET"));
     Req->OnProcessRequestComplete().BindUObject(this, &UAocietyClientSubsystem::OnHttpDone, FName("emotion"));
-    Req->ProcessRequest();
+    StartHttpRequest(Req);
 }
 
 void UAocietyClientSubsystem::RequestWorldState()
@@ -269,7 +320,7 @@ void UAocietyClientSubsystem::RequestWorldState()
     Req->SetURL(BackendURL + TEXT("/world/state"));
     Req->SetVerb(TEXT("GET"));
     Req->OnProcessRequestComplete().BindUObject(this, &UAocietyClientSubsystem::OnHttpDone, FName("world"));
-    Req->ProcessRequest();
+    StartHttpRequest(Req);
 }
 
 void UAocietyClientSubsystem::RequestNPCList()
@@ -277,18 +328,20 @@ void UAocietyClientSubsystem::RequestNPCList()
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
     Req->SetURL(BackendURL + TEXT("/npc/list"));
     Req->SetVerb(TEXT("GET"));
-    Req->ProcessRequest();
+    StartHttpRequest(Req);
 }
 
 void UAocietyClientSubsystem::RequestNPCCare(const FString& NpcId)
 {
+    TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
+    Body->SetStringField(TEXT("npc_id"), NpcId);
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
     Req->SetURL(CareBackendURL + TEXT("/emotion/care_with_voice"));
     Req->SetVerb(TEXT("POST"));
     Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-    Req->SetContentAsString(FString::Printf(TEXT("{\"npc_id\":\"%s\"}"), *NpcId));
+    Req->SetContentAsString(SerializeRequestBody(Body));
     Req->OnProcessRequestComplete().BindUObject(this, &UAocietyClientSubsystem::OnHttpDone, FName("care"));
-    Req->ProcessRequest();
+    StartHttpRequest(Req, 45.0f);
 }
 
 void UAocietyClientSubsystem::RequestNPCDialogue(const FString& NpcId,
@@ -296,11 +349,7 @@ void UAocietyClientSubsystem::RequestNPCDialogue(const FString& NpcId,
                                                  const FString& District,
                                                  const FString& TopicId)
 {
-    if (NpcId.IsEmpty() || PlayerInput.IsEmpty()) return;
-    const FString EscNpc = NpcId.Replace(TEXT("\\"), TEXT("\\\\")).Replace(TEXT("\""), TEXT("\\\""));
-    const FString EscInput = PlayerInput.Replace(TEXT("\\"), TEXT("\\\\")).Replace(TEXT("\""), TEXT("\\\""));
-    const FString EscDistrict = District.Replace(TEXT("\\"), TEXT("\\\\")).Replace(TEXT("\""), TEXT("\\\""));
-    const FString EscTopic = TopicId.Replace(TEXT("\\"), TEXT("\\\\")).Replace(TEXT("\""), TEXT("\\\""));
+    if (bShuttingDown || NpcId.IsEmpty() || PlayerInput.IsEmpty()) return;
     const bool bAmbient = TopicId == TEXT("ambient_resident_chat");
     const FString Mode = bAmbient ? TEXT("ambient") : TEXT("player");
     const FString CounterpartId = bAmbient
@@ -325,20 +374,34 @@ void UAocietyClientSubsystem::RequestNPCDialogue(const FString& NpcId,
     }
     const int64 EventTimestamp = FDateTime::UtcNow().ToUnixTimestamp();
 
+    TSharedRef<FJsonObject> Position = MakeShared<FJsonObject>();
+    Position->SetNumberField(TEXT("x"), PlayerLocation.X);
+    Position->SetNumberField(TEXT("y"), PlayerLocation.Y);
+    Position->SetNumberField(TEXT("z"), PlayerLocation.Z);
+    TSharedRef<FJsonObject> SceneContext = MakeShared<FJsonObject>();
+    SceneContext->SetStringField(TEXT("location"), TEXT("forest_town"));
+    SceneContext->SetStringField(TEXT("interaction"), Mode);
+    SceneContext->SetStringField(TEXT("activity"), TopicId);
+    SceneContext->SetStringField(TEXT("nearby_landmark"), District);
+    SceneContext->SetNumberField(TEXT("event_timestamp"), EventTimestamp);
+    SceneContext->SetObjectField(TEXT("player_position"), Position);
+    TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
+    Body->SetStringField(TEXT("npc_id"), NpcId);
+    Body->SetStringField(TEXT("player_input"), PlayerInput);
+    Body->SetStringField(TEXT("mode"), Mode);
+    Body->SetStringField(TEXT("counterpart_id"), CounterpartId);
+    Body->SetStringField(TEXT("conversation_scope"), ResidentConversationScope);
+    Body->SetObjectField(TEXT("scene_context"), SceneContext);
+
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
     Req->SetURL(BackendURL + TEXT("/forest/resident_chat"));
     Req->SetVerb(TEXT("POST"));
     Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-    Req->SetContentAsString(FString::Printf(
-        TEXT("{\"npc_id\":\"%s\",\"player_input\":\"%s\",\"mode\":\"%s\",\"counterpart_id\":\"%s\",\"scene_context\":{\"location\":\"forest_town\",\"interaction\":\"%s\",\"activity\":\"%s\",\"nearby_landmark\":\"%s\",\"event_timestamp\":%lld,\"player_position\":{\"x\":%.1f,\"y\":%.1f,\"z\":%.1f}}}"),
-        *EscNpc, *EscInput, *Mode, *CounterpartId, *Mode, *EscTopic,
-        *EscDistrict,
-        static_cast<long long>(EventTimestamp), PlayerLocation.X,
-        PlayerLocation.Y, PlayerLocation.Z));
+    Req->SetContentAsString(SerializeRequestBody(Body));
     Req->OnProcessRequestComplete().BindUObject(
         this, &UAocietyClientSubsystem::OnDialogueHttpDone,
         NpcId, Mode, CounterpartId);
-    Req->ProcessRequest();
+    StartHttpRequest(Req, 45.0f);
 }
 
 TArray<FAocietyConversationEntry>
@@ -363,7 +426,7 @@ TArray<FString> UAocietyClientSubsystem::GetConversationNpcIds() const
 void UAocietyClientSubsystem::AppendConversationEntry(
     const FAocietyConversationEntry& Entry)
 {
-    if (Entry.NpcId.IsEmpty() || Entry.Text.IsEmpty())
+    if (ConversationNamespace.IsEmpty() || Entry.NpcId.IsEmpty() || Entry.Text.IsEmpty())
     {
         return;
     }
@@ -380,12 +443,31 @@ void UAocietyClientSubsystem::AppendConversationEntry(
     OnConversationUpdated.Broadcast(Entry.NpcId, Entry);
 }
 
+void UAocietyClientSubsystem::ConfigureConversationScope(
+    const FString& AccountId, const FString& AgentId)
+{
+    if (bShuttingDown) return;
+    const FString NewNamespace = AocietyConversationScope::GetNamespace(AccountId, AgentId);
+    if (NewNamespace == ConversationNamespace) return;
+    SaveConversationHistory();
+    // A late response from a previous identity must not enter the new inbox.
+    Disconnect();
+    ConversationNamespace = NewNamespace;
+    ResidentConversationScope = FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    LoadConversationHistory();
+}
+
+FString UAocietyClientSubsystem::GetConversationHistoryPath() const
+{
+    return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Aociety"),
+        TEXT("Conversations"), ConversationNamespace, TEXT("ConversationHistory.json"));
+}
+
 void UAocietyClientSubsystem::LoadConversationHistory()
 {
     ConversationHistory.Reset();
-    const FString Path = FPaths::Combine(
-        FPaths::ProjectSavedDir(), TEXT("Aociety"),
-        TEXT("ConversationHistory.json"));
+    if (ConversationNamespace.IsEmpty()) return;
+    const FString Path = GetConversationHistoryPath();
     FString JsonText;
     if (!FFileHelper::LoadFileToString(JsonText, *Path))
     {
@@ -421,8 +503,10 @@ void UAocietyClientSubsystem::LoadConversationHistory()
         }
         TArray<FAocietyConversationEntry>& History =
             ConversationHistory.FindOrAdd(NpcId);
-        for (const TSharedPtr<FJsonValue>& Value : *Values)
+        constexpr int32 MaxEntriesPerResident = 120;
+        for (int32 Index = FMath::Max(0, Values->Num() - MaxEntriesPerResident); Index < Values->Num(); ++Index)
         {
+            const TSharedPtr<FJsonValue>& Value = (*Values)[Index];
             const TSharedPtr<FJsonObject>* Object = nullptr;
             if (!Value.IsValid()
                 || !Value->TryGetObject(Object)
@@ -449,6 +533,7 @@ void UAocietyClientSubsystem::LoadConversationHistory()
 
 void UAocietyClientSubsystem::SaveConversationHistory() const
 {
+    if (ConversationNamespace.IsEmpty()) return;
     TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
     Root->SetNumberField(TEXT("version"), 1);
     TSharedRef<FJsonObject> Conversations = MakeShared<FJsonObject>();
@@ -478,38 +563,34 @@ void UAocietyClientSubsystem::SaveConversationHistory() const
     {
         return;
     }
-    const FString Directory = FPaths::Combine(
-        FPaths::ProjectSavedDir(), TEXT("Aociety"));
+    const FString Path = GetConversationHistoryPath();
+    const FString Directory = FPaths::GetPath(Path);
     IFileManager::Get().MakeDirectory(*Directory, true);
     FFileHelper::SaveStringToFile(
         JsonText,
-        *FPaths::Combine(Directory, TEXT("ConversationHistory.json")),
+        *Path,
         FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 }
 
 void UAocietyClientSubsystem::RequestWorldAction(const FString& ActionType, const FString& District,
                                                   const TMap<FString, FString>& Payload)
 {
-    FString PayloadJson = TEXT("{");
-    bool First = true;
+    TSharedRef<FJsonObject> PayloadJson = MakeShared<FJsonObject>();
     for (const auto& Pair : Payload)
     {
-        if (!First) PayloadJson += TEXT(",");
-        First = false;
-        PayloadJson += FString::Printf(TEXT("\"%s\":\"%s\""), *Pair.Key, *Pair.Value);
+        PayloadJson->SetStringField(Pair.Key, Pair.Value);
     }
-    PayloadJson += TEXT("}");
-
-    FString Body = FString::Printf(
-        TEXT("{\"action_type\":\"%s\",\"district\":\"%s\",\"payload\":%s}"),
-        *ActionType, *District, *PayloadJson);
+    TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
+    Body->SetStringField(TEXT("action_type"), ActionType);
+    Body->SetStringField(TEXT("district"), District);
+    Body->SetObjectField(TEXT("payload"), PayloadJson);
 
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
     Req->SetURL(BackendURL + TEXT("/world/action"));
     Req->SetVerb(TEXT("POST"));
     Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-    Req->SetContentAsString(Body);
-    Req->ProcessRequest();
+    Req->SetContentAsString(SerializeRequestBody(Body));
+    StartHttpRequest(Req);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -544,23 +625,24 @@ void UAocietyClientSubsystem::SetTTSVoice(const FString& VoiceName)
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
     Req->SetURL(CareBackendURL + TEXT("/tts/voices/") + VoiceName);
     Req->SetVerb(TEXT("POST"));
-    Req->ProcessRequest();
+    StartHttpRequest(Req);
     PreferredTTSVoice = VoiceName;
 }
 
 void UAocietyClientSubsystem::SynthesizeTTS(const FString& Text, const FString& VoiceName)
 {
-    FString Esc = Text.Replace(TEXT("\""), TEXT("\\\""));
     FString UseVoice = VoiceName.IsEmpty() ? PreferredTTSVoice : VoiceName;
+    TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
+    Body->SetStringField(TEXT("text"), Text);
+    Body->SetStringField(TEXT("voice"), UseVoice);
 
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
     Req->SetURL(CareBackendURL + TEXT("/tts/synthesize"));
     Req->SetVerb(TEXT("POST"));
     Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-    Req->SetContentAsString(FString::Printf(
-        TEXT("{\"text\":\"%s\",\"voice\":\"%s\"}"), *Esc, *UseVoice));
+    Req->SetContentAsString(SerializeRequestBody(Body));
     Req->OnProcessRequestComplete().BindUObject(this, &UAocietyClientSubsystem::OnHttpDone, FName("tts"));
-    Req->ProcessRequest();
+    StartHttpRequest(Req, 45.0f);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -575,20 +657,21 @@ void UAocietyClientSubsystem::StartAssessment()
     Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
     Req->SetContentAsString(TEXT("{}"));
     Req->OnProcessRequestComplete().BindUObject(this, &UAocietyClientSubsystem::OnHttpDone, FName("ast_start"));
-    Req->ProcessRequest();
+    StartHttpRequest(Req);
 }
 
 void UAocietyClientSubsystem::SubmitAssessmentTurn(const FString& SessionId, const FString& UserInput)
 {
     if (SessionId.IsEmpty()) return;
-    FString Esc = UserInput.Replace(TEXT("\""), TEXT("\\\""));
+    TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
+    Body->SetStringField(TEXT("session_id"), SessionId);
+    Body->SetStringField(TEXT("player_input"), UserInput);
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
     Req->SetURL(CareBackendURL + TEXT("/assessment/turn"));
     Req->SetVerb(TEXT("POST"));
     Req->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-    Req->SetContentAsString(FString::Printf(
-        TEXT("{\"session_id\":\"%s\",\"player_input\":\"%s\"}"), *SessionId, *Esc));
-    Req->ProcessRequest();
+    Req->SetContentAsString(SerializeRequestBody(Body));
+    StartHttpRequest(Req, 45.0f);
 }
 
 void UAocietyClientSubsystem::FinishAssessment(const FString& SessionId)
@@ -597,7 +680,7 @@ void UAocietyClientSubsystem::FinishAssessment(const FString& SessionId)
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = FHttpModule::Get().CreateRequest();
     Req->SetURL(CareBackendURL + TEXT("/assessment/finish/") + SessionId);
     Req->SetVerb(TEXT("POST"));
-    Req->ProcessRequest();
+    StartHttpRequest(Req, 45.0f);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -633,15 +716,18 @@ void UAocietyClientSubsystem::OnDialogueHttpDone(
     FString RequestedCounterpartId)
 {
     FAocietyNPCDialogue Dialogue;
-    Dialogue.NpcId = RequestedNpcId;
     Dialogue.Source = TEXT("error");
-    Dialogue.Model = TEXT("deepseek-v4-flash");
-    Dialogue.Provider = TEXT("deepseek");
-    Dialogue.Mode = RequestedMode;
-    Dialogue.CounterpartId = RequestedCounterpartId;
 
-    auto Broadcast = [this, &Dialogue]()
+    auto Broadcast = [this, &Dialogue, &RequestedNpcId, &RequestedMode, &RequestedCounterpartId]()
     {
+        if (Dialogue.Source != TEXT("llm"))
+        {
+            // Local errors still reach the requested resident's UI; these are
+            // routing fields, never evidence that response metadata existed.
+            Dialogue.NpcId = RequestedNpcId;
+            Dialogue.Mode = RequestedMode;
+            Dialogue.CounterpartId = RequestedCounterpartId;
+        }
         if (!Dialogue.Message.IsEmpty())
         {
             FAocietyConversationEntry Entry;
@@ -687,45 +773,44 @@ void UAocietyClientSubsystem::OnDialogueHttpDone(
         return;
     }
 
-    auto ApplyFields = [&Dialogue](const TSharedPtr<FJsonObject>& Object)
+    AocietyDialogueValidation::FMetadata Metadata;
+    TSharedPtr<FJsonObject> Payload;
+    if (!AocietyDialogueValidation::TryReadMetadata(Json, Metadata, Payload))
     {
-        if (!Object.IsValid()) return;
-        if (Object->HasField(TEXT("npc_id"))) Dialogue.NpcId = Object->GetStringField(TEXT("npc_id"));
-        if (Object->HasField(TEXT("message"))) Dialogue.Message = Object->GetStringField(TEXT("message"));
-        if (Object->HasField(TEXT("mood"))) Dialogue.Mood = Object->GetStringField(TEXT("mood"));
-        if (Object->HasField(TEXT("source"))) Dialogue.Source = Object->GetStringField(TEXT("source"));
-        if (Object->HasField(TEXT("model"))) Dialogue.Model = Object->GetStringField(TEXT("model"));
-        if (Object->HasField(TEXT("provider"))) Dialogue.Provider = Object->GetStringField(TEXT("provider"));
-        if (Object->HasField(TEXT("mode"))) Dialogue.Mode = Object->GetStringField(TEXT("mode"));
-        if (Object->HasField(TEXT("counterpart_id"))) Dialogue.CounterpartId = Object->GetStringField(TEXT("counterpart_id"));
-        if (Object->HasField(TEXT("request_id"))) Dialogue.RequestId = Object->GetStringField(TEXT("request_id"));
-        if (Object->HasField(TEXT("error_code"))) Dialogue.ErrorCode = Object->GetStringField(TEXT("error_code"));
-    };
-
-    ApplyFields(Json);
-    if (Json->HasField(TEXT("dialogue")))
-    {
-        ApplyFields(Json->GetObjectField(TEXT("dialogue")));
+        Dialogue.Message = TEXT("居民响应缺少有效来源或路由信息，未显示未经验证的内容。");
+        Dialogue.Mood = TEXT("请求失败");
+        Dialogue.ErrorCode = TEXT("invalid_response_metadata");
+        Broadcast();
+        return;
     }
+    Dialogue.NpcId = Metadata.NpcId;
+    Dialogue.Source = Metadata.Source;
+    Dialogue.Model = Metadata.Model;
+    Dialogue.Provider = Metadata.Provider;
+    Dialogue.Mode = Metadata.Mode;
+    Dialogue.CounterpartId = Metadata.CounterpartId;
+    Payload->TryGetStringField(TEXT("message"), Dialogue.Message);
+    Dialogue.Message.TrimStartAndEndInline();
+    Payload->TryGetStringField(TEXT("mood"), Dialogue.Mood);
+    Payload->TryGetStringField(TEXT("request_id"), Dialogue.RequestId);
+    Payload->TryGetStringField(TEXT("error_code"), Dialogue.ErrorCode);
 
-    if (!Dialogue.NpcId.Equals(RequestedNpcId, ESearchCase::CaseSensitive) ||
-        !Dialogue.Mode.Equals(RequestedMode, ESearchCase::IgnoreCase) ||
-        !Dialogue.CounterpartId.Equals(
-            RequestedCounterpartId, ESearchCase::CaseSensitive))
+    if (!AocietyDialogueValidation::MatchesRequest(Metadata,
+            RequestedNpcId, RequestedMode, RequestedCounterpartId))
     {
         UE_LOG(LogAociety, Warning,
             TEXT("[Aociety][ForestAI] response routing mismatch: requested=%s/%s/%s returned=%s/%s/%s"),
             *RequestedNpcId, *RequestedMode, *RequestedCounterpartId,
             *Dialogue.NpcId, *Dialogue.Mode, *Dialogue.CounterpartId);
+        Dialogue.Source = TEXT("error");
+        Dialogue.Message = TEXT("居民响应与本次请求不匹配，未显示错误路由的内容。");
+        Dialogue.Mood = TEXT("请求失败");
+        Dialogue.ErrorCode = TEXT("response_routing_mismatch");
+        Broadcast();
+        return;
     }
-    Dialogue.NpcId = RequestedNpcId;
-    Dialogue.Mode = RequestedMode;
-    Dialogue.CounterpartId = RequestedCounterpartId;
-
     const bool bVerifiedLLM =
-        Dialogue.Source.Equals(TEXT("llm"), ESearchCase::IgnoreCase) &&
-        Dialogue.Model.Equals(TEXT("deepseek-v4-flash"), ESearchCase::IgnoreCase) &&
-        Dialogue.Provider.Equals(TEXT("deepseek"), ESearchCase::IgnoreCase) &&
+        AocietyDialogueValidation::IsVerifiedLLM(Metadata) &&
         !Dialogue.Message.IsEmpty();
     if (Dialogue.Source.Equals(TEXT("llm"), ESearchCase::IgnoreCase) && !bVerifiedLLM)
     {
@@ -773,18 +858,16 @@ void UAocietyClientSubsystem::OnHttpDone(FHttpRequestPtr Req, FHttpResponsePtr R
     if (Endpoint == FName("emotion") || Endpoint == FName("state"))
     {
         FAocietyEmotion E;
-        E.Emotion = Json->HasField(TEXT("emotion")) ? Json->GetStringField(TEXT("emotion")) : TEXT("unknown");
-        E.Valence = Json->HasField(TEXT("valence")) ? Json->GetNumberField(TEXT("valence")) : 0.5f;
-        E.Arousal = Json->HasField(TEXT("arousal")) ? Json->GetNumberField(TEXT("arousal")) : 0.0f;
-        E.SupportNeed = Json->HasField(TEXT("support_need")) ? Json->GetNumberField(TEXT("support_need")) : 0.0f;
-        E.bDegraded = Json->HasField(TEXT("degraded")) && Json->GetBoolField(TEXT("degraded"));
-        if (Json->HasField(TEXT("trend")))
+        E.Emotion = TEXT("unknown");
+        Json->TryGetStringField(TEXT("emotion"), E.Emotion);
+        Json->TryGetNumberField(TEXT("valence"), E.Valence);
+        Json->TryGetNumberField(TEXT("arousal"), E.Arousal);
+        Json->TryGetNumberField(TEXT("support_need"), E.SupportNeed);
+        Json->TryGetBoolField(TEXT("degraded"), E.bDegraded);
+        const TSharedPtr<FJsonObject>* TrendObj = nullptr;
+        if (Json->TryGetObjectField(TEXT("trend"), TrendObj) && TrendObj && TrendObj->IsValid())
         {
-            TSharedPtr<FJsonObject> TrendObj = Json->GetObjectField(TEXT("trend"));
-            if (TrendObj.IsValid())
-            {
-                E.Trend = TrendObj->GetStringField(TEXT("label"));
-            }
+            (*TrendObj)->TryGetStringField(TEXT("label"), E.Trend);
         }
         EmitEmotionIfChanged(E);
         LastEmotion = E;
@@ -795,24 +878,20 @@ void UAocietyClientSubsystem::OnHttpDone(FHttpRequestPtr Req, FHttpResponsePtr R
     }
     else if (Endpoint == FName("world"))
     {
-        if (Json->HasField(TEXT("world_state")))
+        const TSharedPtr<FJsonObject>* WorldStateObject = nullptr;
+        if (Json->TryGetObjectField(TEXT("world_state"), WorldStateObject) && WorldStateObject && WorldStateObject->IsValid())
         {
-            const TSharedPtr<FJsonObject> WorldStateObject = Json->GetObjectField(TEXT("world_state"));
-            if (WorldStateObject.IsValid())
-            {
-                FAocietyWorldSnapshot W;
-                W.Day = WorldStateObject->GetIntegerField(TEXT("day"));
-                W.ClockMinutes = WorldStateObject->GetIntegerField(TEXT("clock_minutes"));
-                W.TimePeriod = WorldStateObject->GetStringField(TEXT("time_period"));
-                OnWorldUpdated.Broadcast(W);
-            }
+            FAocietyWorldSnapshot W;
+            (*WorldStateObject)->TryGetNumberField(TEXT("day"), W.Day);
+            (*WorldStateObject)->TryGetNumberField(TEXT("clock_minutes"), W.ClockMinutes);
+            (*WorldStateObject)->TryGetStringField(TEXT("time_period"), W.TimePeriod);
+            OnWorldUpdated.Broadcast(W);
         }
     }
     else if (Endpoint == FName("ast_start"))
     {
-        if (Json->HasField(TEXT("session_id")))
+        if (Json->TryGetStringField(TEXT("session_id"), CurrentSessionId))
         {
-            CurrentSessionId = Json->GetStringField(TEXT("session_id"));
             UE_LOG(LogAociety, Log, TEXT("[Aociety] 评估开始: %s"), *CurrentSessionId);
         }
     }
@@ -821,13 +900,16 @@ void UAocietyClientSubsystem::OnHttpDone(FHttpRequestPtr Req, FHttpResponsePtr R
 void UAocietyClientSubsystem::EmitCareFromJson(const TSharedPtr<FJsonObject>& Json)
 {
     FNpcCareAudio Care;
-    Care.NpcLine = Json->GetStringField(TEXT("npc_line"));
-    Care.Action = Json->GetStringField(TEXT("action"));
-    Care.CareLevel = Json->HasField(TEXT("care_level")) ? Json->GetStringField(TEXT("care_level")) : TEXT("nudge");
-    Care.Duration = Json->HasField(TEXT("duration_seconds")) ? Json->GetNumberField(TEXT("duration_seconds")) : 5.0f;
-    Care.VoiceName = Json->HasField(TEXT("voice")) ? Json->GetStringField(TEXT("voice")) : TEXT("xiaoxiao");
-    Care.VoiceNameCN = Json->HasField(TEXT("voice_name_cn")) ? Json->GetStringField(TEXT("voice_name_cn")) : TEXT("晓晓");
-    Care.AudioBase64 = Json->HasField(TEXT("audio_base64")) ? Json->GetStringField(TEXT("audio_base64")) : TEXT("");
+    if (!Json.IsValid() || !Json->TryGetStringField(TEXT("npc_line"), Care.NpcLine) || Care.NpcLine.IsEmpty()) return;
+    Json->TryGetStringField(TEXT("action"), Care.Action);
+    Care.CareLevel = TEXT("nudge");
+    Care.VoiceName = TEXT("xiaoxiao");
+    Care.VoiceNameCN = TEXT("晓晓");
+    Json->TryGetStringField(TEXT("care_level"), Care.CareLevel);
+    Json->TryGetNumberField(TEXT("duration_seconds"), Care.Duration);
+    Json->TryGetStringField(TEXT("voice"), Care.VoiceName);
+    Json->TryGetStringField(TEXT("voice_name_cn"), Care.VoiceNameCN);
+    Json->TryGetStringField(TEXT("audio_base64"), Care.AudioBase64);
 
     OnCareTriggered.Broadcast(Care);
 
@@ -850,21 +932,28 @@ void UAocietyClientSubsystem::EmitEmotionIfChanged(const FAocietyEmotion& New)
 
 void UAocietyClientSubsystem::StartTimer()
 {
-    if (UWorld* World = GetWorld())
+    if (UGameInstance* GameInstance = GetGameInstance())
     {
-        World->GetTimerManager().SetTimer(
+        const TWeakObjectPtr<UAocietyClientSubsystem> WeakThis(this);
+        GameInstance->GetTimerManager().SetTimer(
             Timer_Heartbeat,
-            [this]() { RequestCurrentEmotion(); },
-            HeartbeatInterval, true
+            [WeakThis]()
+            {
+                if (UAocietyClientSubsystem* Self = WeakThis.Get())
+                {
+                    if (!Self->bShuttingDown) Self->RequestCurrentEmotion();
+                }
+            },
+            FMath::Max(0.5f, HeartbeatInterval), true
         );
     }
 }
 
 void UAocietyClientSubsystem::StopTimer()
 {
-    if (UWorld* World = GetWorld())
+    if (UGameInstance* GameInstance = GetGameInstance())
     {
-        World->GetTimerManager().ClearTimer(Timer_Heartbeat);
+        GameInstance->GetTimerManager().ClearTimer(Timer_Heartbeat);
     }
 }
 

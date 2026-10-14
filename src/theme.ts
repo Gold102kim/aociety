@@ -43,7 +43,11 @@ export function resolveFavoriteColor(value?: string) {
 export function getThemeStyle(value?: string) {
   const color = resolveFavoriteColor(value);
   const { r, g, b } = toRgb(color.hex);
-  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  const linear = (channel: number) => {
+    const srgb = channel / 255;
+    return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance = 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
   return {
     '--accent': color.hex,
     '--accent-hover': mixWithWhite(color.hex, 0.16),
@@ -51,6 +55,6 @@ export function getThemeStyle(value?: string) {
     '--accent-faint': `rgba(${r}, ${g}, ${b}, 0.045)`,
     '--accent-border': `rgba(${r}, ${g}, ${b}, 0.3)`,
     '--accent-glow': `rgba(${r}, ${g}, ${b}, 0.55)`,
-    '--accent-contrast': luminance > 0.56 ? '#07110f' : '#f6f8fb',
+    '--accent-contrast': luminance > 0.179 ? '#07110f' : '#f6f8fb',
   } as CSSProperties;
 }

@@ -9,7 +9,7 @@ const regions = [
   { name: '失物招领咖啡馆', type: '情绪主题地点', status: '概念阶段', className: 'cafe' },
 ];
 
-export function WorldPage({ user, onLaunch }: { user: LauncherUser; onLaunch: () => void }) {
+export function WorldPage({ user, onLaunch, launching = false }: { user: LauncherUser; onLaunch: () => void; launching?: boolean }) {
   const [section, setSection] = useState<'map' | 'events' | 'travel'>('map');
   return (
     <section className={`world-content world-section-${section}`}>
@@ -21,7 +21,7 @@ export function WorldPage({ user, onLaunch }: { user: LauncherUser; onLaunch: ()
         <article className="world-map-card">
           <div className="world-panel-heading"><div><span>REGION MAP</span><h2>世界区域地图</h2></div><small>概念布局 · 非实际比例</small></div>
           <div className="world-map"><div className="world-map-grid" aria-hidden="true"/><div className="world-route route-one" aria-hidden="true"/><div className="world-route route-two" aria-hidden="true"/><div className="world-route route-three" aria-hidden="true"/><button type="button" className="world-node node-central"><i/><strong>中央小镇</strong><span>核心区域</span></button><button type="button" className="world-node node-neon"><i/><strong>霓虹街区</strong><span>夜间区域</span></button><button type="button" className="world-node node-coast"><i/><strong>海滨区域</strong><span>休闲区域</span></button><button type="button" className="world-node node-cafe"><i/><strong>咖啡馆</strong><span>情绪锚点</span></button><div className="world-map-legend"><span><i/>规划区域</span><span><i/>未开放</span></div></div>
-          <div className="world-map-footer"><div><span>下一目标</span><strong>完成中央小镇可行走原型</strong></div><button type="button" className="play-button" onClick={onLaunch}><span className="play-triangle"/>进入游戏世界</button></div>
+          <div className="world-map-footer"><div><span>下一目标</span><strong>完成中央小镇可行走原型</strong></div><button type="button" className="play-button" onClick={onLaunch} disabled={launching}><span className="play-triangle"/>{launching ? '正在启动…' : '进入游戏世界'}</button></div>
         </article>
         <aside className="world-side-column">
           <article className="world-panel world-event-card"><div className="world-panel-heading compact"><div><span>WORLD EVENTS</span><h2>世界事件</h2></div><small>原型模拟</small></div><div className="world-event-list"><article><i className="mint">◇</i><div><strong>暮色灯光测试</strong><p>中央小镇正在切换黄昏照明方案。</p></div><time>18:40</time></article><article><i className="amber">△</i><div><strong>流动商店抵达</strong><p>概念商队停留在东侧广场。</p></div><time>17:25</time></article><article><i className="blue">○</i><div><strong>海风数据异常</strong><p>海滨区域环境参数等待校准。</p></div><time>16:08</time></article></div></article>

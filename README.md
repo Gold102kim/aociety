@@ -10,15 +10,30 @@ EchoVerse 的 Windows Electron 启动器工程。当前版本是可构建、可�
 
 它还不是可公开运营的平台：账户仍保存在本机，AI 仍由开发机配置直连供应商，游戏票据仍是联调用原型。生产边界和阻断项见 [工程审计](docs/ENGINEERING_AUDIT.md) 与 [安全说明](SECURITY.md)。
 
+## 公开源码与本机资源
+
+本分支仅分发源码、配置模板、测试、文档和确认可分发的界面资源。角色模型、原始工程素材、UE 场景/角色二进制及测试音视频保留在本机，不随本次上传分发。来源与恢复说明见 [第三方资源](docs/THIRD_PARTY_ASSETS.md)。旧 Git 历史没有自动改写，不能把当前分支停止跟踪等同于历史已清除。
+
+没有获授权的本机分身资源时，可明确使用源码模式完成检查和构建；页面会显示模型不可用的说明，不能将此构建当作包含全部游戏素材的完整游戏包：
+
+```powershell
+$env:ECHO_ALLOW_MISSING_LOCAL_ASSETS='1'
+pnpm check
+```
+
+恢复模型和预览图后，取消该变量并运行默认严格资产检查。源码模式只允许二者同时缺失，存在但损坏或部分缺失仍然失败。UE 编辑器构建还需要 UE5.8 和受支持的 MSVC 工具链；静态契约测试不代替原生编译。
+
 ## 当前能力
 
 - 软件启动后先进入注册/登录，登录成功前不能进入主界面。
 - 新账户完成一次自然的首次资料流程；已填写字段不可修改，空白字段可后续补充。
 - 每个账户获得独立 Agent ID、人格档案和记忆命名空间；基础模型服务可以被多个账户共享，并非每位玩家独占一套模型权重。
-- 资料保存后显示 2–3 秒启动过渡，再进入主界面。
+- 首次资料保存后显示完整启动过渡；老账户过渡缩短到约 650 毫秒。
 - 世界、社交、虚拟分身和个人主页具备基础内容与导航，退出登录位于个人主页。
 - Three.js 加载临时 GLB 虚拟分身；页面隐藏时暂停渲染，伴生模式限制帧率，并支持 reduced-motion。
 - 右上角菱形按钮可切换为透明无边框伴生窗口。
+- 深色玻璃界面可切换清晰模式，并尊重系统减少透明度、增强对比度和强制颜色设置。
+- 退出或切换账户使未完成的登录、资料、AI 和游戏启动请求失效；取消 AI 会中止客户端 HTTP，不能保证供应商已经开始的计算或计费也随之停止。
 - Launcher Session 通过版本化 JSON Schema 与 UE5 交接。
 
 ## 工具链
@@ -31,6 +46,7 @@ EchoVerse 的 Windows Electron 启动器工程。当前版本是可构建、可�
 
 ```powershell
 pnpm install --frozen-lockfile
+node node_modules/electron/install.js
 pnpm check
 ```
 
@@ -54,6 +70,7 @@ pnpm dist:win
 $env:ELECTRON_MIRROR='https://npmmirror.com/mirrors/electron/'
 $env:ELECTRON_BUILDER_BINARIES_MIRROR='https://npmmirror.com/mirrors/electron-builder-binaries/'
 pnpm install
+node node_modules/electron/install.js
 pnpm dist:win
 ```
 
@@ -67,7 +84,17 @@ pnpm dist:win
 | `pnpm test:contracts` | UE5 Launcher Session JSON Schema |
 | `pnpm test:assets` | GLB 与预览图格式、结构和体积门禁 |
 | `pnpm test:secrets` | 密钥与开发机绝对路径检查 |
+| `pnpm test:session` | 异步会话、游戏资源和 IPC 负向回归 |
 | `pnpm check` | 全部类型检查、测试和生产构建 |
+
+Python 居民/硬件服务的隔离离线回归：
+
+```powershell
+python -m pip install -r requirements-resident.txt
+python -B -m unittest discover -s tests -v
+```
+
+测试使用 mock 和临时目录，不需要真实 API Key，不调用付费模型。服务并发、关闭和可选旧助手的显式凭据共享边界见 [Python 审查](PYTHON_SERVICE_REVIEW.md)。
 
 ## 本地数据
 
@@ -96,8 +123,8 @@ pnpm dist:win
 本机首次配置：
 
 ```powershell
-python -m venv ..\runtime\aociety-python
-..\runtime\aociety-python\Scripts\python.exe -m pip install -r requirements-resident.txt
+python -m venv runtime\aociety-python
+runtime\aociety-python\Scripts\python.exe -m pip install -r requirements-resident.txt
 pnpm configure:local-game
 ```
 

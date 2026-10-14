@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import base64
+import asyncio
 import json
 import os
 import time
@@ -45,7 +46,7 @@ from backend.assessment_engine import (
     extract_turn_analysis_from_model, compute_dimension_confidence,
     build_memory_summary, derive_type_code,
 )
-from backend.openclaw_gateway import OpenClawGatewayConfig, OpenClawGatewayClient
+from backend.bounded_worker import BoundedAsyncWorker, WorkerBusyError
 
 # Simple in-memory memory store for now (OpenClaw requires runtime)
 class SimpleMemoryStore:
@@ -95,6 +96,8 @@ tts_service = TTSService(voice_name=os.environ.get("TTS_VOICE", "xiaoxiao"))
 
 # WebSocket 连接池
 active_websockets: dict[str, WebSocket] = {}
+emotion_ws_worker = BoundedAsyncWorker(max_workers=2, name="emotion-websocket")
+world_ws_worker = BoundedAsyncWorker(max_workers=2, name="world-websocket")
 
 
 # ────────────────────────────────────────────────────────────────
@@ -105,7 +108,15 @@ active_websockets: dict[str, WebSocket] = {}
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     world_engine.reset()
-    yield
+    try:
+        yield
+    finally:
+        emotion_ws_worker.close()
+        world_ws_worker.close()
+        try:
+            npc_glm.close()
+        finally:
+            world_engine.ark.close()
 
 
 # ────────────────────────────────────────────────────────────────
@@ -732,26 +743,13 @@ async def emotion_websocket(ws: WebSocket):
             data = await ws.receive_json()
             frame = EmotionFrameIn(**data)
 
-            # 分析情感
-            glm_result = glm_emotion.analyze_emotion(
-                text_hint=frame.text_hint,
-                image_base64=frame.image_base64,
-            ) if ENABLE_EMOTION else None
-
-            packet = affect_runtime.build_packet(
-                timestamp_ms=frame.timestamp_ms or int(time.time() * 1000),
-                image_data_url=f"data:image/jpeg;base64,{frame.image_base64}" if frame.image_base64 else "",
-                width=640, height=480,
-                audio_features=[],
-                audio_pcm16_base64=frame.audio_base64 or "",
-                sample_rate=16_000,
-                text_hint=frame.text_hint or "",
-                legacy_remote_result=None,
-                local_expr_label="neutral",
-                local_expr_conf=0.5,
-            )
-
-            await ws.send_json(packet)
+            # Reuse the REST analysis/fusion path off the event loop. The old
+            # path blocked other sockets and discarded its paid cloud result.
+            try:
+                packet = await emotion_ws_worker.run(analyze_emotion, frame, timeout=12.0)
+            except (WorkerBusyError, asyncio.TimeoutError):
+                packet = EmotionOut(degraded=True, source_models={"runtime": "busy"})
+            await ws.send_json(packet.model_dump())
     except WebSocketDisconnect:
         pass
     except Exception:
@@ -771,13 +769,24 @@ async def world_websocket(ws: WebSocket):
             data = await ws.receive_json()
             _type = data.get("type", "")
             if _type == "get_state":
-                await ws.send_json({"type": "world_state", "data": world_engine.snapshot_cached()})
+                try:
+                    snapshot = await world_ws_worker.run(world_engine.snapshot_cached, timeout=12.0)
+                except (WorkerBusyError, asyncio.TimeoutError):
+                    await ws.send_json({"type": "error", "message": "世界服务繁忙，请稍后重试。"})
+                    continue
+                await ws.send_json({"type": "world_state", "data": snapshot})
             elif _type == "action":
-                result = world_engine.action(
-                    data.get("action_type", ""),
-                    data.get("district", ""),
-                    data.get("payload", {}),
-                )
+                try:
+                    result = await world_ws_worker.run(
+                        world_engine.action,
+                        data.get("action_type", ""),
+                        data.get("district", ""),
+                        data.get("payload", {}),
+                        timeout=12.0,
+                    )
+                except (WorkerBusyError, asyncio.TimeoutError):
+                    await ws.send_json({"type": "error", "message": "世界服务繁忙，请稍后重试。"})
+                    continue
                 await ws.send_json({"type": "world_state", "data": result.world_state})
     except WebSocketDisconnect:
         pass
@@ -792,4 +801,9 @@ async def world_websocket(ws: WebSocket):
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("HARDWARE_CARE_PORT", "8010"))
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=port, reload=True)
+    uvicorn.run(
+        "backend.main:app",
+        host=os.environ.get("AOCIETY_BIND_HOST", "127.0.0.1"),
+        port=port,
+        reload=os.environ.get("AOCIETY_DEV_RELOAD", "0").lower() in {"1", "true", "yes"},
+    )

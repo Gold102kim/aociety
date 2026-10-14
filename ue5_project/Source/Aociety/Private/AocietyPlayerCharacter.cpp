@@ -255,7 +255,7 @@ void AAocietyPlayerCharacter::Tick(float DeltaSeconds)
     }
 
     MotionEvidenceAccumulator += DeltaSeconds;
-    if (MotionEvidenceAccumulator >= 1.0f)
+    if (bRuntimeAuditEnabled && MotionEvidenceAccumulator >= 1.0f)
     {
         MotionEvidenceAccumulator = 0.0f;
         UAocietyMotionMatchingAnimInstance* MotionInstance =

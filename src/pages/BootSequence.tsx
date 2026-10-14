@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { LauncherUser } from '../auth';
 import { getThemeStyle } from '../theme';
+import { version } from '../../package.json';
 
-export function BootSequence({ user, onComplete }: { user: LauncherUser; onComplete: () => void }) {
+export function BootSequence({ user, onComplete, durationMs = 2700 }: { user: LauncherUser; onComplete: () => void; durationMs?: number }) {
   const lines = useMemo(() => [
-    '> ECHOVERSE BOOT PROTOCOL / BUILD 0.3',
+    `> ECHOVERSE BOOT PROTOCOL / BUILD ${version}`,
     `> 验证居民身份... ${user.displayName}`,
     '> 初始化神经链接...',
     '> 读取性格档案...',
@@ -26,13 +27,13 @@ export function BootSequence({ user, onComplete }: { user: LauncherUser; onCompl
         return current;
       }
       return current + 1;
-    }), 260);
-    const completeTimer = window.setTimeout(onComplete, 2700);
+    }), Math.max(50, Math.floor(durationMs / (lines.length + 2))));
+    const completeTimer = window.setTimeout(onComplete, durationMs);
     return () => {
       window.clearInterval(lineTimer);
       window.clearTimeout(completeTimer);
     };
-  }, [lines.length, onComplete, reduceMotion]);
+  }, [lines.length, onComplete, reduceMotion, durationMs]);
 
   const progress = Math.round((visibleLines / lines.length) * 100);
   return (

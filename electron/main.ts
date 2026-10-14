@@ -7,14 +7,26 @@ import { randomUUID } from 'node:crypto';
 import { AccountStore, BasicQuestionnaire, PublicUser } from './auth-service';
 import { AiChatMessage, AiChatService } from './ai-service';
 import { initializeLogger, logError, logEvent } from './logger';
+import { waitForServiceHealth } from './service-health';
+import { RequestEpoch } from './request-epoch';
 
 let mainWindow: BrowserWindow | null = null;
 let companionWindow: BrowserWindow | null = null;
 let accountStore: AccountStore | null = null;
 let currentUser: PublicUser | null = null;
+const sessionEpoch = new RequestEpoch();
 let aiChatService: AiChatService | null = null;
 let isQuitting = false;
 let activeGameProcess: ChildProcess | null = null;
+let gameLaunchInFlight = false;
+type GameLaunchAttempt = {
+  services: Set<ChildProcess>;
+  game: ChildProcess | null;
+  sessionPath?: string;
+  cancelled: boolean;
+  delivered: boolean;
+};
+let pendingGameLaunch: GameLaunchAttempt | null = null;
 
 type GameServiceConfig = {
   name: string;
@@ -122,6 +134,7 @@ async function isHealthReady(healthUrl: string) {
   const timeout = setTimeout(() => controller.abort(), 1_500);
   try {
     const response = await fetch(healthUrl, { method: 'GET', signal: controller.signal, cache: 'no-store' });
+    await response.body?.cancel();
     return response.ok;
   } catch {
     return false;
@@ -130,25 +143,19 @@ async function isHealthReady(healthUrl: string) {
   }
 }
 
-async function waitForHealth(healthUrl: string, timeoutMs: number) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await isHealthReady(healthUrl)) return true;
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  return false;
-}
-
 async function startGameServices(config: GameConfig) {
+  const attempt = pendingGameLaunch;
   const started: ChildProcess[] = [];
   try {
     for (const service of config.services ?? []) {
+      if (attempt?.cancelled || isQuitting) throw new Error('游戏启动已取消。');
       if (await isHealthReady(service.healthUrl)) {
-        logEvent('info', 'game.service_already_ready', { name: service.name, healthUrl: service.healthUrl });
+        logEvent('info', 'game.service_already_ready', { name: service.name });
         continue;
       }
       if (!fs.existsSync(service.executablePath)) throw new Error(`服务程序不存在：${service.name}`);
       if (service.workingDirectory && !fs.existsSync(service.workingDirectory)) throw new Error(`服务目录不存在：${service.name}`);
+      if (attempt?.cancelled || isQuitting) throw new Error('游戏启动已取消。');
 
       const child = spawn(service.executablePath, service.args ?? [], {
         cwd: service.workingDirectory || path.dirname(service.executablePath),
@@ -156,15 +163,17 @@ async function startGameServices(config: GameConfig) {
         stdio: 'ignore',
         windowsHide: true,
       });
+      // Register ownership immediately, before any await: before-quit cannot
+      // rely on async startup/health callbacks running after app termination.
+      started.push(child);
+      attempt?.services.add(child);
       await new Promise<void>((resolve, reject) => {
         child.once('spawn', resolve);
         child.once('error', reject);
       });
-      started.push(child);
-
-      const ready = await waitForHealth(service.healthUrl, service.startupTimeoutMs ?? 30_000);
+      const ready = await waitForServiceHealth(child, service.healthUrl, service.startupTimeoutMs ?? 30_000);
       if (!ready) throw new Error(`服务启动超时：${service.name}`);
-      logEvent('info', 'game.service_started', { name: service.name, healthUrl: service.healthUrl });
+      logEvent('info', 'game.service_started', { name: service.name });
     }
     return started;
   } catch (error) {
@@ -179,10 +188,42 @@ function stopGameServices(processes: ChildProcess[]) {
   }
 }
 
+function cancelGameLaunchAttempt(attempt: GameLaunchAttempt | null) {
+  if (!attempt || attempt.delivered) return;
+  attempt.cancelled = true;
+  const game = attempt.game;
+  attempt.game = null;
+  if (game && game.exitCode === null && !game.killed) game.kill();
+  if (attempt.services.size) stopGameServices([...attempt.services]);
+  attempt.services.clear();
+  if (attempt.sessionPath) {
+    removeSessionFile(attempt.sessionPath);
+    attempt.sessionPath = undefined;
+  }
+}
+
 async function launchConfiguredGame(user: PublicUser) {
+  if (gameLaunchInFlight) return { ok: false, message: '游戏正在启动，请稍候。' };
+  gameLaunchInFlight = true;
+  const attempt: GameLaunchAttempt = {
+    services: new Set(), game: null, cancelled: false, delivered: false,
+  };
+  pendingGameLaunch = attempt;
+  try {
+    return await launchGameOnce(user, attempt);
+  } finally {
+    cancelGameLaunchAttempt(attempt);
+    if (pendingGameLaunch === attempt) pendingGameLaunch = null;
+    gameLaunchInFlight = false;
+  }
+}
+
+async function launchGameOnce(user: PublicUser, attempt: GameLaunchAttempt) {
   if (activeGameProcess && activeGameProcess.exitCode === null && !activeGameProcess.killed) {
     return { ok: false, message: '游戏已经在运行。' };
   }
+  const epoch = sessionEpoch.capture();
+  if (!isCurrentSession(epoch, user.id)) return expiredSessionResult();
 
   const config = readGameConfig();
   if (!config) {
@@ -199,14 +240,25 @@ async function launchConfiguredGame(user: PublicUser) {
   let startedServices: ChildProcess[] = [];
   try {
     startedServices = await startGameServices(config);
+    for (const service of startedServices) attempt.services.add(service);
   } catch (error) {
     stopGameServices(startedServices);
+    if (!isCurrentSession(epoch, user.id) || attempt.cancelled) return expiredSessionResult();
     logError('game.service_start_failed', error, { channel: config.channel || 'development' });
     return { ok: false, message: error instanceof Error ? error.message : '游戏服务启动失败。' };
   }
+  if (!isCurrentSession(epoch, user.id) || attempt.cancelled) {
+    cancelGameLaunchAttempt(attempt);
+    return expiredSessionResult();
+  }
 
-  const { launchId, sessionPath } = writeLaunchSession(user, config);
+  let sessionPath: string | undefined;
   try {
+    const session = writeLaunchSession(user, config);
+    sessionPath = session.sessionPath;
+    attempt.sessionPath = sessionPath;
+    const launchId = session.launchId;
+    const activeSessionPath = sessionPath;
     const args = [
       ...(config.additionalArgs ?? []),
       `-LauncherSessionFile=${sessionPath}`,
@@ -219,23 +271,32 @@ async function launchConfiguredGame(user: PublicUser) {
       stdio: 'ignore',
       windowsHide: false,
     });
+    attempt.game = child;
     await new Promise<void>((resolve, reject) => {
       child.once('spawn', resolve);
       child.once('error', reject);
     });
+    if (!isCurrentSession(epoch, user.id) || attempt.cancelled) {
+      // Only this just-created game and the services owned by this attempt are
+      // cancelled. An already-running game/service is never included here.
+      cancelGameLaunchAttempt(attempt);
+      return expiredSessionResult();
+    }
     activeGameProcess = child;
     child.once('exit', (code, signal) => {
       logEvent('info', 'game.exited', { code, signal });
-      removeSessionFile(sessionPath);
+      removeSessionFile(activeSessionPath);
       stopGameServices(startedServices);
       if (activeGameProcess === child) activeGameProcess = null;
     });
     child.unref();
+    attempt.delivered = true;
+    if (pendingGameLaunch === attempt) pendingGameLaunch = null;
     logEvent('info', 'game.launched', { launchId, channel: config.channel || 'development' });
     return { ok: true, message: '游戏已启动。', launchId };
   } catch (error) {
     logError('game.launch_failed', error, { channel: config.channel || 'development' });
-    removeSessionFile(sessionPath);
+    if (sessionPath) removeSessionFile(sessionPath);
     stopGameServices(startedServices);
     return { ok: false, message: '游戏启动失败，请稍后重试。' };
   }
@@ -369,11 +430,13 @@ function assertAppWindowSender(event: IpcMainInvokeEvent) {
   if (!trusted || !frame || frame !== event.sender.mainFrame || !isTrustedRendererUrl(frame.url)) throw new Error('不受信任的请求来源。');
 }
 
-function assertWindowEvent(event: IpcMainEvent, expectedWindow: BrowserWindow | null) {
+function isTrustedWindowEvent(event: IpcMainEvent, expectedWindow: BrowserWindow | null) {
   const frame = event.senderFrame;
   if (!expectedWindow || event.sender !== expectedWindow.webContents || !frame || frame !== event.sender.mainFrame || !isTrustedRendererUrl(frame.url)) {
-    throw new Error('不受信任的请求来源。');
+    logEvent('warn', 'ipc.window_event_rejected');
+    return false;
   }
+  return true;
 }
 
 function configureWindowSecurity(window: BrowserWindow, role: 'main' | 'companion') {
@@ -476,6 +539,28 @@ function restoreMainWindow() {
   mainWindow?.focus();
 }
 
+function discardCompanionWindow() {
+  // Its renderer only needs a minimal public identity. Destroying the old
+  // renderer prevents another account from seeing cached names or preferences.
+  const previous = companionWindow;
+  companionWindow = null;
+  if (previous && !previous.isDestroyed()) previous.destroy();
+}
+
+function beginAuthentication() {
+  const epoch = sessionEpoch.invalidate();
+  aiChatService?.cancelAll();
+  currentUser = null;
+  discardCompanionWindow();
+  return epoch;
+}
+
+const expiredSessionResult = () => ({ ok: false as const, message: '账户会话已改变，请重新操作。' });
+
+function isCurrentSession(epoch: number, accountId: string) {
+  return sessionEpoch.isCurrent(epoch) && currentUser?.id === accountId;
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -528,6 +613,11 @@ app.on('window-all-closed', () => {
 });
 app.on('before-quit', () => {
   isQuitting = true;
+  sessionEpoch.invalidate();
+  aiChatService?.cancelAll();
+  // Do not stop previously running games/services. Only an uncommitted launch
+  // owns resources here, and they must be stopped before the event loop exits.
+  cancelGameLaunchAttempt(pendingGameLaunch);
   logEvent('info', 'app.before_quit');
 });
 app.on('child-process-gone', (_event, details) => {
@@ -535,17 +625,17 @@ app.on('child-process-gone', (_event, details) => {
 });
 
 ipcMain.on('window:minimize', (event) => {
-  assertWindowEvent(event, mainWindow);
+  if (!isTrustedWindowEvent(event, mainWindow)) return;
   mainWindow?.minimize();
 });
 ipcMain.on('window:toggle-maximize', (event) => {
-  assertWindowEvent(event, mainWindow);
+  if (!isTrustedWindowEvent(event, mainWindow)) return;
   if (!mainWindow) return;
   if (mainWindow.isMaximized()) mainWindow.unmaximize();
   else mainWindow.maximize();
 });
 ipcMain.on('window:close', (event) => {
-  assertWindowEvent(event, mainWindow);
+  if (!isTrustedWindowEvent(event, mainWindow)) return;
   mainWindow?.close();
 });
 ipcMain.handle('window:enter-companion', (event) => {
@@ -553,11 +643,11 @@ ipcMain.handle('window:enter-companion', (event) => {
   return enterCompanionMode();
 });
 ipcMain.on('companion:restore', (event) => {
-  assertWindowEvent(event, companionWindow);
+  if (!isTrustedWindowEvent(event, companionWindow)) return;
   restoreMainWindow();
 });
 ipcMain.on('companion:quit', (event) => {
-  assertWindowEvent(event, companionWindow);
+  if (!isTrustedWindowEvent(event, companionWindow)) return;
   app.quit();
 });
 ipcMain.handle('companion:get-state', (event) => {
@@ -575,10 +665,14 @@ ipcMain.handle('app:get-version', (event) => {
 ipcMain.handle('auth:register', async (event, input: { displayName: string; email: string; password: string }) => {
   assertTrustedSender(event);
   if (!accountStore) return { ok: false, message: '账户服务尚未准备完成。' };
+  const epoch = beginAuthentication();
   try {
-    currentUser = await accountStore.register(input);
+    const user = await accountStore.register(input);
+    if (!sessionEpoch.isCurrent(epoch)) return expiredSessionResult();
+    currentUser = user;
     return { ok: true, user: currentUser };
   } catch (error) {
+    if (!sessionEpoch.isCurrent(epoch)) return expiredSessionResult();
     return { ok: false, message: error instanceof Error ? error.message : '注册失败，请稍后重试。' };
   }
 });
@@ -586,27 +680,40 @@ ipcMain.handle('auth:register', async (event, input: { displayName: string; emai
 ipcMain.handle('auth:login', async (event, input: { email: string; password: string }) => {
   assertTrustedSender(event);
   if (!accountStore) return { ok: false, message: '账户服务尚未准备完成。' };
+  const epoch = beginAuthentication();
   try {
-    currentUser = await accountStore.login(input.email, input.password);
+    const user = await accountStore.login(input?.email, input?.password);
+    if (!sessionEpoch.isCurrent(epoch)) return expiredSessionResult();
+    currentUser = user;
     return { ok: true, user: currentUser };
   } catch (error) {
+    if (!sessionEpoch.isCurrent(epoch)) return expiredSessionResult();
     return { ok: false, message: error instanceof Error ? error.message : '登录失败，请稍后重试。' };
   }
 });
 
 ipcMain.handle('auth:logout', (event) => {
   assertTrustedSender(event);
+  sessionEpoch.invalidate();
+  aiChatService?.cancelAll();
   currentUser = null;
+  discardCompanionWindow();
   return { ok: true };
 });
 
 ipcMain.handle('auth:complete-questionnaire', async (event, input: BasicQuestionnaire) => {
   assertTrustedSender(event);
   if (!accountStore || !currentUser) return { ok: false, message: '当前账户会话无效，请重新登录。' };
+  const epoch = sessionEpoch.capture();
+  const accountId = currentUser.id;
   try {
-    currentUser = await accountStore.completeBasicQuestionnaire(currentUser.id, input);
+    const user = await accountStore.completeBasicQuestionnaire(accountId, input);
+    if (!sessionEpoch.isCurrent(epoch) || currentUser?.id !== accountId) return expiredSessionResult();
+    currentUser = user;
+    discardCompanionWindow();
     return { ok: true, user: currentUser };
   } catch (error) {
+    if (!isCurrentSession(epoch, accountId)) return expiredSessionResult();
     return { ok: false, message: error instanceof Error ? error.message : '个人资料保存失败，请稍后重试。' };
   }
 });
@@ -614,10 +721,16 @@ ipcMain.handle('auth:complete-questionnaire', async (event, input: BasicQuestion
 ipcMain.handle('auth:supplement-profile', async (event, input: BasicQuestionnaire) => {
   assertTrustedSender(event);
   if (!accountStore || !currentUser) return { ok: false, message: '当前账户会话无效，请重新登录。' };
+  const epoch = sessionEpoch.capture();
+  const accountId = currentUser.id;
   try {
-    currentUser = await accountStore.supplementProfile(currentUser.id, input);
+    const user = await accountStore.supplementProfile(accountId, input);
+    if (!sessionEpoch.isCurrent(epoch) || currentUser?.id !== accountId) return expiredSessionResult();
+    currentUser = user;
+    discardCompanionWindow();
     return { ok: true, user: currentUser };
   } catch (error) {
+    if (!isCurrentSession(epoch, accountId)) return expiredSessionResult();
     return { ok: false, message: error instanceof Error ? error.message : '资料补充失败，请稍后重试。' };
   }
 });
@@ -630,10 +743,14 @@ ipcMain.handle('ai:get-status', (event) => {
 ipcMain.handle('ai:chat', async (event, input: { message: string; history: AiChatMessage[] }) => {
   assertTrustedSender(event);
   if (!currentUser || !aiChatService) return { ok: false, message: '当前账户会话或 AI 服务无效，请重新登录。' };
+  const epoch = sessionEpoch.capture();
+  const accountId = currentUser.id;
   try {
     const result = await aiChatService.chat(currentUser, input?.message, input?.history);
+    if (!sessionEpoch.isCurrent(epoch) || currentUser?.id !== accountId) return expiredSessionResult();
     return { ok: true, ...result };
   } catch (error) {
+    if (!isCurrentSession(epoch, accountId)) return expiredSessionResult();
     return { ok: false, message: error instanceof Error ? error.message : 'AI 回复生成失败，请稍后重试。' };
   }
 });

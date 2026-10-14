@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import os
+import importlib
+import json
+from pathlib import Path
+import threading
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -12,7 +16,14 @@ from services.ark_client import (
     FOREST_LEGACY_TERMS,
     THINKING_DISABLED_BODY,
 )
-from services.forest_residents import ForestResidentService
+from services.forest_residents import (
+    ForestResidentService,
+    MAX_HISTORY_TURNS,
+    MAX_HISTORY_TEXT_CHARS,
+)
+
+SCOPE_A = "a" * 32
+SCOPE_B = "b" * 32
 
 
 class FakeArk:
@@ -44,8 +55,8 @@ class TestForestResidentService(unittest.TestCase):
         ark = FakeArk([llm_reply("今天林间的风很轻。"), llm_reply("我记得你刚才问过天气。")])
         service = ForestResidentService(ark)  # type: ignore[arg-type]
 
-        first = service.chat(npc_id="npc_01", live_event="今天天气怎么样？")
-        second = service.chat(npc_id="npc_01", live_event="你还记得刚才的话吗？")
+        first = service.chat(npc_id="npc_01", live_event="今天天气怎么样？", conversation_scope=SCOPE_A)
+        second = service.chat(npc_id="npc_01", live_event="你还记得刚才的话吗？", conversation_scope=SCOPE_A)
 
         self.assertEqual(first["source"], "llm")
         self.assertEqual(first["provider"], DEEPSEEK_PROVIDER)
@@ -63,13 +74,101 @@ class TestForestResidentService(unittest.TestCase):
             counterpart_id="npc_02",
             mode="ambient",
             live_event="你在小路上遇到了小樱。",
+            conversation_scope=SCOPE_A,
         )
-        service.chat(npc_id="npc_02", live_event="你刚刚听到了什么？")
+        service.chat(npc_id="npc_02", live_event="你刚刚听到了什么？", conversation_scope=SCOPE_A)
 
         self.assertEqual(first["mode"], "ambient")
         self.assertEqual(first["counterpart_id"], "npc_02")
         heard = ark.payloads[1]["recent_dialogue"]
         self.assertEqual(heard[-1]["heard_reply"], "小樱，早上好。")
+
+    def test_random_game_scopes_do_not_share_player_context(self) -> None:
+        ark = FakeArk([llm_reply("A_PRIVATE_REPLY"), llm_reply("B_REPLY"), llm_reply("A_REPLY")])
+        service = ForestResidentService(ark)  # type: ignore[arg-type]
+        service.chat(npc_id="npc_01", live_event="ACCOUNT_A_PRIVATE_SENTINEL", conversation_scope=SCOPE_A)
+        service.chat(npc_id="npc_01", live_event="Account B starts a new game", conversation_scope=SCOPE_B)
+        service.chat(npc_id="npc_01", live_event="Account A continues", conversation_scope=SCOPE_A)
+        self.assertEqual(ark.payloads[1]["recent_dialogue"], [])
+        self.assertEqual(ark.payloads[1]["counterpart_recent_dialogue"], [])
+        self.assertNotIn("ACCOUNT_A_PRIVATE_SENTINEL", json.dumps(ark.payloads[1]))
+        self.assertNotIn("A_PRIVATE_REPLY", json.dumps(ark.payloads[1]))
+        self.assertEqual(ark.payloads[2]["recent_dialogue"][-1]["event"], "ACCOUNT_A_PRIVATE_SENTINEL")
+        self.assertNotIn("B_REPLY", json.dumps(ark.payloads[2]))
+
+    def test_ambient_memory_is_consistent_only_inside_one_game_scope(self) -> None:
+        ark = FakeArk([llm_reply("A_AMBIENT_REPLY"), llm_reply("B_REPLY"), llm_reply("A_REPLY")])
+        service = ForestResidentService(ark)  # type: ignore[arg-type]
+        service.chat(npc_id="npc_01", counterpart_id="npc_02", mode="ambient", live_event="A_AMBIENT_SENTINEL", conversation_scope=SCOPE_A)
+        service.chat(npc_id="npc_02", live_event="New game B", conversation_scope=SCOPE_B)
+        service.chat(npc_id="npc_02", live_event="Same game A", conversation_scope=SCOPE_A)
+        self.assertEqual(ark.payloads[1]["recent_dialogue"], [])
+        self.assertNotIn("A_AMBIENT_SENTINEL", json.dumps(ark.payloads[1]))
+        self.assertEqual(ark.payloads[2]["recent_dialogue"][-1]["heard_reply"], "A_AMBIENT_REPLY")
+
+    def test_missing_or_invalid_scope_is_stateless_even_after_scoped_chat(self) -> None:
+        ark = FakeArk([llm_reply("Scoped reply")] + [llm_reply("Stateless reply")] * 5)
+        service = ForestResidentService(ark)  # type: ignore[arg-type]
+        service.chat(npc_id="npc_01", live_event="PRIVATE_SCOPED_EVENT", conversation_scope=SCOPE_A)
+        for scope in ("", "", "../invalid", "z" * 32, "a" * 1000):
+            service.chat(npc_id="npc_01", live_event="UNSCOPED_SENTINEL", conversation_scope=scope)
+            self.assertEqual(ark.payloads[-1]["recent_dialogue"], [])
+            self.assertEqual(ark.payloads[-1]["counterpart_recent_dialogue"], [])
+            self.assertNotIn("PRIVATE_SCOPED_EVENT", json.dumps(ark.payloads[-1]))
+        self.assertEqual(len(service._history), 1)
+        self.assertNotIn("UNSCOPED_SENTINEL", json.dumps(service._history))
+
+    def test_scope_lru_and_turn_text_limits_bound_memory(self) -> None:
+        ark = FakeArk([llm_reply("Reply")] * 4 + [llm_reply("R" * 5000)] * (MAX_HISTORY_TURNS + 3))
+        service = ForestResidentService(ark)  # type: ignore[arg-type]
+        with patch("services.forest_residents.MAX_CONVERSATION_SCOPES", 2):
+            for scope in (SCOPE_A, SCOPE_B, "c" * 32, SCOPE_A):
+                service.chat(npc_id="npc_01", live_event="LRU turn", conversation_scope=scope)
+                self.assertLessEqual(len(service._history), 2)
+            self.assertEqual(ark.payloads[3]["recent_dialogue"], [], "Evicted old context must not be restored.")
+            for _ in range(MAX_HISTORY_TURNS + 3):
+                service.chat(npc_id="npc_01", live_event="E" * 5000, conversation_scope=SCOPE_A)
+        history = service._history[SCOPE_A]["npc_01"]
+        self.assertEqual(len(history), MAX_HISTORY_TURNS)
+        self.assertTrue(all(len(turn["event"]) <= MAX_HISTORY_TEXT_CHARS and len(turn["reply"]) <= MAX_HISTORY_TEXT_CHARS for turn in history))
+
+    def test_late_reply_cannot_recreate_or_mutate_an_evicted_scope(self) -> None:
+        started, release = threading.Event(), threading.Event()
+
+        class BlockingArk:
+            model_id = DEEPSEEK_MODEL_ID
+
+            def generate_forest_resident_reply(self, payload):
+                if payload["live_event"] == "OLD_INFLIGHT_SENTINEL":
+                    started.set()
+                    release.wait(2)
+                    return llm_reply("OLD_INFLIGHT_REPLY")
+                return llm_reply("Fresh reply")
+
+        service = ForestResidentService(BlockingArk())  # type: ignore[arg-type]
+        failures = []
+
+        def old_request():
+            try:
+                service.chat(npc_id="npc_01", live_event="OLD_INFLIGHT_SENTINEL", conversation_scope=SCOPE_A)
+            except Exception as error:
+                failures.append(error)
+
+        with patch("services.forest_residents.MAX_CONVERSATION_SCOPES", 1):
+            worker = threading.Thread(target=old_request)
+            worker.start()
+            try:
+                self.assertTrue(started.wait(1))
+                service.chat(npc_id="npc_01", live_event="Evict A with B", conversation_scope=SCOPE_B)
+                service.chat(npc_id="npc_01", live_event="FRESH_A_EVENT", conversation_scope=SCOPE_A)
+            finally:
+                release.set()
+                worker.join(2)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(failures, [])
+        self.assertEqual(len(service._history), 1)
+        self.assertEqual(service._history[SCOPE_A]["npc_01"][-1]["event"], "FRESH_A_EVENT")
+        self.assertNotIn("OLD_INFLIGHT_SENTINEL", json.dumps(service._history))
 
     def test_failure_is_never_reported_as_llm(self) -> None:
         service = ForestResidentService(FakeArk([None]))  # type: ignore[arg-type]
@@ -158,12 +257,12 @@ class TestArkClientRoute(unittest.TestCase):
         self.assertEqual(client.model_id, DEEPSEEK_MODEL_ID)
         self.assertEqual(client.provider, DEEPSEEK_PROVIDER)
         self.assertFalse(client.configured)
-        client._dialogue_executor.shutdown(wait=False)
-        client._background_executor.shutdown(wait=False)
+        client.close()
 
     def test_forest_system_prompt_contains_no_legacy_world_terms(self) -> None:
         client = object.__new__(ArkClient)
         client._client = object()
+        client._closed = False
         client._disabled_until = 0.0
         client.model_id = DEEPSEEK_MODEL_ID
         client.provider = DEEPSEEK_PROVIDER

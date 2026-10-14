@@ -700,8 +700,9 @@ void AAocietyGameMode::HandleNPCDialogue(FAocietyNPCDialogue Dialogue)
         ? Dialogue.Source
         : FString::Printf(TEXT("%s / %s"), *Dialogue.Source, *Dialogue.Model);
 
-    UE_LOG(LogTemp, Log, TEXT("[Aociety][NPC] %s: %s (%s)"),
-           *Dialogue.NpcId, *Dialogue.Message, *Attribution);
+    // Chat belongs in the scoped inbox, not a persistent diagnostic log.
+    UE_LOG(LogTemp, Log, TEXT("[Aociety][NPC] npc=%s attribution=%s"),
+           *Dialogue.NpcId, *Attribution);
 
     if (!Speaker)
     {

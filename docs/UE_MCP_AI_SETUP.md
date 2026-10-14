@@ -6,6 +6,7 @@
 - UE MCP 服务地址为 `http://127.0.0.1:8181/mcp`。
 - Codex 作为外部 MCP 客户端连接 UE；UE 5.8 当前没有独立命名为 `GPT` 或 `Codex` 的 `.uplugin`。
 - 普通玩家从软件启动游戏时会禁用上述开发插件，避免增加游戏启动负担。
+- 编辑器默认不自动启动 MCP 服务；需要远程调试时由开发者主动启用，仅允许可信客户端访问。
 
 ## Codex 配置
 
@@ -29,13 +30,17 @@ codex mcp get unreal_engine
 
 ```ini
 [/Script/ModelContextProtocolEngine.ModelContextProtocolSettings]
-bAutoStartServer=True
+bAutoStartServer=False
 ServerPortNumber=8181
 ServerUrlPath=/mcp
 bEnableToolSearch=True
 ```
 
-打开 `Aociety.uproject` 后，日志应包含：
+需要使用 MCP 时，在 UE 编辑器 Project Settings → Plugins → Model Context
+Protocol 中主动启用服务/自动启动，并重启编辑器。该选择应保存在本机配置；不要
+为了个人调试把仓库的默认设置改回自动启动。停止使用时关闭服务。
+
+仅在主动启用后打开 `Aociety.uproject`，日志才应包含：
 
 ```text
 Starting MCP server on port 8181

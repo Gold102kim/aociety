@@ -25,6 +25,11 @@ UCameraCaptureComponent::UCameraCaptureComponent()
 bool UCameraCaptureComponent::StartCapture()
 {
     if (bCapturing) return true;
+    if (!GetWorld() || !FMath::IsFinite(FPS) || FPS <= 0.0f || Width <= 0 || Height <= 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Camera] Invalid capture settings or no active world"));
+        return false;
+    }
 
 #if WITH_OPENCV
     cv::VideoCapture Cap(CameraID);

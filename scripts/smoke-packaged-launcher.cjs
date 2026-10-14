@@ -1,14 +1,16 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { spawn } = require('node:child_process');
 const { AccountStore } = require('../dist-electron/auth-service.js');
 
 const root = path.resolve(__dirname, '..');
-const launcherPath = path.join(root, 'release', 'EchoVerse-Launcher-0.4.0-x64.exe');
+const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+const launcherPath = path.join(root, 'release', `EchoVerse-Launcher-${version}-x64.exe`);
 const gameConfigPath = path.join(root, 'config', 'game.local.json');
 const gameLogPath = path.join(root, 'ue5_project', 'Saved', 'Logs', 'Aociety.log');
-const smokeRoot = path.join('C:\\tmp', `echoverse-packaged-smoke-${process.pid}-${Date.now()}`);
+const smokeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'echoverse-packaged-smoke-'));
 const resultPath = path.join(smokeRoot, 'result.json');
 const email = 'packaged-smoke@echoverse.local';
 const password = 'EchoVerseSmoke2026!';

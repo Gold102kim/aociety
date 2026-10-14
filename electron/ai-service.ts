@@ -165,16 +165,28 @@ ${JSON.stringify(facts, null, 2)}`;
 export class AiChatService {
   private connectionState: AiConnectionState = 'untested';
   private connectionMessage = '';
-  private readonly activeAccountChats = new Set<string>();
+  private readonly activeAccountChats = new Map<string, AbortController>();
+  private readonly cancelledChats = new WeakSet<AbortController>();
   private readonly accountChatTimestamps = new Map<string, number[]>();
   private globalChatTimestamps: number[] = [];
-  private activeChatCount = 0;
 
   constructor(
     private readonly userDataDirectory: string,
     private readonly projectDirectory: string,
     private readonly environment: NodeJS.ProcessEnv = process.env,
   ) {}
+
+  cancelAccount(accountId: string) {
+    const controller = this.activeAccountChats.get(accountId);
+    if (!controller) return;
+    this.cancelledChats.add(controller);
+    this.activeAccountChats.delete(accountId);
+    controller.abort();
+  }
+
+  cancelAll() {
+    for (const accountId of [...this.activeAccountChats.keys()]) this.cancelAccount(accountId);
+  }
 
   getStatus() {
     try {
@@ -226,6 +238,9 @@ export class AiChatService {
 
   private consumeChatBudget(accountId: string) {
     const threshold = Date.now() - CHAT_RATE_WINDOW_MS;
+    for (const [id, timestamps] of this.accountChatTimestamps) {
+      if (!timestamps.length || timestamps[timestamps.length - 1] <= threshold) this.accountChatTimestamps.delete(id);
+    }
     this.globalChatTimestamps = this.globalChatTimestamps.filter((timestamp) => timestamp > threshold);
     if (this.globalChatTimestamps.length >= MAX_GLOBAL_CHAT_REQUESTS_PER_MINUTE) {
       throw new Error('模型服务当前请求过多，请稍后再试。');
@@ -249,8 +264,8 @@ export class AiChatService {
     if (!config) throw new Error('共享模型服务尚未配置。请检查本地 AI 配置。');
 
     const history = Array.isArray(historyInput)
-      ? historyInput.slice(-12).map((item) => ({
-          role: item.role === 'assistant' ? 'assistant' as const : 'user' as const,
+      ? historyInput.slice(-12).filter((item) => item && typeof item === 'object' && (item.role === 'user' || item.role === 'assistant')).map((item) => ({
+          role: item.role,
           content: cleanChatText(item.content, 2000),
         })).filter((item) => item.content)
       : [];
@@ -261,14 +276,12 @@ export class AiChatService {
     if (this.activeAccountChats.has(user.id)) {
       throw new Error('该账户的上一条消息仍在处理中，请稍候再试。');
     }
-    if (this.activeChatCount >= MAX_CONCURRENT_CHAT_REQUESTS) {
+    if (this.activeAccountChats.size >= MAX_CONCURRENT_CHAT_REQUESTS) {
       throw new Error('模型服务当前并发请求过多，请稍后再试。');
     }
     this.consumeChatBudget(user.id);
-    this.activeAccountChats.add(user.id);
-    this.activeChatCount += 1;
-
     const controller = new AbortController();
+    this.activeAccountChats.set(user.id, controller);
     const timeout = setTimeout(() => controller.abort(), 45_000);
 
     try {
@@ -292,7 +305,8 @@ export class AiChatService {
           signal: controller.signal,
         });
         const data = await response.json() as ChatCompletionResponse;
-        if (!response.ok) throw new Error(data.error?.message || `模型请求失败（HTTP ${response.status}）。`);
+        if (this.cancelledChats.has(controller)) throw new Error('本次模型请求已取消。');
+        if (!response.ok) throw new Error(`模型请求失败（HTTP ${response.status}）。请检查模型配置或稍后重试。`);
         const text = data.choices?.[0]?.message?.content?.trim() || '';
         if (!text) throw new Error('模型没有返回可显示的文本。');
         this.connectionState = 'connected';
@@ -319,7 +333,8 @@ export class AiChatService {
         signal: controller.signal,
       });
       const data = await response.json() as OpenAiResponse;
-      if (!response.ok) throw new Error(data.error?.message || `模型请求失败（HTTP ${response.status}）。`);
+      if (this.cancelledChats.has(controller)) throw new Error('本次模型请求已取消。');
+      if (!response.ok) throw new Error(`模型请求失败（HTTP ${response.status}）。请检查模型配置或稍后重试。`);
 
       const text = (data.output || [])
         .filter((item) => item.type === 'message')
@@ -333,6 +348,7 @@ export class AiChatService {
       this.connectionMessage = '';
       return { text, responseId: data.id || '', model: data.model || assignedModel };
     } catch (error) {
+      if (this.cancelledChats.has(controller)) throw new Error('本次模型请求已取消。');
       this.connectionState = 'failed';
       if (error instanceof Error && error.name === 'AbortError') {
         this.connectionMessage = '无法在 45 秒内访问模型服务，请检查网络、Base URL 和模型配置。';
@@ -342,12 +358,13 @@ export class AiChatService {
         this.connectionMessage = '无法连接共享模型服务，请检查网络、防火墙或 Base URL。';
         throw new Error(this.connectionMessage);
       }
-      this.connectionMessage = error instanceof Error ? error.message : '共享模型请求失败。';
-      throw error;
+      const rawMessage = error instanceof Error ? error.message : '共享模型请求失败。';
+      this.connectionMessage = rawMessage.split(config.apiKey).join('[已隐藏凭据]').slice(0, 300);
+      throw new Error(this.connectionMessage);
     } finally {
       clearTimeout(timeout);
-      this.activeAccountChats.delete(user.id);
-      this.activeChatCount = Math.max(0, this.activeChatCount - 1);
+      // A cancelled request can finish after a new request for the same account.
+      if (this.activeAccountChats.get(user.id) === controller) this.activeAccountChats.delete(user.id);
     }
   }
 }

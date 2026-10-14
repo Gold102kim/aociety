@@ -1,6 +1,14 @@
 # Aociety-NEW 交接说明
 
-更新时间：2026-07-17
+更新时间：2026-10-14
+
+## 本轮源码审查状态
+
+当前编辑工作区为独立的源码副本；完整本机素材仍保留在 E 盘原项目。
+公开分支排除受限/未经确认的角色、场景和测试音视频，不改写历史。
+恢复、依赖审计、自动验证及未完成条件见 `docs/PROJECT_REVIEW_0.6.0.md`。
+特别注意：新 UE C++ 尚未通过原生编译（本机缺少有效 MSVC 工具链），
+已有游戏二进制不代表包含本次源码修复；不要把静态检查称为游戏验收。
 
 ## 1. 当前目标
 
@@ -129,7 +137,7 @@ BackendURL     = http://127.0.0.1:8000   # 居民、世界、NPC
 CareBackendURL = http://127.0.0.1:8010   # 情感、TTS、评估、WebSocket
 ```
 
-`UAocietyGameInstance` 已实现 Launcher Contract 1.0，读取并校验 `LauncherSessionFile`、`LauncherContractVersion` 和 `LauncherLaunchId`。开发版允许没有启动器参数时直接调试；Shipping 构建会拒绝无效或过期会话。
+`UAocietyGameInstance` 已实现 Launcher Contract 1.0，读取并校验 `LauncherSessionFile`、`LauncherContractVersion` 和 `LauncherLaunchId`。开发版允许没有启动器参数时直接调试。Shipping 目前拒绝所有本地票据，直到实现真正的服务端票据交换；格式与有效期校验不能证明本地票据可信。
 
 ## 5. 验收清单
 
@@ -157,7 +165,7 @@ PIE：
 
 ```powershell
 cd E:\Aociety-NEW
-python -m pytest -q
+python -B -m unittest discover -s tests -v
 curl.exe http://127.0.0.1:8000/health
 curl.exe -X POST http://127.0.0.1:8000/forest/probe
 ```

@@ -3,8 +3,11 @@ const os = require('node:os');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
+const localRuntimePython = path.resolve(root, 'runtime', 'aociety-python', 'Scripts', 'python.exe');
+const siblingRuntimePython = path.resolve(root, '..', 'runtime', 'aociety-python', 'Scripts', 'python.exe');
 const runtimePython = process.env.AOCIETY_PYTHON_PATH
-  || path.resolve(root, '..', 'runtime', 'aociety-python', 'Scripts', 'python.exe');
+  || [localRuntimePython, siblingRuntimePython].find((candidate) => fs.existsSync(candidate))
+  || localRuntimePython;
 const unrealCandidates = [
   process.env.UE_EDITOR_PATH,
   'D:\\UE_5.8\\Engine\\Binaries\\Win64\\UnrealEditor.exe',

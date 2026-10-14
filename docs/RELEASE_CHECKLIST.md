@@ -31,8 +31,9 @@
 
 ```powershell
 pnpm install --frozen-lockfile
+node node_modules/electron/install.js
 pnpm check
-pnpm audit --prod --audit-level high
+pnpm audit --audit-level high
 pnpm dist:win
 ```
 
@@ -40,7 +41,9 @@ pnpm dist:win
 - [ ] React 与 Electron 类型检查通过。
 - [ ] 账户、AI、契约和资产测试全部通过。
 - [ ] Vite/Electron 生产构建通过，`dist` 中无旧哈希残留。
-- [ ] 生产依赖无未处置的高危或严重漏洞。
+- [ ] 全部锁定依赖（包括 devDependencies 中的运行及构建依赖）无未处置的高危或严重漏洞。
+- [ ] 无官方补丁的剩余告警已记录实际依赖路径、运行影响与跟进条件，未使用 audit ignore 隐藏。
+- [ ] 源码版显式允许缺失本机授权模型时，只豁免完全缺失的模型对；部分缺失或损坏资产仍失败。生产/完整本机包使用严格检查。
 - [ ] Windows portable 产物从上述同一提交生成。
 
 任何测试被跳过、审计例外或构建警告都必须有负责人、原因、影响、到期日和跟踪问题。

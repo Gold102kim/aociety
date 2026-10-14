@@ -25,7 +25,7 @@ import httpx
 from .vision_service import VisionService
 from .audio_service import AudioService
 from .body_pose_service import BodyPoseService
-from .tts_service import TTSService
+from .tts_service import SWEET_VOICES, TTSService
 
 
 class EmotionPipeline:
@@ -78,7 +78,8 @@ class EmotionPipeline:
 
         print(f"[Pipeline] 完整情感管线已启动 → {self.backend_url}")
         print(f"[Pipeline] 摄像头: {enable_vision} | 麦克风: {enable_audio} | 姿态: {enable_pose}")
-        print(f"[Pipeline] 甜女声TTS: {self.tts.voice_name} ({TTSService.SWEET_VOICES[self.tts.voice_name][2]})")
+        voice_info = SWEET_VOICES.get(self.tts.voice_name, SWEET_VOICES["xiaoxiao"])
+        print(f"[Pipeline] 甜女声TTS: {self.tts.voice_name} ({voice_info[2]})")
 
     def stop(self) -> None:
         self._running = False

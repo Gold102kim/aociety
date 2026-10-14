@@ -3,7 +3,7 @@ import { LauncherUser } from '../auth';
 export function getDevelopmentPreviewUser(): LauncherUser | null {
   const parameters = new URLSearchParams(window.location.search);
   const preview = parameters.get('preview');
-  if (!import.meta.env.DEV || !['profile', 'world', 'avatar', 'chat', 'social', 'boot', 'questionnaire'].includes(preview ?? '')) return null;
+  if (!import.meta.env.DEV || !['home', 'profile', 'world', 'avatar', 'chat', 'social', 'boot', 'questionnaire'].includes(preview ?? '')) return null;
   const favoriteColor = parameters.get('themeColor') || '薄荷绿';
   return {
     id: 'preview-account-id', displayName: '102Gold', email: 'preview@echoverse.local', createdAt: '2026-07-15T00:00:00.000Z',

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { createRenderScheduler } from './renderScheduler';
 
 type AvatarViewportProps = {
   variant: 'preview' | 'companion';
@@ -153,47 +154,30 @@ export function AvatarViewport({ variant }: AvatarViewportProps) {
     const swayQuaternion = new THREE.Quaternion();
     const loadedRoots: THREE.Object3D[] = [];
     const resources = createResourceTracker();
-    let animationFrame = 0;
-    let renderTimer = 0;
     let disposed = false;
+    let inViewport = true;
     let elapsedSeconds = 0;
     let previousTimestamp: number | null = null;
-    let previousRenderTimestamp = 0;
-
-    const cancelScheduledRender = () => {
-      if (animationFrame !== 0) window.cancelAnimationFrame(animationFrame);
-      if (renderTimer !== 0) window.clearTimeout(renderTimer);
-      animationFrame = 0;
-      renderTimer = 0;
-    };
+    const canRender = () => !disposed && !document.hidden && inViewport;
+    const scheduler = createRenderScheduler(renderFrame, canRender, {
+      now: () => performance.now(),
+      frame: (callback) => window.requestAnimationFrame(callback),
+      cancelFrame: (id) => window.cancelAnimationFrame(id),
+      timer: (callback, delay) => window.setTimeout(callback, delay),
+      cancelTimer: (id) => window.clearTimeout(id),
+    });
 
     const renderScene = () => {
-      if (disposed || document.hidden) return;
+      if (!canRender()) return;
       renderer.render(scene, camera);
     };
 
     function requestRender() {
-      if (disposed || document.hidden || animationFrame !== 0 || renderTimer !== 0) return;
-
-      const minimumFrameInterval = variant === 'companion' ? 1000 / 30 : 0;
-      const delay = previousRenderTimestamp === 0
-        ? 0
-        : Math.max(minimumFrameInterval - (performance.now() - previousRenderTimestamp), 0);
-      if (delay > 1) {
-        renderTimer = window.setTimeout(() => {
-          renderTimer = 0;
-          if (!disposed && !document.hidden) {
-            animationFrame = window.requestAnimationFrame(renderFrame);
-          }
-        }, delay);
-        return;
-      }
-      animationFrame = window.requestAnimationFrame(renderFrame);
+      scheduler.request();
     }
 
     function renderFrame(timestamp: number) {
-      animationFrame = 0;
-      if (disposed || document.hidden) {
+      if (!canRender()) {
         previousTimestamp = null;
         return;
       }
@@ -219,9 +203,7 @@ export function AvatarViewport({ variant }: AvatarViewportProps) {
       }
       controls?.update();
       renderScene();
-      previousRenderTimestamp = timestamp;
-
-      if (!prefersReducedMotion) requestRender();
+      if (avatar && !prefersReducedMotion) requestRender();
     }
 
     const fitCamera = () => {
@@ -261,19 +243,21 @@ export function AvatarViewport({ variant }: AvatarViewportProps) {
 
     const handleVisibilityChange = () => {
       previousTimestamp = null;
-      previousRenderTimestamp = 0;
-      if (document.hidden) {
-        cancelScheduledRender();
-        return;
-      }
-      requestRender();
+      scheduler.pause();
+      if (canRender()) requestRender();
     };
+
+    const intersectionObserver = new IntersectionObserver(([entry]) => {
+      inViewport = entry.isIntersecting;
+      handleVisibilityChange();
+    });
+    intersectionObserver.observe(host);
 
     const handleMotionPreferenceChange = (event: MediaQueryListEvent) => {
       prefersReducedMotion = event.matches;
       if (controls) controls.enableDamping = !prefersReducedMotion;
       previousTimestamp = null;
-      previousRenderTimestamp = 0;
+      scheduler.pause();
       requestRender();
     };
 
@@ -335,11 +319,12 @@ export function AvatarViewport({ variant }: AvatarViewportProps) {
 
     return () => {
       disposed = true;
-      cancelScheduledRender();
+      scheduler.dispose();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       motionPreference.removeEventListener('change', handleMotionPreferenceChange);
       controls?.removeEventListener('change', requestRender);
       resizeObserver.disconnect();
+      intersectionObserver.disconnect();
       controls?.dispose();
       loadedRoots.forEach((root) => {
         root.removeFromParent();

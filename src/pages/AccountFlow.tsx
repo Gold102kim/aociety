@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { BasicQuestionnaire, completeQuestionnaire, LauncherUser, login, register } from '../auth';
 import { emptyQuestionnaire, mbtiOptions } from '../profile';
 import { colorOptions, getThemeStyle } from '../theme';
@@ -13,27 +13,37 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: Launch
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const mounted = useRef(true);
+  const inFlight = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (inFlight.current) return;
     setMessage('');
     if (!/^\S+@\S+\.\S+$/.test(email)) return setMessage('请输入有效的邮箱地址。');
     if (password.length < 8) return setMessage('密码至少需要 8 位。');
     if (mode === 'register' && displayName.trim().length < 2) return setMessage('昵称至少需要 2 个字符。');
     if (mode === 'register' && password !== confirmPassword) return setMessage('两次输入的密码不一致。');
 
+    inFlight.current = true;
     setBusy(true);
     try {
       const user = mode === 'login' ? await login(email, password) : await register({ displayName, email, password });
-      onAuthenticated(user);
+      if (mounted.current) onAuthenticated(user);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '操作失败，请稍后重试。');
+      if (mounted.current) setMessage(error instanceof Error ? error.message : '操作失败，请稍后重试。');
     } finally {
-      setBusy(false);
+      inFlight.current = false;
+      if (mounted.current) setBusy(false);
     }
   };
 
   const changeMode = (nextMode: AuthMode) => {
+    if (inFlight.current) return;
     setMode(nextMode);
     setMessage('');
   };
@@ -55,8 +65,8 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: Launch
           <div className="brand-large"><span className="brand-mark">E</span><span>ECHO<span>VERSE</span></span></div>
           <p className="brand-subtitle">DIGITAL LIFE PLATFORM</p>
           <div className="auth-tabs" role="tablist" aria-label="账户操作">
-            <button type="button" role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'active' : ''} onClick={() => changeMode('login')}>登录</button>
-            <button type="button" role="tab" aria-selected={mode === 'register'} className={mode === 'register' ? 'active' : ''} onClick={() => changeMode('register')}>创建账户</button>
+            <button type="button" role="tab" aria-selected={mode === 'login'} disabled={busy} className={mode === 'login' ? 'active' : ''} onClick={() => changeMode('login')}>登录</button>
+            <button type="button" role="tab" aria-selected={mode === 'register'} disabled={busy} className={mode === 'register' ? 'active' : ''} onClick={() => changeMode('register')}>创建账户</button>
           </div>
           <form onSubmit={submit} aria-busy={busy}>
             {mode === 'register' && <label>玩家昵称<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="你希望别人如何称呼你" autoComplete="nickname"/></label>}
@@ -78,19 +88,31 @@ export function QuestionnaireScreen({ user, onCompleted, onLogout }: { user: Lau
   const [form, setForm] = useState<BasicQuestionnaire>(emptyQuestionnaire);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const mounted = useRef(true);
+  const inFlight = useRef(false);
+  const requestEpoch = useRef(0);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; requestEpoch.current += 1; };
+  }, []);
   const update = (field: keyof Omit<BasicQuestionnaire, 'interests'>, value: string) => setForm((current) => ({ ...current, [field]: value }));
   const updateInterest = (index: number, value: string) => setForm((current) => ({ ...current, interests: current.interests.map((interest, currentIndex) => currentIndex === index ? value : interest) }));
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (inFlight.current) return;
+    inFlight.current = true;
+    const epoch = ++requestEpoch.current;
     setBusy(true);
     setMessage('');
     try {
-      onCompleted(await completeQuestionnaire(form));
+      const nextUser = await completeQuestionnaire(form);
+      if (mounted.current && requestEpoch.current === epoch) onCompleted(nextUser);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '个人资料保存失败，请稍后重试。');
+      if (mounted.current && requestEpoch.current === epoch) setMessage(error instanceof Error ? error.message : '个人资料保存失败，请稍后重试。');
     } finally {
-      setBusy(false);
+      inFlight.current = false;
+      if (mounted.current && requestEpoch.current === epoch) setBusy(false);
     }
   };
 
@@ -102,7 +124,7 @@ export function QuestionnaireScreen({ user, onCompleted, onLogout }: { user: Lau
       </aside>
 
       <section className="questionnaire-panel">
-        <div className="questionnaire-header"><div><span>PLAYER PROFILE</span><h2>关于你</h2></div><button type="button" onClick={onLogout}>退出账户</button></div>
+        <div className="questionnaire-header"><div><span>PLAYER PROFILE</span><h2>关于你</h2></div><button type="button" onClick={() => { requestEpoch.current += 1; onLogout(); }}>退出账户</button></div>
         <p className="questionnaire-note">没有标准答案，所有内容均为选填。请确认后再保存：已填写的内容将被锁定，空白项以后仍可补充。</p>
         <form className="questionnaire-form" onSubmit={submit} aria-busy={busy}>
           <div className="form-grid two-columns">

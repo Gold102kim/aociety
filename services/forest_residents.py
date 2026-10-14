@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import OrderedDict
+import re
 from threading import Lock
 import time
 import uuid
@@ -41,11 +42,19 @@ SAFE_SCENE_KEYS = {
     "event_timestamp",
 }
 
+MAX_CONVERSATION_SCOPES = 128
+MAX_HISTORY_TURNS = 12
+MAX_HISTORY_TEXT_CHARS = 2000
+_CONVERSATION_SCOPE_PATTERN = re.compile(r"[a-fA-F0-9]{32}")
+
 
 class ForestResidentService:
     def __init__(self, ark: ArkClient) -> None:
         self.ark = ark
-        self._history: dict[str, list[dict[str, str]]] = defaultdict(list)
+        # An ephemeral game launch scope separates model context. This is not
+        # authentication; knowing a scope grants no account or filesystem rights.
+        # Legacy unscoped NPC history is intentionally not imported.
+        self._history: OrderedDict[str, dict[str, list[dict[str, str]]]] = OrderedDict()
         self._lock = Lock()
 
     def chat(
@@ -56,6 +65,7 @@ class ForestResidentService:
         mode: str = "player",
         counterpart_id: str = "",
         scene: dict[str, Any] | None = None,
+        conversation_scope: str = "",
     ) -> dict[str, Any]:
         resident = RESIDENTS.get(npc_id)
         if not resident:
@@ -82,13 +92,23 @@ class ForestResidentService:
         )
         counterpart = RESIDENTS.get(valid_counterpart_id, {})
         safe_scene = self._sanitize_scene(scene)
+        scope = self._normalize_scope(conversation_scope)
+        scoped_history: dict[str, list[dict[str, str]]] | None = None
+        recent: list[dict[str, str]] = []
+        counterpart_recent: list[dict[str, str]] = []
         with self._lock:
-            recent = list(self._history[npc_id][-8:])
-            counterpart_recent = (
-                list(self._history[valid_counterpart_id][-4:])
-                if counterpart
-                else []
-            )
+            if scope:
+                scoped_history = self._history.get(scope)
+                if scoped_history is None:
+                    scoped_history = {}
+                    self._history[scope] = scoped_history
+                    while len(self._history) > MAX_CONVERSATION_SCOPES:
+                        self._history.popitem(last=False)
+                else:
+                    self._history.move_to_end(scope)
+                recent = list(scoped_history.get(npc_id, [])[-8:])
+                if counterpart:
+                    counterpart_recent = list(scoped_history.get(valid_counterpart_id, [])[-4:])
 
         request_id = uuid.uuid4().hex[:12]
         generated = self.ark.generate_forest_resident_reply(
@@ -131,29 +151,34 @@ class ForestResidentService:
         mood = str(generated.get("mood", "平静")).strip() or "平静"
         model = str(generated.get("_meta_model", self.ark.model_id))
         with self._lock:
-            self._history[npc_id].append(
-                {
-                    "kind": "spoken_turn",
-                    "event": live_event,
-                    "reply": reply,
-                    "mood": mood,
-                    "counterpart": str(counterpart.get("name", "玩家")),
-                }
-            )
-            self._history[npc_id] = self._history[npc_id][-12:]
-            if counterpart:
-                self._history[valid_counterpart_id].append(
+            # An evicted scope may still have an in-flight model call. Never
+            # recreate it or append its reply to a newly created bucket.
+            if scope and self._history.get(scope) is scoped_history:
+                assert scoped_history is not None
+                history = scoped_history.setdefault(npc_id, [])
+                history.append(
                     {
-                        "kind": "heard_turn",
-                        "speaker": str(resident.get("name", npc_id)),
-                        "event": live_event,
-                        "heard_reply": reply,
-                        "mood": mood,
+                        "kind": "spoken_turn",
+                        "event": live_event[:MAX_HISTORY_TEXT_CHARS],
+                        "reply": reply[:MAX_HISTORY_TEXT_CHARS],
+                        "mood": mood[:80],
+                        "counterpart": str(counterpart.get("name", "玩家")),
                     }
                 )
-                self._history[valid_counterpart_id] = self._history[
-                    valid_counterpart_id
-                ][-12:]
+                scoped_history[npc_id] = history[-MAX_HISTORY_TURNS:]
+                if counterpart:
+                    heard = scoped_history.setdefault(valid_counterpart_id, [])
+                    heard.append(
+                        {
+                            "kind": "heard_turn",
+                            "speaker": str(resident.get("name", npc_id)),
+                            "event": live_event[:MAX_HISTORY_TEXT_CHARS],
+                            "heard_reply": reply[:MAX_HISTORY_TEXT_CHARS],
+                            "mood": mood[:80],
+                        }
+                    )
+                    scoped_history[valid_counterpart_id] = heard[-MAX_HISTORY_TURNS:]
+                self._history.move_to_end(scope)
 
         dialogue = {
             "npc_id": npc_id,
@@ -169,6 +194,13 @@ class ForestResidentService:
             "counterpart_id": valid_counterpart_id,
         }
         return {**dialogue, "dialogue": dialogue}
+
+    @staticmethod
+    def _normalize_scope(scope: str) -> str:
+        # Invalid/old clients remain stateless, never joined to a shared inbox.
+        if not isinstance(scope, str) or not _CONVERSATION_SCOPE_PATTERN.fullmatch(scope):
+            return ""
+        return scope.lower()
 
     @staticmethod
     def _is_verified_llm_result(generated: dict[str, Any] | None) -> bool:

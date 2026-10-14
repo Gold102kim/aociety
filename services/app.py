@@ -56,6 +56,7 @@ class ConversationRequest(BaseModel):
     player_position: dict[str, float] = Field(default_factory=dict)
     screenshot_b64: str = ""
     scene_context: dict[str, Any] = Field(default_factory=dict)
+    conversation_scope: str = Field(default="", max_length=32, pattern=r"^(?:[a-fA-F0-9]{32})?$")
 
 
 class HearingRequest(BaseModel):
@@ -74,6 +75,7 @@ class PlayerTalkRequest(BaseModel):
     player_position: dict[str, float] = Field(default_factory=dict)
     screenshot_b64: str = ""
     scene_context: dict[str, Any] = Field(default_factory=dict)
+    conversation_scope: str = Field(default="", max_length=32, pattern=r"^(?:[a-fA-F0-9]{32})?$")
 
 
 class ForestResidentRequest(BaseModel):
@@ -82,6 +84,9 @@ class ForestResidentRequest(BaseModel):
     mode: str = "player"
     counterpart_id: str = ""
     scene_context: dict[str, Any] = Field(default_factory=dict)
+    # Privacy partition for this random game launch, not an account credential.
+    # Older clients without it get a stateless reply and no retained context.
+    conversation_scope: str = Field(default="", max_length=32, pattern=r"^(?:[a-fA-F0-9]{32})?$")
 
 
 class AIPulseRequest(BaseModel):
@@ -120,6 +125,10 @@ async def lifespan(_app: FastAPI):
         task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await task
+        try:
+            forest_ark.close()
+        finally:
+            engine.ark.close()
 
 
 app = FastAPI(title="Aociety Forest Town Service", lifespan=lifespan)
@@ -207,6 +216,7 @@ def npc_conversation(payload: ConversationRequest) -> dict[str, Any]:
             or "你在林间小路遇到了另一名居民，请自然回应此刻的相遇。",
             mode="ambient",
             counterpart_id=payload.listener_id,
+            conversation_scope=payload.conversation_scope,
             scene={
                 "current_district": payload.current_district,
                 "player_position": payload.player_position,
@@ -262,6 +272,7 @@ def npc_player_talk(payload: PlayerTalkRequest) -> dict[str, Any]:
             npc_id=payload.npc_id,
             live_event=live_event,
             mode="player",
+            conversation_scope=payload.conversation_scope,
             scene={
                 "current_district": payload.district,
                 "player_position": payload.player_position,
@@ -304,5 +315,6 @@ def forest_resident_chat(payload: ForestResidentRequest) -> dict[str, Any]:
         live_event=live_event,
         mode=mode,
         counterpart_id=payload.counterpart_id,
+        conversation_scope=payload.conversation_scope,
         scene=payload.scene_context,
     )

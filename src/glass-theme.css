@@ -1,0 +1,149 @@
+/* iOS-inspired glass for the launcher only. No refraction shaders, animated blur or canvas filters. */
+.app.ui-refresh.ui-glass {
+  --glass-filter: blur(22px) saturate(135%);
+  --glass-fill: linear-gradient(145deg, rgba(220,239,255,.15), rgba(38,55,77,.64) 48%, rgba(25,38,58,.74));
+  --glass-border: rgba(223,239,255,.23);
+  --glass-shadow: 0 14px 34px rgba(2,8,20,.24), inset 0 1px 0 rgba(255,255,255,.2), inset 0 -1px 0 rgba(255,255,255,.04);
+  --glass-panel: rgba(21,32,49,.9);
+  --glass-field: rgba(10,19,33,.78);
+  --glass-chrome: rgba(18,29,45,.62);
+  --glass-nested: rgba(17,30,48,.4);
+  --glass-tabs: rgba(19,33,52,.64);
+  --glass-selected: rgba(229,246,255,.13);
+  --glass-message: rgba(32,48,69,.85);
+  --glass-composer: rgba(12,22,37,.3);
+  --glass-suggestions: rgba(13,29,46,.64);
+  --glass-secondary: rgba(239,255,249,.09);
+  --glass-control-shadow: inset 0 1px rgba(255,255,255,.16);
+  --glass-action-shadow: 0 7px 18px rgba(0,10,16,.2), inset 0 1px rgba(255,255,255,.35);
+  --glass-hover-shadow: 0 18px 40px rgba(2,8,20,.28), inset 0 1px rgba(255,255,255,.3);
+  --glass-edge-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 1px 0 0 rgba(230,255,255,.07);
+  --radius-card: 22px;
+  --ui-muted: #b3c1d2;
+  position: relative;
+  isolation: isolate;
+  background-color: #0c1525;
+  background-image:
+    radial-gradient(ellipse 56% 68% at 84% 12%, rgba(98,165,190,.35), transparent 74%),
+    radial-gradient(ellipse 52% 57% at 29% 95%, rgba(119,97,167,.27), transparent 74%),
+    radial-gradient(ellipse 38% 70% at 4% 40%, rgba(50,140,143,.25), transparent 77%),
+    radial-gradient(ellipse 44% 62% at 80% 80%, var(--accent-soft), transparent 76%);
+}
+.ui-glass .titlebar { background: var(--glass-chrome); border-bottom-color: rgba(234,246,255,.13); backdrop-filter: var(--glass-filter); }
+.ui-glass .window-controls .appearance-toggle { width: auto; min-width: 76px; height: 28px; margin: 7px 14px 7px 0; padding: 0 11px; display: flex; align-items: center; gap: 7px; color: #dae6f4; background: rgba(235,245,255,.07); border: 1px solid var(--glass-border); border-radius: 999px; font-size: 11px; }
+.ui-glass .appearance-toggle svg { width: 15px; height: 15px; }
+.ui-glass .window-controls .appearance-toggle:hover { background: rgba(235,245,255,.13); }
+.ui-glass .window-controls .appearance-toggle[aria-pressed="true"] { color: var(--accent); border-color: var(--accent-border); }
+.ui-glass .sidebar { margin: 14px 0 14px 14px; padding: 20px 12px 14px; border: 1px solid var(--glass-border); border-radius: 26px; background: var(--glass-fill); backdrop-filter: var(--glass-filter); box-shadow: var(--glass-shadow); }
+.ui-glass .sidebar-heading { padding-left: 12px; padding-bottom: 22px; }
+.ui-glass .sidebar-heading small { color: #a4b8cc; }
+.ui-glass .sidebar-bottom { border-color: rgba(231,242,255,.13); }
+.ui-glass .nav-item { border: 1px solid transparent; border-radius: 15px; padding-left: 12px; padding-right: 12px; gap: 10px; color: #c0cddd; }
+.ui-glass .nav-item.active { color: var(--accent); border-color: var(--accent-border); background: var(--glass-selected); box-shadow: var(--glass-control-shadow); }
+.ui-glass .nav-item:hover:not(.active) { background: rgba(235,245,255,.08); border-color: rgba(235,245,255,.12); }
+.ui-glass .profile { background: var(--glass-nested); border-color: rgba(234,246,255,.15); border-radius: 17px; gap: 9px; }
+.ui-glass .profile-copy strong { max-width: 96px; }
+.ui-glass .profile:hover { background: rgba(235,245,255,.1); }
+.ui-glass .avatar { border: 1px solid rgba(238,255,255,.23); background: linear-gradient(135deg, var(--accent-soft), rgba(225,251,255,.11)); color: var(--accent); }
+.ui-glass :is(.home-content,.world-content,.avatar-content,.social-content,.profile-content,.chat-content) { background: transparent; animation: none; }
+.ui-glass :is(.world-content,.avatar-content,.social-content,.profile-content,.chat-content)::before { display: none; }
+.ui-glass .eyebrow { color: #b0c3d8; }
+.ui-glass .release-badge { border-radius: 999px; border-color: var(--glass-border); background: var(--glass-fill); box-shadow: var(--glass-control-shadow); color: #c3d2e3; }
+.ui-glass .town-hero { border-radius: 28px; border-color: rgba(225,255,240,.3); box-shadow: var(--glass-shadow); }
+.ui-glass .town-hero::after { content: ''; position: absolute; pointer-events: none; inset: 0; border-radius: inherit; box-shadow: var(--glass-edge-shadow); }
+.ui-glass :is(.play-button,.primary-button,.avatar-chat-button,.chat-composer button) { border-radius: 999px; box-shadow: var(--glass-action-shadow); background: var(--accent); color: var(--accent-contrast); }
+.ui-glass :is(.play-button,.primary-button,.avatar-chat-button,.chat-composer button)::after { display: none; }
+.ui-glass :is(.play-button,.primary-button,.avatar-chat-button,.chat-composer button):hover:not(:disabled) { background: var(--accent-hover); transform: translateY(-1px); }
+.ui-glass .town-actions .secondary-button { border-radius: 999px; border-color: rgba(225,255,240,.3); background: var(--glass-secondary); box-shadow: var(--glass-control-shadow); color: #e2ede7; }
+.ui-glass .illustration-caption { background: rgba(7,29,25,.7); border: 1px solid rgba(238,255,244,.18); border-radius: 999px; }
+.ui-glass .quick-card { border-radius: 22px; border-color: var(--glass-border); background: var(--glass-fill); box-shadow: var(--glass-shadow); backdrop-filter: var(--glass-filter); }
+.ui-glass .quick-card:hover { border-color: rgba(235,249,255,.43); background: var(--glass-fill); transform: translateY(-2px); box-shadow: var(--glass-hover-shadow); }
+.ui-glass .quick-card p { color: #c0ccdb; }
+.ui-glass .quick-icon { background: var(--glass-selected); border: 1px solid rgba(222,250,253,.13); border-radius: 13px; box-shadow: var(--glass-control-shadow); }
+.ui-glass :is(.quick-tag,.quick-arrow,.companion-hint) { color: #adbed1; }
+.ui-glass :is(.world-map-card,.world-panel,.world-region-section,.world-metrics article,.social-panel,.social-metrics article,.profile-card,.avatar-info-card,.chat-side-card) { background: var(--glass-fill); border-color: var(--glass-border); box-shadow: var(--glass-shadow); border-radius: 22px; }
+.ui-glass :is(.world-map-card,.avatar-preview-card,.chat-window,.profile-details-card,.social-inbox)::before { display: none; }
+.ui-glass :is(.chat-window,.avatar-preview-card) { background: var(--glass-panel); border-color: var(--glass-border); box-shadow: var(--glass-shadow); border-radius: 24px; backdrop-filter: none; }
+.ui-glass .avatar-preview-stage { background: radial-gradient(ellipse at 50% 45%, var(--accent-soft), #101c2d 68%); }
+.ui-glass :is(.avatar-q-preview,.avatar-not-created.loaded,.profile-status,.world-server-state.demo,.social-connection) { backdrop-filter: none; background-color: var(--glass-panel); border-radius: 14px; }
+.ui-glass .avatar-preview-stage :is(.avatar-stage-ring,.avatar-q-preview i) { animation: none; }
+.ui-glass .page-tabs { border-radius: 999px; padding: 4px 5px; border-color: var(--glass-border); background: var(--glass-tabs); box-shadow: var(--glass-control-shadow); backdrop-filter: none; }
+.ui-glass .page-tabs button { border-radius: 999px; color: #b6c6d8; }
+.ui-glass .page-tabs button.active { color: var(--ui-text); background: var(--glass-selected); box-shadow: var(--glass-control-shadow); }
+.ui-glass .chat-agent-bar { background: rgba(242,250,255,.035); border-color: rgba(225,240,255,.12); }
+.ui-glass .chat-agent-avatar { background: var(--accent-soft); border-color: rgba(233,255,252,.18); }
+.ui-glass .chat-message p { background: var(--glass-message); border-color: rgba(226,241,255,.13); border-radius: 5px 18px 18px; }
+.ui-glass .chat-message.user p { background: var(--accent-soft); border-color: var(--accent-border); border-radius: 18px 5px 18px 18px; }
+.ui-glass .chat-composer { background: var(--glass-composer); border-color: rgba(233,245,255,.12); }
+.ui-glass :is(.chat-composer textarea,.auth-card input,.questionnaire-panel input,.questionnaire-panel select,.profile-supplement-grid input,.profile-supplement-grid select,.social-search-card input) { background: var(--glass-field); border-color: rgba(220,239,255,.23); border-radius: 15px; color: #eef4fc; }
+.ui-glass :is(.chat-composer textarea,.auth-card input,.questionnaire-panel input,.profile-supplement-grid input,.social-search-card input)::placeholder { color: #9eafc3; opacity: 1; }
+.ui-glass .chat-side-card dt { color: #b5c5d7; }
+.ui-glass .chat-suggestions button { border-radius: 12px; background: var(--glass-suggestions); border-color: rgba(226,240,255,.16); }
+.ui-glass .chat-model-status { border-radius: 999px; background: rgba(40,35,29,.85); }
+.ui-glass .chat-model-status.ready { background: rgba(20,43,38,.85); }
+.ui-glass .toast { border-radius: 18px; border-color: var(--glass-border); background: rgba(31,46,66,.94); box-shadow: var(--glass-shadow); }
+.ui-glass .auth-panel { background: transparent; border-color: rgba(234,245,255,.12); }
+.ui-glass .auth-card { width: min(100%,440px); padding: 32px; background: var(--glass-fill); border: 1px solid var(--glass-border); border-radius: 28px; box-shadow: var(--glass-shadow); }
+.ui-glass .auth-tabs { border: 1px solid var(--glass-border); padding: 4px; border-radius: 999px; background: var(--glass-chrome); }
+.ui-glass .auth-tabs button { padding: 10px; border-radius: 999px; color: #b3c2d3; }
+.ui-glass .auth-tabs button.active { background: var(--glass-selected); box-shadow: var(--glass-control-shadow); }
+.ui-glass .auth-tabs button.active::after { display: none; }
+.ui-glass :is(.brand-subtitle,.auth-card form label,.legal,.prototype-note) { color: #adbed2; }
+.ui-glass .questionnaire-card { background: var(--glass-panel); border: 1px solid var(--glass-border); border-radius: 24px; }
+.ui-glass :is(.profile-definition-grid span,.profile-interests > span,.account-card dt,.profile-card-heading small,.logout-card p,.world-panel-heading small,.world-event-list p,.world-event-list time,.world-travel-list p,.world-travel-list small,.world-region-heading p,.social-panel-heading small,.social-feed p,.social-feed time,.social-feed small,.social-search-card > p,.friend-preview-list small,.social-preference-card p) { color: var(--ui-muted); }
+.ui-glass .friend-preview-list .offline { opacity: 1; }
+.ui-glass :is(.questionnaire-panel select,.profile-supplement-grid select) option { background: #172337; color: #eef4fc; }
+
+/* Same foreground/spacing in clear mode; only the material changes. */
+.app.ui-refresh.ui-glass.ui-glass-reduced {
+  --glass-filter: none;
+  --glass-fill: #1b2a3f;
+  --glass-panel: #172337;
+  --glass-field: #0d192a;
+  --glass-border: #4c6179;
+  --glass-shadow: none;
+  --glass-chrome: #172337;
+  --glass-nested: #172337;
+  --glass-tabs: #172337;
+  --glass-selected: #30455d;
+  --glass-message: #203045;
+  --glass-composer: #172337;
+  --glass-suggestions: #172337;
+  --glass-secondary: #213f35;
+  --glass-control-shadow: none;
+  --glass-action-shadow: none;
+  --glass-hover-shadow: none;
+  --glass-edge-shadow: none;
+  background-image: none;
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .app.ui-refresh.ui-glass {
+    --glass-filter: none;
+    --glass-fill: #1b2a3f;
+    --glass-panel: #172337;
+    --glass-field: #0d192a;
+    --glass-border: #4c6179;
+    --glass-shadow: none;
+    --glass-chrome: #172337;
+    --glass-nested: #172337;
+    --glass-tabs: #172337;
+    --glass-selected: #30455d;
+    --glass-message: #203045;
+    --glass-composer: #172337;
+    --glass-suggestions: #172337;
+    --glass-secondary: #213f35;
+    --glass-control-shadow: none;
+    --glass-action-shadow: none;
+    --glass-hover-shadow: none;
+    --glass-edge-shadow: none;
+    background-image: none;
+  }
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .app.ui-refresh.ui-glass { --glass-fill: #1b2a3f; --glass-filter: none; }
+}
+@media (forced-colors: active) {
+  .app.ui-refresh.ui-glass { --accent: Highlight !important; --accent-hover: Highlight !important; --accent-contrast: HighlightText !important; --ui-text: CanvasText; --ui-muted: CanvasText; --glass-fill: Canvas; --glass-panel: Canvas; --glass-field: Canvas; --glass-border: CanvasText; --glass-filter: none; --glass-shadow: none; background: Canvas; color: CanvasText; }
+  .ui-glass :is(.titlebar,.sidebar,.quick-card,.chat-window,.chat-side-card,.avatar-preview-card,.avatar-info-card,.page-tabs,.profile,.auth-card,.chat-message p,.chat-composer textarea) { color: CanvasText; background: Canvas; border-color: CanvasText; box-shadow: none; }
+  .ui-glass :is(.play-button,.primary-button,.avatar-chat-button,.chat-composer button,.nav-item.active) { background: Highlight; color: HighlightText; border: 1px solid Highlight; }
+}

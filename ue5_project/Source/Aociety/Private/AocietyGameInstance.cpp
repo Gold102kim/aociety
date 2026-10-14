@@ -21,6 +21,14 @@ bool ReadRequiredString(const TSharedPtr<FJsonObject>& Object, const TCHAR* Fiel
 
 bool UAocietyGameInstance::LoadLauncherSession()
 {
+    bLauncherSessionValid = false;
+    // No trusted, one-time server ticket exchange exists in this prototype.
+    // A local JSON file cannot authenticate a player, even when well formed.
+#if UE_BUILD_SHIPPING
+    LauncherSessionError = TEXT("ServerTicketExchangeUnavailable");
+    return false;
+#endif
+
     FString SessionFile;
     FString ContractVersion;
     FString CommandLineLaunchId;
@@ -117,6 +125,9 @@ void UAocietyGameInstance::Init()
 
     if (UAocietyClientSubsystem* Client = GetSubsystem<UAocietyClientSubsystem>())
     {
+        Client->ConfigureConversationScope(
+            bLauncherSessionValid ? LauncherAccountId : FString(),
+            bLauncherSessionValid ? LauncherAgentId : FString());
         Client->BackendURL = BackendURL;
         Client->CareBackendURL = CareBackendURL;
         if (bAutoStartCapture)

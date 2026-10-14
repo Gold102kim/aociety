@@ -9,13 +9,14 @@
   python scripts/start_all.py              # 启动所有服务
   python scripts/start_all.py --no-models   # 仅启动主后端（跳过本地模型）
   python scripts/start_all.py --no-backend  # 仅启动本地模型
+  python scripts/start_all.py --host 0.0.0.0 # 明确允许局域网访问
+  python scripts/start_all.py --reload      # 开发模式，自动重载主后端
 """
 
 from __future__ import annotations
 
 import argparse
 import os
-import signal
 import subprocess
 import sys
 import time
@@ -35,7 +36,13 @@ MODELS_DIR = PROJECT_ROOT / "models"
 
 
 def log(msg: str) -> None:
-    print(f"[Aociety] {msg}")
+    line = f"[Aociety] {msg}"
+    try:
+        print(line)
+    except UnicodeEncodeError:
+        # Windows redirected consoles can use a non-Chinese code page. Logging
+        # must not abort startup merely because that console lacks a glyph.
+        print(line.encode(sys.stdout.encoding or "utf-8", errors="replace").decode(sys.stdout.encoding or "utf-8"))
 
 
 def check_models() -> bool:
@@ -53,7 +60,7 @@ def check_models() -> bool:
     return True
 
 
-def start_r1_omni(background: list) -> subprocess.Popen | None:
+def start_r1_omni(background: list, *, host: str = "127.0.0.1") -> subprocess.Popen | None:
     """启动 R1-Omni-0.5B 情感推理服务"""
     port = PORTS["r1_omni"]
     model_path = MODELS_DIR / "r1-omni-0.5b"
@@ -63,7 +70,7 @@ def start_r1_omni(background: list) -> subprocess.Popen | None:
             [
                 sys.executable, "-m", "uvicorn",
                 "services.r1_omni_server:app",
-                "--host", "0.0.0.0",
+                "--host", host,
                 "--port", str(port),
                 "--log-level", "warning",
             ],
@@ -78,7 +85,7 @@ def start_r1_omni(background: list) -> subprocess.Popen | None:
         return None
 
 
-def start_arousal_service(background: list) -> subprocess.Popen | None:
+def start_arousal_service(background: list, *, host: str = "127.0.0.1") -> subprocess.Popen | None:
     """启动 Arousal 唤醒度分析服务"""
     port = PORTS["arousal"]
     log(f"启动 Arousal Service → 端口 {port}")
@@ -87,7 +94,7 @@ def start_arousal_service(background: list) -> subprocess.Popen | None:
             [
                 sys.executable, "-m", "uvicorn",
                 "services.arousal_server:app",
-                "--host", "0.0.0.0",
+                "--host", host,
                 "--port", str(port),
                 "--log-level", "warning",
             ],
@@ -102,7 +109,7 @@ def start_arousal_service(background: list) -> subprocess.Popen | None:
         return None
 
 
-def start_main_backend(background: list) -> subprocess.Popen:
+def start_main_backend(background: list, *, host: str = "127.0.0.1", reload: bool = False) -> subprocess.Popen:
     """启动主后端服务"""
     port = PORTS["main"]
     log(f"启动主后端服务 → 端口 {port}")
@@ -110,9 +117,9 @@ def start_main_backend(background: list) -> subprocess.Popen:
         [
             sys.executable, "-m", "uvicorn",
             "backend.main:app",
-            "--host", "0.0.0.0",
+            "--host", host,
             "--port", str(port),
-            "--reload",
+            *(["--reload"] if reload else []),
             "--log-level", "info",
         ],
         cwd=str(PROJECT_ROOT),
@@ -142,6 +149,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Aociety 本地服务启动器")
     parser.add_argument("--no-models", action="store_true", help="跳过本地模型")
     parser.add_argument("--no-backend", action="store_true", help="跳过主后端")
+    parser.add_argument("--host", default=os.environ.get("AOCIETY_BIND_HOST", "127.0.0.1"), help="监听地址；默认仅本机访问")
+    parser.add_argument("--reload", action="store_true", help="开发模式：自动重载主后端")
     args = parser.parse_args()
 
     log("=" * 50)
@@ -160,15 +169,15 @@ def main() -> None:
 
         # 2. 启动本地模型
         if not args.no_models:
-            start_r1_omni(background)
-            start_arousal_service(background)
+            start_r1_omni(background, host=args.host)
+            start_arousal_service(background, host=args.host)
             wait_for_ports()
         else:
             log("跳过本地模型启动")
 
         # 3. 启动主后端
         if not args.no_backend:
-            start_main_backend(background)
+            start_main_backend(background, host=args.host, reload=args.reload)
 
         log("所有服务已启动。按 Ctrl+C 停止。")
 

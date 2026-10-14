@@ -205,6 +205,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="Aociety|Conversation")
     TArray<FString> GetConversationNpcIds() const;
 
+    // Configure only after the launcher identity has been parsed. Legacy
+    // unscoped files are retained but never imported into an account inbox.
+    void ConfigureConversationScope(const FString& AccountId, const FString& AgentId);
+
     UFUNCTION(BlueprintCallable, Category="Aociety|World")
     void RequestWorldAction(const FString& ActionType, const FString& District,
                            const TMap<FString, FString>& Payload);
@@ -245,7 +249,13 @@ private:
 
     FString CurrentSessionId;
     bool bIsConnected = false;
+    bool bShuttingDown = false;
+    TArray<FHttpRequestPtr> ActiveRequests;
     TMap<FString, TArray<FAocietyConversationEntry>> ConversationHistory;
+    FString ConversationNamespace;
+    // Random per game lifetime (and identity switch), not an authentication
+    // token. Never reuse the persistent inbox namespace as a server history key.
+    FString ResidentConversationScope;
 
     FTimerHandle Timer_Heartbeat;
     FTimerHandle Timer_Reconnect;
@@ -260,9 +270,12 @@ private:
     void EmitCareFromJson(const TSharedPtr<class FJsonObject>& Json);
     void StartTimer();
     void StopTimer();
+    void StartHttpRequest(const TSharedRef<IHttpRequest, ESPMode::ThreadSafe>& Request,
+                          float TimeoutSeconds = 10.0f);
     void AppendConversationEntry(const FAocietyConversationEntry& Entry);
     void LoadConversationHistory();
     void SaveConversationHistory() const;
+    FString GetConversationHistoryPath() const;
 
     static TArray<uint8> DecodeBase64(const FString& B64);
 };

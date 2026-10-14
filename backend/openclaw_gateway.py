@@ -18,8 +18,6 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
-from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, load_pem_private_key, load_pem_public_key
-
 try:
     import websockets
 except Exception:  # pragma: no cover - dependency handled at runtime
@@ -107,35 +105,35 @@ def discover_openclaw_state_dir(configured: str, workspace_dir: str) -> Path:
         if copied is not None:
             return copied
         candidates.append(configured_path)
-    candidates.extend(
-        [
-            Path.home() / ".openclaw",
-            Path(os.environ.get("APPDATA", "")) / "Antigravity" / "openclaw",
-            Path(os.environ.get("LOCALAPPDATA", "")) / "Antigravity" / "openclaw",
-            Path(os.environ.get("LOCALAPPDATA", "")) / "com.lbjlaq.antigravity-tools" / "openclaw",
-            Path(workspace_dir).expanduser().resolve() / ".openclaw",
-            Path(workspace_dir).expanduser().resolve() / ".." / ".openclaw",
-        ]
-    )
+    candidates.extend(_state_fallback_candidates(workspace_dir))
     for candidate in candidates:
         candidate = candidate.resolve()
         if (candidate / "openclaw.json").exists() and (candidate / "identity" / "device.json").exists():
             return candidate
-    raise OpenClawGatewayError("OpenClaw state dir not found; set OPENCLAW_STATE_DIR")
+    raise OpenClawGatewayError(
+        "OpenClaw application state dir not found; set OPENCLAW_STATE_DIR. "
+        "Cross-application sharing requires both OPENCLAW_ALLOW_SHARED_STATE=1 "
+        "and an explicitly authorized OPENCLAW_SHARED_STATE_DIR."
+    )
+
+
+def _state_fallback_candidates(workspace_dir: str) -> List[Path]:
+    # A workspace-local state belongs to this application. Never scan desktop
+    # .openclaw / Antigravity accounts, sibling directories, or APPDATA for a
+    # login that happens to work.
+    candidates = [Path(workspace_dir).expanduser().resolve() / ".openclaw"]
+    share_state = os.environ.get("OPENCLAW_ALLOW_SHARED_STATE", "0").strip().lower() in {"1", "true", "yes", "on"}
+    shared_source = os.environ.get("OPENCLAW_SHARED_STATE_DIR", "").strip()
+    if share_state and shared_source:
+        candidates.append(Path(shared_source).expanduser().resolve())
+    return candidates
 
 
 def _materialize_openclaw_state_dir(target: Path, workspace_dir: str) -> Optional[Path]:
     target = target.expanduser().resolve()
     if (target / "openclaw.json").exists() and (target / "identity" / "device.json").exists():
         return target
-    fallback_candidates = [
-        Path.home() / ".openclaw",
-        Path(os.environ.get("APPDATA", "")) / "Antigravity" / "openclaw",
-        Path(os.environ.get("LOCALAPPDATA", "")) / "Antigravity" / "openclaw",
-        Path(os.environ.get("LOCALAPPDATA", "")) / "com.lbjlaq.antigravity-tools" / "openclaw",
-        Path(workspace_dir).expanduser().resolve() / ".openclaw",
-        Path(workspace_dir).expanduser().resolve() / ".." / ".openclaw",
-    ]
+    fallback_candidates = _state_fallback_candidates(workspace_dir)
     source: Optional[Path] = None
     for candidate in fallback_candidates:
         candidate = candidate.expanduser().resolve()
@@ -507,28 +505,32 @@ class OpenClawGatewayClient:
         return stdout_text, stderr_text, payload_text, returncode
 
     def _prepare_codex_home(self, runtime: Dict[str, str]) -> Path:
-        configured = str(os.environ.get("CODEX_HOME", "") or "").strip()
-        if configured:
-            codex_home_root = Path(configured).expanduser()
-        elif str(self.config.codex_home or "").strip():
+        # Never inherit the caller's global CODEX_HOME or automatically copy
+        # their desktop login into the application workspace.
+        if str(self.config.codex_home or "").strip():
             codex_home_root = Path(str(self.config.codex_home)).expanduser()
         else:
             codex_home_root = Path(str(self.config.workspace_dir)).expanduser().resolve().parent / "codex_home"
         codex_home_root.mkdir(parents=True, exist_ok=True)
-        codex_home = codex_home_root / "runtime"
-        if codex_home.exists():
-            shutil.rmtree(codex_home, ignore_errors=True)
+        share_auth = os.environ.get("OPENCLAW_ALLOW_SHARED_CODEX_AUTH", "0").strip().lower() in {"1", "true", "yes", "on"}
+        # Keep opt-in credentials separate so disabling sharing never reuses a
+        # previously copied global login. Preserve the old runtime/account data.
+        codex_home = codex_home_root / ("shared-runtime" if share_auth else "isolated-runtime")
         codex_home.mkdir(parents=True, exist_ok=True)
-        source_home = Path.home() / ".codex"
-        for name in ("auth.json", "cap_sid"):
-            src = source_home / name
-            dest = codex_home / name
-            if src.exists():
-                try:
-                    if not dest.exists() or src.stat().st_mtime > dest.stat().st_mtime:
-                        shutil.copy2(src, dest)
-                except Exception:
-                    pass
+        if share_auth:
+            configured_source = os.environ.get("OPENCLAW_SHARED_CODEX_HOME", "").strip()
+            source_home = Path(configured_source).expanduser() if configured_source else Path.home() / ".codex"
+            if not (source_home / "auth.json").is_file():
+                raise OpenClawGatewayError(
+                    "Shared Codex login was explicitly enabled, but auth.json is missing. "
+                    "Set OPENCLAW_SHARED_CODEX_HOME to your authorized login directory "
+                    "or disable OPENCLAW_ALLOW_SHARED_CODEX_AUTH."
+                )
+            for name in ("auth.json", "cap_sid"):
+                src = source_home / name
+                dest = codex_home / name
+                if src.is_file():
+                    shutil.copy2(src, dest)
         self._repair_codex_home_state(codex_home)
         (codex_home / "config.toml").write_text(self._build_codex_home_config(), encoding="utf-8")
         return codex_home
@@ -699,6 +701,10 @@ class OpenClawGatewayClient:
         return websockets.connect(runtime["url"], origin=runtime["origin"], max_size=20_000_000)
 
     async def _connect_session(self, ws, runtime: Dict[str, str], inbox: List[Dict[str, object]]) -> None:
+        try:
+            from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, load_pem_private_key, load_pem_public_key
+        except ImportError as exc:
+            raise OpenClawGatewayError("OpenClaw device signing requires the optional cryptography package") from exc
         private_key = load_pem_private_key(runtime["private_key_pem"].encode("utf-8"), password=None)
         public_key = load_pem_public_key(runtime["public_key_pem"].encode("utf-8"))
         public_raw = public_key.public_bytes(Encoding.Raw, PublicFormat.Raw)

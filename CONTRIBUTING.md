@@ -17,8 +17,11 @@
 git clone <repository-url>
 cd aociety
 pnpm install --frozen-lockfile
+node node_modules/electron/install.js
 pnpm check
 ```
+
+公开源码不包含未获再分发授权的模型/场景二进制。如果未恢复本机合法模型，显式设置 `ECHO_ALLOW_MISSING_LOCAL_ASSETS=1` 后运行检查；严格资产验证及缺失策略见 `docs/THIRD_PARTY_ASSETS.md`。
 
 如果锁文件需要因依赖变更而更新，先修改 `package.json`，再执行正常的 `pnpm install`，审查 `pnpm-lock.yaml` 差异并在提交前重新运行 `pnpm check`。不要为了通过 CI 删除或手工改写锁文件。
 
@@ -32,6 +35,7 @@ pnpm check
 | `pnpm test:ai` | 人格提示、配置隔离和供应商适配测试 |
 | `pnpm test:contracts` | Launcher Session JSON Schema 测试 |
 | `pnpm test:assets` | 3D 模型与预览图门禁 |
+| `pnpm test:session` | 异步会话与窗口 IPC 负向测试 |
 | `pnpm test` | 运行全部模块测试 |
 | `pnpm build` | 清理并生成生产前端与 Electron 代码 |
 | `pnpm check` | 类型检查、测试和生产构建 |
@@ -95,6 +99,7 @@ pnpm check
 - 不把开发机绝对路径写入源码、示例或测试快照。
 - 不清空真实账户数据作为测试准备；使用临时用户数据目录或专用测试账户。
 - 构建前运行清理命令，避免旧哈希资源混入 `dist` 或安装包。
+- 不自动继承或复制其他桌面助手的登录状态。旧硬件助手跨应用共享需明确开启、指定来源；忽略应用 runtime、`.openclaw`、`codex_home`、账户文件与数据库。
 
 ## 测试要求
 
