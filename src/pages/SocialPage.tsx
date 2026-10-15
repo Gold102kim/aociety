@@ -20,7 +20,7 @@ export function SocialPage({ user }: { user: LauncherUser }) {
           <article className="social-panel friend-list-card"><div className="social-panel-heading compact"><div><span>FRIENDS</span><h2>好友列表</h2></div><small>演示 3 人</small></div><div className="friend-preview-list"><article><span className="violet">N</span><div><strong>Nova_07</strong><small><i/>在线 · 中央小镇</small></div><button type="button" aria-label="Nova_07 的更多操作">···</button></article><article><span className="cyan">L</span><div><strong>Lumen</strong><small><i/>在线 · 伴生模式</small></div><button type="button" aria-label="Lumen 的更多操作">···</button></article><article className="offline"><span className="gold">R</span><div><strong>Rin</strong><small><i/>2 小时前在线</small></div><button type="button" aria-label="Rin 的更多操作">···</button></article></div></article>
         </aside>
       </div>
-      <article className="social-panel social-preference-card"><div><span>MATCHING SIGNALS</span><h2>当前社交兴趣信号</h2><p>这些信息来自你的身份偏好，只用于未来生成相遇建议，不会直接建立关系。</p></div><div className="social-interest-tags">{interests.length ? interests.map((interest) => <i key={interest}>{interest}</i>) : <em>尚未填写核心爱好</em>}</div><div className="social-agent-state"><span>账户 AI 档案</span><strong>{user.aiAgent.status === 'READY' ? '已就绪' : '等待初始化'}</strong></div></article>
+      <article className="social-panel social-preference-card"><div><h2>旧版兴趣资料</h2><p>仅展示本机旧资料，尚未用于在线匹配；不会自动导入数字代表记忆。</p></div><div className="social-interest-tags">{interests.length ? interests.map((interest) => <i key={interest}>{interest}</i>) : <em>未填写，不影响文字对话</em>}</div><div className="social-agent-state"><span>社交服务</span><strong>原型 · 尚未连接</strong></div></article>
     </section>
   );
 }

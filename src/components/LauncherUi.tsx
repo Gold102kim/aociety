@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 
-export type IconName = 'home' | 'world' | 'avatar' | 'chat' | 'friends' | 'settings' | 'download' | 'user';
+export type IconName = 'home' | 'world' | 'avatar' | 'chat' | 'friends' | 'settings' | 'download' | 'user' | 'chevron' | 'back' | 'close' | 'minimize' | 'maximize' | 'companion' | 'send' | 'shield' | 'play';
 
 export function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
@@ -12,6 +12,15 @@ export function Icon({ name }: { name: IconName }) {
     settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></>,
     download: <><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></>,
     user: <><circle cx="12" cy="8" r="4"/><path d="M4.5 21c.6-5 3-7.5 7.5-7.5s6.9 2.5 7.5 7.5"/></>,
+    chevron: <path d="m9 5 7 7-7 7"/>,
+    back: <><path d="m11 5-7 7 7 7"/><path d="M4 12h16"/></>,
+    close: <path d="m6 6 12 12M6 18 18 6"/>,
+    minimize: <path d="M5 12h14"/>,
+    maximize: <rect x="5" y="5" width="14" height="14" rx="1.5"/>,
+    companion: <><rect x="3" y="4" width="18" height="16" rx="4"/><rect x="12" y="11" width="6" height="6" rx="1.5"/></>,
+    send: <><path d="M12 20V4M6 10l6-6 6 6"/></>,
+    shield: <><path d="M12 3 4.5 6v5.5c0 4.6 3 7.9 7.5 9.5 4.5-1.6 7.5-4.9 7.5-9.5V6L12 3Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></>,
+    play: <path d="m8 5 11 7-11 7V5Z"/>,
   };
   return <svg className="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
 }
@@ -27,10 +36,10 @@ export function TitleBar({ canEnterCompanion, reducedTransparency, systemReduced
       <div className="brand-mini"><span className="brand-mark">E</span><span>ECHO<span>VERSE</span></span></div>
       <div className="window-controls">
         <button type="button" className="appearance-toggle" aria-label="减少透明效果" aria-pressed={reducedTransparency} disabled={systemReducedTransparency} title={systemReducedTransparency ? '清晰模式由系统辅助功能设置启用' : reducedTransparency ? '切换到玻璃质感' : '切换到清晰模式，减少透明效果'} onClick={onToggleTransparency}><svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="3" y="3" width="11" height="11" rx="4"/><rect x="7" y="7" width="10" height="10" rx="4"/></svg><span>{systemReducedTransparency ? '清晰 · 系统' : reducedTransparency ? '清晰' : '玻璃'}</span></button>
-        {canEnterCompanion && <button type="button" className="companion-toggle" aria-label="折叠到伴生模式" title="折叠到伴生模式" onClick={enterCompanion}>◇</button>}
-        <button type="button" aria-label="最小化" onClick={() => window.launcher?.window.minimize()}>—</button>
-        <button type="button" aria-label="最大化" onClick={() => window.launcher?.window.toggleMaximize()}>□</button>
-        <button type="button" className="close" aria-label="关闭" onClick={() => window.launcher?.window.close()}>×</button>
+        {canEnterCompanion && <button type="button" className="companion-toggle" aria-label="折叠到伴生模式" title="折叠到伴生模式" onClick={enterCompanion}><Icon name="companion"/></button>}
+        <button type="button" aria-label="最小化" onClick={() => window.launcher?.window.minimize()}><Icon name="minimize"/></button>
+        <button type="button" aria-label="最大化" onClick={() => window.launcher?.window.toggleMaximize()}><Icon name="maximize"/></button>
+        <button type="button" className="close" aria-label="关闭" onClick={() => window.launcher?.window.close()}><Icon name="close"/></button>
       </div>
     </header>
   );

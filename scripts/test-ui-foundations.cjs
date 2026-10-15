@@ -71,6 +71,14 @@ assert.doesNotThrow(() => appearance.save(blockedStorage, true), 'Blocked storag
 assert.doesNotThrow(() => appearance.save(blockedStorage, false), 'Blocked storage must not break glass mode.');
 
 const glassCss = fs.readFileSync(path.join(root, 'src/glass-theme.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+for (const background of ['#172337', '#1b2a3f', '#344354']) {
+  for (const foreground of ['#f3f6fc', '#b3c0d2']) {
+    const ratio = (luminance(foreground) + .05) / (luminance(background) + .05);
+    assert.ok(ratio >= 4.5, `Glass text pair needs 4.5:1, got ${ratio.toFixed(2)}.`);
+  }
+}
+assert.match(glassCss, /input\[type="checkbox"\]\s*\{\s*appearance:\s*auto;/, 'Forced colors must restore native checkbox rendering.');
+assert.match(glassCss, /\.chat-workspaces button\[aria-pressed="true"\]\s*\{\s*color:\s*CanvasText;\s*background:\s*Canvas;/, 'Forced-color selected text must not disappear into browser text backplates.');
 assert.match(glassCss, /\.app\.ui-refresh\.ui-glass\.ui-glass-reduced\s*\{[^}]*--glass-filter:\s*none;[^}]*background-image:\s*none;/, 'Manual reduced transparency should disable blur and ambient decoration.');
 assert.match(glassCss, /@media\s*\(prefers-reduced-transparency:\s*reduce\),\s*\(prefers-contrast:\s*more\)\s*\{\s*\.app\.ui-refresh\.ui-glass\s*\{[^}]*--glass-filter:\s*none;/, 'System transparency and contrast preferences need a no-blur fallback.');
 assert.match(glassCss, /@supports\s+not\s*\(backdrop-filter:\s*blur\(1px\)\)\s*\{[^}]*--glass-filter:\s*none;/, 'Browsers without backdrop-filter need a fallback.');
@@ -84,6 +92,12 @@ for (const [, selector, declarations] of glassCss.matchAll(/([^{}]+)\{([^{}]*)\}
   }
 }
 const refreshCss = fs.readFileSync(path.join(root, 'src/ui-refresh.css'), 'utf8');
+const liquidCss = fs.readFileSync(path.join(root, 'src/liquid-glass.css'), 'utf8');
+assert.match(liquidCss, /\[data-liquid-glass\]::before\s*\{[^}]*backdrop-filter:\s*var\(--liquid-filter\)/, 'Lens distortion belongs on backdrop-only pseudo elements.');
+assert.equal(/(?:^|[;{])\s*(?:-webkit-)?filter\s*:/m.test(liquidCss), false, 'Optical chrome must never distort foreground text or the avatar canvas.');
+assert.equal(/animation[^;{}]*infinite/.test(liquidCss), false, 'Optical chrome must not introduce a continuous rendering loop.');
+assert.match(liquidCss, /\.ui-glass-reduced \[data-liquid-glass\]::before[^}]*display:\s*none/, 'Clear mode must suppress the lens immediately.');
+assert.match(liquidCss, /@media \(prefers-reduced-motion: reduce\)/, 'Optical feedback must honor reduced motion.');
 assert.match(refreshCss, /\.ui-refresh\s+\.chat-content\[hidden\]\s*\{\s*display:\s*none;/, 'Retained inactive chat must remain hidden.');
 assert.match(refreshCss, /\.ui-refresh\s+\.chat-window\s*\{[^}]*min-height:\s*0;[^}]*grid-template-rows:\s*auto\s+minmax\(0,\s*1fr\)\s+auto\s+auto;/, 'Chat should preserve its bounded scroll area.');
 assert.match(refreshCss, /\.ui-refresh\s+\.chat-composer\s*\{[^}]*grid-row:\s*4;/, 'Chat composer must keep its fixed grid row.');

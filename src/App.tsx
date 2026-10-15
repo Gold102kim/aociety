@@ -1,8 +1,9 @@
 import { lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { LauncherUser, signOut } from './auth';
 import { TitleBar } from './components/LauncherUi';
+import { LiquidGlassEffects } from './components/LiquidGlassEffects';
 import { getDevelopmentPreviewUser } from './dev/previewUser';
-import { AuthScreen, QuestionnaireScreen } from './pages/AccountFlow';
+import { AuthScreen } from './pages/AccountFlow';
 import { BootSequence } from './pages/BootSequence';
 import { PageLoadBoundary } from './components/PageLoadBoundary';
 import { getThemeStyle } from './theme';
@@ -25,7 +26,6 @@ function LauncherApplication() {
   }, []);
   const [user, setUser] = useState<LauncherUser | null>(() => getDevelopmentPreviewUser());
   const [booting, setBooting] = useState(() => import.meta.env.DEV && new URLSearchParams(window.location.search).get('preview') === 'boot');
-  const [firstBoot, setFirstBoot] = useState(true);
   const accountEpoch = useRef(0);
   const renderedEpoch = accountEpoch.current;
   const completeBoot = useCallback(() => setBooting(false), []);
@@ -34,18 +34,7 @@ function LauncherApplication() {
     if (accountEpoch.current !== renderedEpoch) return;
     accountEpoch.current += 1;
     setUser(nextUser);
-    if (nextUser.basicQuestionnaireCompletedAt) {
-      setFirstBoot(false);
-      setBooting(true);
-      void import('./pages/LauncherHome').catch(() => undefined);
-    }
-  };
-
-  const questionnaireCompleted = (nextUser: LauncherUser) => {
-    if (accountEpoch.current !== renderedEpoch || nextUser.id !== user?.id) return;
-    setUser(nextUser);
-    setFirstBoot(true);
-    setBooting(true);
+    setBooting(false);
     void import('./pages/LauncherHome').catch(() => undefined);
   };
 
@@ -67,13 +56,11 @@ function LauncherApplication() {
     if (accountEpoch.current === renderedEpoch && nextUser.id === user?.id) setUser(nextUser);
   };
 
-  if (booting && user?.basicQuestionnaireCompletedAt) return <BootSequence user={user} durationMs={firstBoot ? 2700 : 650} onComplete={completeBoot}/>;
+  if (booting && user) return <BootSequence user={user} durationMs={650} onComplete={completeBoot}/>;
 
   const content = !user
     ? <AuthScreen onAuthenticated={authenticated}/>
-    : !user.basicQuestionnaireCompletedAt
-      ? <QuestionnaireScreen user={user} onCompleted={questionnaireCompleted} onLogout={() => { void logout(); }}/>
-      : <LauncherHome key={user.id} user={user} onLogout={() => { void logout(); }} onUserUpdated={userUpdated}/>;
+    : <LauncherHome key={user.id} user={user} onLogout={() => { void logout(); }} onUserUpdated={userUpdated}/>;
 
   const toggleTransparency = () => {
     const next = !reducedTransparency;
@@ -81,7 +68,7 @@ function LauncherApplication() {
     try { saveReducedTransparency(window.localStorage, next); } catch { /* Storage may be unavailable. */ }
   };
   const effectiveReducedTransparency = reducedTransparency || systemReducedTransparency;
-  return <div className={`app ui-refresh ui-glass${effectiveReducedTransparency ? ' ui-glass-reduced' : ''}`} style={getThemeStyle(user?.basicQuestionnaire?.favoriteColor)}><TitleBar canEnterCompanion={Boolean(user?.basicQuestionnaireCompletedAt)} reducedTransparency={effectiveReducedTransparency} systemReducedTransparency={systemReducedTransparency} onToggleTransparency={toggleTransparency}/>{content}</div>;
+  return <div className={`app ui-refresh ui-glass${effectiveReducedTransparency ? ' ui-glass-reduced' : ''}`} style={getThemeStyle(user?.basicQuestionnaire?.favoriteColor)}><LiquidGlassEffects disabled={effectiveReducedTransparency}/><TitleBar canEnterCompanion={Boolean(user)} reducedTransparency={effectiveReducedTransparency} systemReducedTransparency={systemReducedTransparency} onToggleTransparency={toggleTransparency}/>{content}</div>;
 }
 
 export default function App() {

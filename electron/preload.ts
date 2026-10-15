@@ -1,4 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { ContinuationAction, RepresentativeAction, RepresentativeResult, RepresentativeApi, RepresentativeChange } from './representative-types';
+import type { SimulationInput, SimulationResult } from './simulation-types';
 
 contextBridge.exposeInMainWorld('launcher', {
   window: {
@@ -28,8 +30,22 @@ contextBridge.exposeInMainWorld('launcher', {
   },
   ai: {
     getStatus: () => ipcRenderer.invoke('ai:get-status') as Promise<AiStatus>,
-    chat: (input: { message: string; history: AiChatMessage[] }) => ipcRenderer.invoke('ai:chat', input) as Promise<AiChatResult>,
+    chat: (input: { message: string; history: AiChatMessage[]; temporary: boolean; privacyEpoch: number; savedContent?: boolean }) => ipcRenderer.invoke('ai:chat', input) as Promise<AiChatResult>,
+    cancel: (temporary?: boolean) => ipcRenderer.invoke('ai:cancel', temporary) as Promise<void>,
+    simulate: (input: SimulationInput) => ipcRenderer.invoke('ai:simulate', input) as Promise<SimulationResult>,
   },
+  representative: {
+    getState: () => ipcRenderer.invoke('representative:get-state') as Promise<RepresentativeResult>,
+    update: (input: RepresentativeAction) => ipcRenderer.invoke('representative:update', input) as Promise<RepresentativeResult>,
+    continuation: (input: ContinuationAction) => ipcRenderer.invoke('representative:continuation', input) as Promise<RepresentativeResult>,
+    onChanged: (listener: (status: RepresentativeChange) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, status: unknown) => {
+        if (status === 'saved' || status === 'failed' || status === 'paused') listener(status);
+      };
+      ipcRenderer.on('representative:changed', handler);
+      return () => { ipcRenderer.removeListener('representative:changed', handler); };
+    },
+  } satisfies RepresentativeApi,
   game: {
     launch: () => ipcRenderer.invoke('game:launch') as Promise<{ ok: boolean; message: string }>,
   },
@@ -40,7 +56,7 @@ type AuthResult =
   | { ok: false; message: string };
 
 type AiChatMessage = { role: 'user' | 'assistant'; content: string };
-type AiStatus = { configured: boolean; model: string; connection: 'unconfigured' | 'untested' | 'connected' | 'failed'; message?: string };
+type AiStatus = { configured: boolean; provider?: 'deepseek' | 'openai'; model: string; connection: 'unconfigured' | 'untested' | 'connected' | 'failed'; message?: string };
 type AiChatResult =
   | { ok: true; text: string; responseId: string; model: string }
   | { ok: false; message: string };

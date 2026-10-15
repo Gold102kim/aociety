@@ -36,12 +36,15 @@ interface Window {
       logout: () => Promise<{ ok: boolean }>;
     };
     ai: {
-      getStatus: () => Promise<{ configured: boolean; model: string; connection: 'unconfigured' | 'untested' | 'connected' | 'failed'; message?: string }>;
-      chat: (input: { message: string; history: Array<{ role: 'user' | 'assistant'; content: string }> }) => Promise<
+      getStatus: () => Promise<{ configured: boolean; provider?: 'deepseek' | 'openai'; model: string; connection: 'unconfigured' | 'untested' | 'connected' | 'failed'; message?: string }>;
+      chat: (input: { message: string; history: Array<{ role: 'user' | 'assistant'; content: string }>; temporary: boolean; privacyEpoch: number; savedContent?: boolean }) => Promise<
         | { ok: true; text: string; responseId: string; model: string }
         | { ok: false; message: string }
       >;
+      cancel: (temporary?: boolean) => Promise<void>;
+      simulate: (input: import('../electron/simulation-types').SimulationInput) => Promise<import('../electron/simulation-types').SimulationResult>;
     };
+    representative: import('../electron/representative-types').RepresentativeApi;
     game: {
       launch: () => Promise<{ ok: boolean; message: string }>;
     };

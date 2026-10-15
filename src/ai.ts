@@ -13,10 +13,13 @@ export function getAiStatus() {
   return requireAiApi().getStatus();
 }
 
-export async function sendAiMessage(message: string, history: ChatMessage[]) {
+export async function sendAiMessage(message: string, history: ChatMessage[], temporary: boolean, privacyEpoch: number, savedContent = false) {
   const result = await requireAiApi().chat({
     message,
-    history: history.map(({ role, content }) => ({ role, content })),
+    history: history.map(({ role, content }) => ({ role, content: content.slice(0, 2000) })),
+    temporary,
+    privacyEpoch,
+    savedContent,
   });
   if (!result.ok) throw new Error(result.message);
   return result;

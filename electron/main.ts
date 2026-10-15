@@ -1,21 +1,27 @@
-import { app, BrowserWindow, ipcMain, IpcMainEvent, IpcMainInvokeEvent, screen, session } from 'electron';
+import { app, BrowserWindow, ipcMain, IpcMainEvent, IpcMainInvokeEvent, screen, session, safeStorage } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { AccountStore, BasicQuestionnaire, PublicUser } from './auth-service';
-import { AiChatMessage, AiChatService } from './ai-service';
+import { AiChatService } from './ai-service';
 import { initializeLogger, logError, logEvent } from './logger';
 import { waitForServiceHealth } from './service-health';
 import { RequestEpoch } from './request-epoch';
+import { RepresentativeStore } from './representative-store';
+import { runPrivateSimulation, runRepresentativeChat, type RepresentativeChatInput } from './representative-chat';
+import type { SimulationInput } from './simulation-types';
+import type { ContinuationAction, RepresentativeAction, RepresentativeResult, RepresentativeState, SavedContinuation } from './representative-types';
 
 let mainWindow: BrowserWindow | null = null;
 let companionWindow: BrowserWindow | null = null;
 let accountStore: AccountStore | null = null;
 let currentUser: PublicUser | null = null;
 const sessionEpoch = new RequestEpoch();
+const conversationEpoch = new RequestEpoch();
 let aiChatService: AiChatService | null = null;
+let representativeStore: RepresentativeStore | null = null;
 let isQuitting = false;
 let activeGameProcess: ChildProcess | null = null;
 let gameLaunchInFlight = false;
@@ -445,7 +451,12 @@ function configureWindowSecurity(window: BrowserWindow, role: 'main' | 'companio
     if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
   });
   window.webContents.on('will-attach-webview', (event) => event.preventDefault());
+  window.webContents.on('did-start-navigation', (details) => {
+    // A new document returns to the login screen; never leave its old account active.
+    if (role === 'main' && details.isMainFrame && !details.isSameDocument) beginAuthentication();
+  });
   window.webContents.on('render-process-gone', (_event, details) => {
+    if (role === 'main') beginAuthentication();
     logEvent('error', 'renderer.process_gone', { role, reason: details.reason, exitCode: details.exitCode });
   });
   window.webContents.on('did-fail-load', (_event, errorCode, errorDescription, _validatedUrl, isMainFrame) => {
@@ -549,7 +560,9 @@ function discardCompanionWindow() {
 
 function beginAuthentication() {
   const epoch = sessionEpoch.invalidate();
+  conversationEpoch.invalidate();
   aiChatService?.cancelAll();
+  representativeStore?.clearSession();
   currentUser = null;
   discardCompanionWindow();
   return epoch;
@@ -559,6 +572,22 @@ const expiredSessionResult = () => ({ ok: false as const, message: '账户会话
 
 function isCurrentSession(epoch: number, accountId: string) {
   return sessionEpoch.isCurrent(epoch) && currentUser?.id === accountId;
+}
+
+function isCurrentConversation(epoch: number, accountId: string, chatEpoch: number) {
+  return isCurrentSession(epoch, accountId) && conversationEpoch.isCurrent(chatEpoch);
+}
+
+function representativeRuntimeResult(accountId: string, state: RepresentativeState, resumed?: SavedContinuation): RepresentativeResult {
+  if (!representativeStore || currentUser?.id !== accountId) return expiredSessionResult();
+  const temporary = representativeStore.isTemporary(accountId);
+  return {
+    ok: true,
+    state: temporary ? { ...state, memories: [], continuations: [] } : state,
+    learningPaused: representativeStore.isLearningPaused(accountId),
+    temporary,
+    ...(!temporary && resumed ? { resumed } : {}),
+  };
 }
 
 function createWindow() {
@@ -600,6 +629,11 @@ app.whenReady().then(() => {
   cleanupExpiredSessionFiles();
   accountStore = new AccountStore(path.join(app.getPath('userData'), 'accounts.json'));
   aiChatService = new AiChatService(app.getPath('userData'), app.isPackaged ? path.dirname(process.execPath) : app.getAppPath());
+  representativeStore = new RepresentativeStore(path.join(app.getPath('userData'), 'representative'), {
+    available: async () => process.platform === 'win32' && await safeStorage.isAsyncEncryptionAvailable(),
+    encrypt: (value) => safeStorage.encryptStringAsync(value),
+    decrypt: async (value) => (await safeStorage.decryptStringAsync(value)).result,
+  });
   logEvent('info', 'app.ready', { version: app.getVersion(), packaged: app.isPackaged, platform: process.platform });
   createWindow();
   void runPackagedSmokeAutoLaunch();
@@ -696,6 +730,7 @@ ipcMain.handle('auth:logout', (event) => {
   assertTrustedSender(event);
   sessionEpoch.invalidate();
   aiChatService?.cancelAll();
+  representativeStore?.clearSession();
   currentUser = null;
   discardCompanionWindow();
   return { ok: true };
@@ -740,19 +775,112 @@ ipcMain.handle('ai:get-status', (event) => {
   return aiChatService?.getStatus() ?? { configured: false, model: 'deepseek-v4-flash', connection: 'unconfigured' };
 });
 
-ipcMain.handle('ai:chat', async (event, input: { message: string; history: AiChatMessage[] }) => {
+ipcMain.handle('representative:get-state', async (event) => {
   assertTrustedSender(event);
-  if (!currentUser || !aiChatService) return { ok: false, message: '当前账户会话或 AI 服务无效，请重新登录。' };
+  if (!currentUser || !representativeStore) return { ok: false, message: '请先登录账户。' };
   const epoch = sessionEpoch.capture();
   const accountId = currentUser.id;
+  const chatEpoch = conversationEpoch.capture();
+  const valid = () => isCurrentConversation(epoch, accountId, chatEpoch);
   try {
-    const result = await aiChatService.chat(currentUser, input?.message, input?.history);
-    if (!sessionEpoch.isCurrent(epoch) || currentUser?.id !== accountId) return expiredSessionResult();
+    const state = await representativeStore.getState(accountId, valid);
+    if (!valid()) return expiredSessionResult();
+    return representativeRuntimeResult(accountId, state);
+  } catch {
+    if (!valid()) return expiredSessionResult();
+    return { ok: false, message: '无法读取记忆与隐私设置，请重新登录或检查系统加密服务。' };
+  }
+});
+
+ipcMain.handle('representative:update', async (event, input: RepresentativeAction) => {
+  assertTrustedSender(event);
+  if (!currentUser || !representativeStore) return { ok: false, message: '请先登录账户。' };
+  const epoch = sessionEpoch.capture();
+  const accountId = currentUser.id;
+  aiChatService?.cancelAccount(accountId);
+  conversationEpoch.invalidate();
+  const chatEpoch = conversationEpoch.capture();
+  const valid = () => isCurrentConversation(epoch, accountId, chatEpoch);
+  try {
+    const state = await representativeStore.update(accountId, input, valid);
+    if (!valid()) return expiredSessionResult();
+    return representativeRuntimeResult(accountId, state);
+  } catch (error) {
+    if (!valid()) return expiredSessionResult();
+    // Never forward filesystem or OS encryption errors containing local paths.
+    representativeStore.denyRequests(accountId);
+    const message = error instanceof Error && /^(内容已有变化|请选择|这条记忆|系统加密不可用|学习模式无效|操作参数无效|授权参数无效|不支持的记忆操作|隐私设置或账户会话)/.test(error.message)
+      ? `${error.message} 云端请求已暂停，请检查设置。` : '设置未完全保存，已暂停云端请求。请重试或检查系统加密服务。';
+    return { ok: false, message };
+  }
+});
+
+ipcMain.handle('representative:continuation', async (event, input: ContinuationAction) => {
+  assertTrustedSender(event);
+  if (!currentUser || !representativeStore) return { ok: false, message: '请先登录账户。' };
+  const epoch = sessionEpoch.capture();
+  const accountId = currentUser.id;
+  if (input?.kind === 'resume') {
+    conversationEpoch.invalidate();
+    aiChatService?.cancelAccount(accountId);
+  }
+  const chatEpoch = conversationEpoch.capture();
+  const valid = () => isCurrentConversation(epoch, accountId, chatEpoch);
+  try {
+    const result = await representativeStore.continuation(accountId, input, valid);
+    if (!valid()) return expiredSessionResult();
+    return representativeRuntimeResult(accountId, result.state, result.resumed);
+  } catch (error) {
+    if (!valid()) return expiredSessionResult();
+    const message = error instanceof Error && /^(临时对话不能|系统加密不可用|内容已有变化|请填写标题|最多保留|这条待续内容|操作参数无效|隐私设置或账户会话)/.test(error.message)
+      ? error.message : '待续内容未完成操作，请重试或检查系统加密服务。';
+    return { ok: false, message };
+  }
+});
+
+ipcMain.handle('ai:chat', async (event, input: RepresentativeChatInput) => {
+  assertTrustedSender(event);
+  if (!currentUser || !aiChatService || !representativeStore) return { ok: false, message: '当前账户会话或 AI 服务无效，请重新登录。' };
+  const epoch = sessionEpoch.capture();
+  const accountId = currentUser.id;
+  const chatEpoch = conversationEpoch.capture();
+  try {
+    const result = await runRepresentativeChat(representativeStore, aiChatService, currentUser, input,
+      () => isCurrentConversation(epoch, accountId, chatEpoch),
+      (status) => { if (isCurrentConversation(epoch, accountId, chatEpoch)) mainWindow?.webContents.send('representative:changed', status); });
+    if (!isCurrentConversation(epoch, accountId, chatEpoch)) return expiredSessionResult();
     return { ok: true, ...result };
   } catch (error) {
-    if (!isCurrentSession(epoch, accountId)) return expiredSessionResult();
+    if (!isCurrentConversation(epoch, accountId, chatEpoch)) return expiredSessionResult();
     return { ok: false, message: error instanceof Error ? error.message : 'AI 回复生成失败，请稍后重试。' };
   }
+});
+
+ipcMain.handle('ai:simulate', async (event, input: SimulationInput) => {
+  assertTrustedSender(event);
+  if (!currentUser || !aiChatService || !representativeStore) return { ok: false, message: '当前账户会话或 AI 服务无效，请重新登录。' };
+  const epoch = sessionEpoch.capture();
+  const accountId = currentUser.id;
+  const chatEpoch = conversationEpoch.capture();
+  try {
+    const reply = await runPrivateSimulation(representativeStore, aiChatService, currentUser, input,
+      () => isCurrentConversation(epoch, accountId, chatEpoch));
+    if (!isCurrentConversation(epoch, accountId, chatEpoch)) return expiredSessionResult();
+    return { ok: true, reply };
+  } catch (error) {
+    if (!isCurrentConversation(epoch, accountId, chatEpoch)) return expiredSessionResult();
+    return { ok: false, message: error instanceof Error ? error.message : '私密试答生成失败，请稍后重试。' };
+  }
+});
+
+ipcMain.handle('ai:cancel', (event, temporary?: boolean) => {
+  assertTrustedSender(event);
+  if (temporary !== undefined && typeof temporary !== 'boolean') throw new Error('对话模式无效。');
+  if (!currentUser) return;
+  conversationEpoch.invalidate();
+  if (temporary === undefined) representativeStore?.cancelPendingLearning(true);
+  else representativeStore?.beginConversation(currentUser.id, temporary);
+  aiChatService?.cancelAccount(currentUser.id);
 });
 
 ipcMain.handle('game:launch', async (event) => {

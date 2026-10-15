@@ -3,9 +3,12 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { createRenderScheduler } from './renderScheduler';
+import type { AvatarLoadStatus } from './components/AvatarScene';
 
 type AvatarViewportProps = {
   variant: 'preview' | 'companion';
+  onRetry: () => void;
+  onStatusChange?: (status: AvatarLoadStatus) => void;
 };
 
 type ResourceTracker = {
@@ -101,10 +104,11 @@ function disposeObject3D(root: THREE.Object3D, resources: ResourceTracker) {
   });
 }
 
-export function AvatarViewport({ variant }: AvatarViewportProps) {
+export function AvatarViewport({ variant, onRetry, onStatusChange }: AvatarViewportProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [progress, setProgress] = useState(0);
+  useEffect(() => { onStatusChange?.(status); }, [status, onStatusChange]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -115,7 +119,13 @@ export function AvatarViewport({ variant }: AvatarViewportProps) {
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(34, 1, 0.01, 1000);
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' });
+    } catch {
+      setStatus('error');
+      return;
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, variant === 'companion' ? 1.15 : 1.5));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -265,11 +275,19 @@ export function AvatarViewport({ variant }: AvatarViewportProps) {
     motionPreference.addEventListener('change', handleMotionPreferenceChange);
     controls?.addEventListener('change', requestRender);
 
-    new GLTFLoader().load(
+    let loadExpired = false;
+    const loadingManager = new THREE.LoadingManager();
+    const loadTimer = window.setTimeout(() => {
+      loadExpired = true;
+      loadingManager.abort();
+      setStatus('error');
+    }, 20_000);
+    new GLTFLoader(loadingManager).load(
       modelUrl,
       (gltf) => {
         const roots = [...new Set(gltf.scenes.length > 0 ? gltf.scenes : [gltf.scene])];
-        if (disposed) {
+        window.clearTimeout(loadTimer);
+        if (disposed || loadExpired) {
           roots.forEach((root) => disposeObject3D(root, resources));
           return;
         }
@@ -307,11 +325,12 @@ export function AvatarViewport({ variant }: AvatarViewportProps) {
         }
       },
       (event) => {
-        if (!disposed && event.total > 0) {
+        if (!disposed && !loadExpired && event.total > 0) {
           setProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
         }
       },
       () => {
+        window.clearTimeout(loadTimer);
         if (!disposed) setStatus('error');
       },
     );
@@ -319,6 +338,8 @@ export function AvatarViewport({ variant }: AvatarViewportProps) {
 
     return () => {
       disposed = true;
+      window.clearTimeout(loadTimer);
+      loadingManager.abort();
       scheduler.dispose();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       motionPreference.removeEventListener('change', handleMotionPreferenceChange);
@@ -343,8 +364,8 @@ export function AvatarViewport({ variant }: AvatarViewportProps) {
 
   return (
     <div ref={hostRef} className={`avatar-viewport avatar-viewport-${variant}`}>
-      {status === 'loading' && <div className="avatar-viewport-state"><i/><span>正在载入临时分身 · {progress}%</span></div>}
-      {status === 'error' && <div className="avatar-viewport-state error"><strong>E</strong><span>分身模型载入失败</span></div>}
+      {status === 'loading' && <div className="avatar-viewport-state" role="status"><i aria-hidden="true"/><span>正在载入外观{progress > 0 ? ` · ${progress}%` : '…'}</span></div>}
+      {status === 'error' && <div className="avatar-viewport-state error" role="alert"><strong aria-hidden="true">!</strong><span>外观暂不可用</span><small>模型缺失、读取超时或图形环境不支持。文字对话不受影响。</small><button type="button" onClick={onRetry}>重试外观</button></div>}
     </div>
   );
 }

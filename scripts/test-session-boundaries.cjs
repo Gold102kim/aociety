@@ -5,6 +5,8 @@ const vm = require('node:vm');
 const { EventEmitter } = require('node:events');
 const { stripTypeScriptTypes } = require('node:module');
 const { RequestEpoch } = require('../dist-electron/request-epoch.js');
+const { RepresentativeStore } = require('../dist-electron/representative-store.js');
+const { runPrivateSimulation, runRepresentativeChat } = require('../dist-electron/representative-chat.js');
 
 const root = path.resolve(__dirname, '..');
 const source = (file) => fs.readFileSync(path.join(root, file), 'utf8');
@@ -14,7 +16,7 @@ const deferred = () => {
   const promise = new Promise((accept, fail) => { resolve = accept; reject = fail; });
   return { promise, resolve, reject };
 };
-const user = (id) => ({ id, displayName: `Mock ${id}`, aiAgent: { status: 'READY' } });
+const user = (id) => ({ id, displayName: `Mock ${id}`, basicQuestionnaireCompletedAt: '2026-01-01T00:00:00Z', aiAgent: { status: 'READY' } });
 
 function mainHarness() {
   const main = source('electron/main.ts');
@@ -22,23 +24,156 @@ function mainHarness() {
   const context = {
     RequestEpoch,
     sessionEpoch: new RequestEpoch(),
+    conversationEpoch: new RequestEpoch(),
+    runRepresentativeChat,
+    runPrivateSimulation,
     currentUser: null,
     companionWindow: null,
     assertTrustedSender() {},
     assertAppWindowSender() {},
-    aiChatService: { cancelCount: 0, cancelAll() { this.cancelCount += 1; }, getStatus() { return {}; } },
+    aiChatService: { cancelCount: 0, cancelAll() { this.cancelCount += 1; }, getStatus() { return { provider: 'deepseek' }; } },
     ipcMain: { handle: (name, handler) => handlers.set(name, handler) },
     accountStore: {},
+    representativeStore: {
+      clearSession() {}, cancelPendingLearning() {}, beginConversation() {}, isTemporary: () => false, isLearningPaused: () => false,
+      observeContext() {}, observeSavedContent() {},
+      getState: async () => ({ cloudConsent: true, privacyEpoch: 0, revision: 0, memories: [], continuations: [], learningMode: 'off' }),
+      learn: async () => null,
+    },
     launchConfiguredGame: async () => ({ ok: true }),
   };
   vm.createContext(context);
   const helpers = main.slice(main.indexOf('function discardCompanionWindow()'), main.indexOf('function createWindow()'));
   const handlersSource = main.slice(main.indexOf("ipcMain.handle('companion:get-state'"));
   vm.runInContext(stripTypeScriptTypes(`${helpers}\n${handlersSource}`), context);
-  return { context, invoke: (name, input) => handlers.get(name)({}, input) };
+  return { context, invoke: (name, input) => handlers.get(name)({}, name === 'ai:chat' ? { temporary: false, privacyEpoch: 0, ...input } : input) };
 }
 
 async function testMainSessionBoundaries() {
+  {
+    const { context, invoke } = mainHarness();
+    context.currentUser = user('runtime-pause');
+    context.aiChatService.cancelAccount = () => {};
+    const state = { revision: 2, memories: [], continuations: [], learningMode: 'learn' };
+    context.representativeStore.getState = async () => state;
+    context.representativeStore.update = async () => state;
+    context.representativeStore.continuation = async () => ({ state });
+    context.representativeStore.isLearningPaused = () => true;
+    for (const channel of ['representative:get-state', 'representative:update', 'representative:continuation']) {
+      const result = await invoke(channel, { kind: 'save' });
+      assert.equal(result.ok, true);
+      assert.equal(result.learningPaused, true, 'Every representative result carries the current runtime pause.');
+      assert.equal(result.temporary, false, 'Every representative result carries the current temporary mode.');
+      assert.equal(Object.hasOwn(result.state, 'learningPaused'), false, 'Runtime metadata stays outside persistent state.');
+      assert.equal(Object.hasOwn(result.state, 'temporary'), false, 'Temporary mode must not be persisted in the profile.');
+    }
+  }
+  {
+    const { context, invoke } = mainHarness();
+    context.currentUser = user('temporary');
+    context.aiChatService.cancelAccount = () => {};
+    const state = { revision: 2, memories: [{ source: 'Private profile evidence' }], continuations: [{ content: 'Private saved content' }], learningMode: 'learn' };
+    const before = JSON.stringify(state);
+    context.representativeStore.getState = async () => state;
+    context.representativeStore.update = async () => state;
+    context.representativeStore.continuation = async () => ({ state, resumed: state.continuations[0] });
+    context.representativeStore.isTemporary = () => true;
+    for (const channel of ['representative:get-state', 'representative:update', 'representative:continuation']) {
+      const result = await invoke(channel, { kind: 'save' });
+      assert.equal(result.ok, true);
+      assert.equal(result.temporary, true, 'A remounted renderer must receive the live temporary mode.');
+      assert.equal(result.state.memories.length, 0, 'Temporary responses must not expose long-term profile evidence.');
+      assert.equal(result.state.continuations.length, 0, 'Temporary responses must not expose saved content.');
+      assert.equal(Object.hasOwn(result, 'resumed'), false, 'Temporary responses must omit resumed private content.');
+      assert.equal(Object.hasOwn(result.state, 'temporary'), false);
+      assert.equal(JSON.stringify(result).includes('Private'), false);
+    }
+    assert.equal(JSON.stringify(state), before, 'Redacting the renderer result must not delete or alter persistent content.');
+  }
+  {
+    const { context, invoke } = mainHarness();
+    const accountId = 'cancel-only';
+    const store = new RepresentativeStore(path.join(root, 'unused-runtime-only-store'), {});
+    const cancelled = [];
+    context.currentUser = user(accountId);
+    context.representativeStore = store;
+    context.aiChatService.cancelAccount = (id) => cancelled.push(id);
+    store.beginConversation(accountId, true);
+    store.observeSavedContent(accountId);
+    const epoch = context.conversationEpoch.capture();
+    await invoke('ai:cancel');
+    assert.equal(context.conversationEpoch.isCurrent(epoch), false, 'Cancel-only must still invalidate pending requests.');
+    assert.equal(store.isTemporary(accountId), true, 'Stopping generation must not switch a temporary conversation to normal mode.');
+    assert.equal(store.isLearningPaused(accountId), true, 'Stopping generation must retain the non-personal context safety pause.');
+    assert.deepEqual(cancelled, [accountId]);
+    assert.throws(() => invoke('ai:cancel', 'false'), /对话模式无效/);
+    assert.equal(store.isTemporary(accountId), true);
+    assert.equal(store.isLearningPaused(accountId), true);
+    await invoke('ai:cancel', false);
+    assert.equal(store.isTemporary(accountId), false, 'An explicit mode starts the requested new conversation.');
+    assert.equal(store.isLearningPaused(accountId), false, 'Only a new conversation clears the non-personal context safety pause.');
+    await invoke('ai:cancel', true);
+    assert.equal(store.isTemporary(accountId), true);
+  }
+
+  for (const channel of ['representative:get-state', 'representative:update', 'representative:continuation']) {
+    for (const rejected of [false, true]) {
+      const { context, invoke } = mainHarness();
+      const request = deferred();
+      let valid;
+      context.currentUser = user('same-account');
+      context.aiChatService.cancelAccount = () => {};
+      const operation = channel.split(':')[1];
+      if (operation === 'get-state') context.representativeStore.getState = (_id, guard) => { valid = guard; return request.promise; };
+      else context.representativeStore[operation] = (_id, _input, guard) => { valid = guard; return request.promise; };
+      const pending = invoke(channel, { kind: operation === 'continuation' ? 'resume' : 'mode' });
+      assert.equal(valid(), true, `${channel} must accept work in the active conversation.`);
+      await invoke('ai:cancel', true);
+      assert.equal(valid(), false, `${channel} must invalidate a read or write that predates a mode switch.`);
+      if (rejected) request.reject(new Error('Private pre-switch failure'));
+      else {
+        const state = { memories: [{ source: 'Private pre-switch profile' }], continuations: [{ content: 'Private pre-switch saved text' }] };
+        request.resolve(operation === 'continuation' ? { state, resumed: state.continuations[0] } : state);
+      }
+      const result = await pending;
+      assert.equal(result.ok, false, `${channel} must reject pre-switch results even if the account did not change.`);
+      assert.equal(JSON.stringify(result).includes('Private pre-switch'), false, 'Old private data and errors must never reach the next conversation.');
+    }
+  }
+  for (const cancelled of [false, true]) {
+    const { context, invoke } = mainHarness();
+    const request = deferred();
+    const started = deferred();
+    context.currentUser = user('old');
+    context.aiChatService.chat = () => { started.resolve(); return request.promise; };
+    context.aiChatService.cancelAccount = () => {};
+    const pending = invoke('ai:simulate', { scenario: '虚构保留场景', mode: 'generic', temporary: false, privacyEpoch: 0, expectedRevision: 0 });
+    await started.promise;
+    if (cancelled) await invoke('ai:cancel', false);
+    else { await invoke('auth:logout'); context.currentUser = user('new'); }
+    request.resolve({ text: '不得显示的旧试答', model: 'deepseek-test' });
+    const result = await pending;
+    assert.equal(result.ok, false, 'A cancelled or old-account simulation must never reach the renderer.');
+    assert.equal(JSON.stringify(result).includes('不得显示的旧试答'), false);
+  }
+
+  for (const channel of ['representative:get-state', 'representative:continuation']) {
+    const { context, invoke } = mainHarness();
+    const request = deferred();
+    let valid;
+    context.currentUser = user('old');
+    if (channel === 'representative:get-state') context.representativeStore.getState = (_accountId, guard) => { valid = guard; return request.promise; };
+    else context.representativeStore.continuation = (_accountId, _input, guard) => { valid = guard; return request.promise; };
+    const pending = invoke(channel, { kind: 'save', item: { title: 'Private old draft', content: 'Private old content', kind: 'draft' }, expectedRevision: 0 });
+    await invoke('auth:logout');
+    context.currentUser = user('new');
+    assert.equal(valid(), false, `${channel} must invalidate old-account work.`);
+    request.resolve(channel === 'representative:get-state' ? { accountId: 'old', continuations: ['private content'] } : { state: { accountId: 'old' } });
+    const result = await pending;
+    assert.equal(result.ok, false);
+    assert.equal(JSON.stringify(result).includes('private content'), false, 'Old-account continuation data must not reach the new renderer.');
+  }
+
   for (const operation of ['login', 'register']) {
     const { context, invoke } = mainHarness();
     const request = deferred();
@@ -88,6 +223,7 @@ async function testMainSessionBoundaries() {
     context.currentUser = user('old');
     context.aiChatService.chat = () => request.promise;
     const pending = invoke('ai:chat', { message: 'mock message', history: [] });
+    await new Promise(setImmediate);
     await invoke('auth:logout');
     request.resolve({ text: 'private old account reply' });
     assert.equal((await pending).ok, false, 'A reply from an expired account must not reach the next session.');
@@ -99,6 +235,7 @@ async function testMainSessionBoundaries() {
     context.currentUser = user('old');
     context.aiChatService.chat = () => request.promise;
     const pending = invoke('ai:chat', { message: 'mock message', history: [] });
+    await new Promise(setImmediate);
     await invoke('auth:logout');
     request.reject(new Error('A private error from the previous account'));
     assert.match((await pending).message, /账户会话已改变/, 'Expired requests must not return their old private error.');
@@ -122,6 +259,69 @@ async function testMainSessionBoundaries() {
     context.accountStore.supplementProfile = async () => user('new');
     assert.equal((await invoke('auth:supplement-profile', {})).ok, true);
     assert.equal(destroyed, 3, 'Profile changes must refresh cached companion preferences.');
+  }
+}
+
+async function testRendererDocumentBoundaries() {
+  const main = source('electron/main.ts');
+  const security = main.slice(main.indexOf('function configureWindowSecurity('), main.indexOf('function companionPosition('));
+  function rendererHarness(role = 'main') {
+    const test = mainHarness();
+    const contents = Object.assign(new EventEmitter(), { setWindowOpenHandler() {} });
+    test.context.logEvent = () => {};
+    test.context.isTrustedRendererUrl = () => true;
+    vm.runInContext(stripTypeScriptTypes(security), test.context);
+    test.context.configureWindowSecurity({ webContents: contents }, role);
+    return { ...test, contents };
+  }
+  for (const role of ['main', 'companion']) {
+    const { context, contents } = rendererHarness(role);
+    context.currentUser = user('document-boundary');
+    for (const details of [
+      { isMainFrame: false, isSameDocument: false },
+      { isMainFrame: true, isSameDocument: true },
+      ...(role === 'companion' ? [{ isMainFrame: true, isSameDocument: false }] : []),
+    ]) {
+      contents.emit('did-start-navigation', details);
+      assert.equal(context.currentUser.id, 'document-boundary', 'Subframe, same-document and companion navigation must preserve the main session.');
+      assert.equal(context.aiChatService.cancelCount, 0);
+    }
+    if (role === 'companion') {
+      contents.emit('render-process-gone', {}, { reason: 'crashed', exitCode: 1 });
+      assert.equal(context.currentUser.id, 'document-boundary', 'A companion crash must not log the main renderer out.');
+      assert.equal(context.aiChatService.cancelCount, 0);
+    }
+  }
+  for (const event of ['did-start-navigation', 'render-process-gone']) {
+    const { context, contents } = rendererHarness();
+    context.currentUser = user('document-boundary');
+    const store = new RepresentativeStore(path.join(root, 'unused-runtime-only-store'), {});
+    context.representativeStore = store;
+    store.beginConversation(context.currentUser.id, true);
+    store.observeSavedContent(context.currentUser.id);
+    const session = context.sessionEpoch.capture();
+    const conversation = context.conversationEpoch.capture();
+    let companionDestroyed = 0;
+    context.companionWindow = { isDestroyed: () => false, destroy: () => { companionDestroyed += 1; } };
+    if (event === 'did-start-navigation') contents.emit(event, { isMainFrame: true, isSameDocument: false });
+    else contents.emit(event, {}, { reason: 'crashed', exitCode: 1 });
+    assert.equal(context.currentUser, null, 'A new main document or renderer process must reauthenticate instead of inheriting hidden runtime privacy flags.');
+    assert.equal(context.sessionEpoch.isCurrent(session), false);
+    assert.equal(context.conversationEpoch.isCurrent(conversation), false);
+    assert.equal(store.isTemporary('document-boundary'), false);
+    assert.equal(store.isLearningPaused('document-boundary'), false);
+    assert.equal(context.aiChatService.cancelCount, 1);
+    assert.equal(companionDestroyed, 1, 'A new main renderer must not leave an old companion identity alive.');
+  }
+  {
+    const { context, contents, invoke } = rendererHarness();
+    const login = deferred();
+    context.accountStore.login = () => login.promise;
+    const pending = invoke('auth:login', { email: 'mock@example.com', password: 'MockOnly123!' });
+    contents.emit('did-start-navigation', { isMainFrame: true, isSameDocument: false });
+    login.resolve(user('old-document'));
+    assert.equal((await pending).ok, false, 'A login from the previous document must not authenticate the replacement renderer.');
+    assert.equal(context.currentUser, null);
   }
 }
 
@@ -343,9 +543,11 @@ function testComponentHarness(file, componentName, props, extraContext = {}) {
   const component = source(file);
   const start = component.indexOf(`export function ${componentName}(`);
   assert.ok(start >= 0);
-  const end = component.indexOf('\n  return (', start);
+  const end = component.indexOf('\n  return (', start) >= 0
+    ? component.indexOf('\n  return (', start)
+    : component.indexOf('\n  return <', start);
   assert.ok(end >= 0);
-  const prefix = component.slice(start, end).replace('export function', 'function');
+  const prefix = component.slice(start, end).replace('export function', 'function').replaceAll('import.meta.env.DEV', 'false');
   const cleanups = [];
   const stateWrites = [];
   const context = {
@@ -356,7 +558,7 @@ function testComponentHarness(file, componentName, props, extraContext = {}) {
     ...extraContext,
   };
   vm.createContext(context);
-  vm.runInContext(stripTypeScriptTypes(`${prefix}\nreturn { submit: typeof submit === 'undefined' ? saveSupplement : submit }; }\nthis.component = ${componentName};`), context);
+  vm.runInContext(stripTypeScriptTypes(`${prefix}\nreturn { submit: typeof submit === 'undefined' ? (typeof saveSupplement === 'undefined' ? undefined : saveSupplement) : submit, clearConversation: typeof clearConversation === 'undefined' ? undefined : clearConversation, readPrivacy: typeof readPrivacy === 'undefined' ? undefined : readPrivacy, updatePrivacy: typeof updatePrivacy === 'undefined' ? undefined : updatePrivacy, stop: typeof stop === 'undefined' ? undefined : stop }; }\nthis.component = ${componentName};`), context);
   return { handlers: context.component(props), unmount: () => cleanups.forEach((cleanup) => cleanup()), stateWrites };
 }
 
@@ -419,10 +621,9 @@ async function testRendererLateResponses() {
     signOut: () => signout.promise,
   };
   vm.createContext(context);
-  vm.runInContext(stripTypeScriptTypes(`${handlersSource}\nthis.callbacks = { authenticated, questionnaireCompleted, userUpdated, logout };`), context);
+  vm.runInContext(stripTypeScriptTypes(`${handlersSource}\nthis.callbacks = { authenticated, userUpdated, logout };`), context);
   const pendingLogout = context.callbacks.logout();
   context.callbacks.userUpdated(user('old'));
-  context.callbacks.questionnaireCompleted(user('old'));
   context.callbacks.authenticated(user('old'));
   assert.equal(writtenUsers.length, 0, 'App must ignore stale account callbacks as soon as logout begins.');
   signout.resolve();
@@ -430,11 +631,223 @@ async function testRendererLateResponses() {
   assert.deepEqual(writtenUsers, [null]);
 }
 
+async function testLearningPauseFeedback() {
+  const stateNames = [...source('src/pages/AiChatPage.tsx').matchAll(/const \[([^,]+), [^\]]+\] = useState/g)].map((match) => match[1]);
+  function viewFor(getState, cancel = async () => {}) {
+    const writes = [];
+    let listener;
+    let stateIndex = 0;
+    const view = testComponentHarness('src/pages/AiChatPage.tsx', 'AiChatPage', { user: { ...user('pause-test'), aiAgent: { modelAssignment: { baseModelId: 'test-model' } } } }, {
+      getAiStatus: async () => ({ configured: true, provider: 'deepseek', connection: 'untested' }),
+      window: { launcher: { ai: { cancel }, representative: { getState, onChanged: (callback) => { listener = callback; return () => {}; } } } },
+      useState: (value) => { const name = stateNames[stateIndex++]; return [value, (next) => writes.push({ name, next })]; },
+    });
+    return { ...view, writes, notice: (status) => listener(status) };
+  }
+  const snapshot = { revision: 4, privacyEpoch: 2, learningMode: 'learn', cloudConsent: true, memories: [], continuations: [] };
+  const oldRead = deferred();
+  let reads = 0;
+  const paused = viewFor(() => ++reads === 1 ? oldRead.promise : Promise.resolve({ ok: true, state: snapshot, learningPaused: true, temporary: false }));
+  paused.notice('paused');
+  await new Promise(setImmediate);
+  oldRead.resolve({ ok: true, state: snapshot, learningPaused: false, temporary: false });
+  await new Promise(setImmediate);
+  assert.ok(paused.writes.some(({ name, next }) => name === 'learningPaused' && next === true));
+  assert.equal(paused.writes.some(({ name, next }) => name === 'learningPaused' && next === false), false, 'An older privacy read must not overwrite a newer pause event.');
+  assert.equal(paused.writes.some(({ name, next }) => name === 'learningNotice' && next.includes('未保存')), false, 'A safety pause is not an encryption failure.');
+  paused.unmount();
+
+  const refresh = viewFor(async () => ({ ok: true, state: snapshot, learningPaused: true, temporary: false }));
+  await new Promise(setImmediate);
+  assert.ok(refresh.writes.some(({ name, next }) => name === 'learningPaused' && next === true), 'A newly mounted chat reads the runtime pause.');
+  refresh.unmount();
+
+  const stalePause = deferred();
+  let clearReads = 0;
+  const clearing = viewFor(() => ++clearReads === 1 ? stalePause.promise : Promise.resolve({ ok: true, state: snapshot, learningPaused: false, temporary: false }));
+  await clearing.handlers.clearConversation();
+  stalePause.resolve({ ok: true, state: snapshot, learningPaused: true, temporary: false });
+  await new Promise(setImmediate);
+  assert.equal(clearing.writes.some(({ name, next }) => name === 'learningPaused' && next === true), false, 'A pre-clear read cannot restore the old paused label.');
+  clearing.unmount();
+
+  const temporaryView = viewFor(async () => ({ ok: true, state: { ...snapshot, continuations: [] }, learningPaused: false, temporary: true }));
+  await new Promise(setImmediate);
+  assert.ok(temporaryView.writes.some(({ name, next }) => name === 'temporary' && next === true), 'A newly mounted chat must display the current main-process temporary mode.');
+  temporaryView.unmount();
+
+  {
+    const oldMode = deferred();
+    const switchedMode = deferred();
+    const cancellations = [];
+    let modeReads = 0;
+    const switching = viewFor(() => ++modeReads === 1 ? oldMode.promise : switchedMode.promise, async (mode) => { cancellations.push(mode); });
+    const pending = switching.handlers.clearConversation(true);
+    await new Promise(setImmediate);
+    assert.deepEqual(cancellations, [true], 'Switching modes must explicitly request the new conversation mode.');
+    assert.ok(switching.writes.some(({ name, next }) => name === 'privacy' && next === null), 'Switching modes hides the old profile until a fresh result is available.');
+    assert.ok(switching.writes.some(({ name, next }) => name === 'privacyBusy' && next === true));
+    assert.equal(switching.writes.some(({ name, next }) => name === 'privacyBusy' && next === false), false, 'Privacy actions stay blocked while the post-switch read is pending.');
+    switchedMode.resolve({ ok: true, state: { ...snapshot, memories: [], continuations: [] }, learningPaused: false, temporary: true });
+    assert.equal(await pending, true);
+    assert.ok(switching.writes.some(({ name, next }) => name === 'temporary' && next === true));
+    oldMode.resolve({ ok: true, state: snapshot, learningPaused: false, temporary: false });
+    await new Promise(setImmediate);
+    assert.equal(switching.writes.some(({ name, next }) => name === 'temporary' && next === false), false, 'A pre-switch read must not overwrite the newer temporary mode in the renderer.');
+    assert.equal(switching.writes.filter(({ name }) => name === 'privacy').at(-1).next.memories.length, 0);
+    switching.unmount();
+  }
+
+  for (const response of [
+    { ok: false, message: 'Isolated privacy read failure' },
+    { ok: true, state: snapshot, learningPaused: false },
+  ]) {
+    const failed = viewFor(async () => response);
+    await new Promise(setImmediate);
+    assert.equal(await failed.handlers.readPrivacy(), false, 'A failed read or missing runtime mode metadata must not be treated as a usable privacy snapshot.');
+    assert.equal(await failed.handlers.clearConversation(true), false, 'Cancelling requests alone cannot unlock a conversation whose privacy read failed.');
+    assert.ok(failed.writes.some(({ name, next }) => name === 'privacy' && next === null));
+    assert.ok(failed.writes.some(({ name, next }) => name === 'privacyError' && Boolean(next)));
+    assert.equal(failed.writes.some(({ name, next }) => name === 'temporary' && next === false), false, 'Read failure must never invent a normal-mode snapshot.');
+    failed.unmount();
+  }
+
+  const chatSource = source('src/pages/AiChatPage.tsx');
+  const temporaryControl = chatSource.slice(chatSource.indexOf('className="chat-side-card representative-temporary"'));
+  assert.match(temporaryControl.match(/disabled=\{([^}]+)\}/)?.[1] ?? '', /!privacy/, 'The temporary switch must be unavailable before privacy metadata has been read.');
+
+  const ipcCalls = [];
+  const ipc = Object.assign(new EventEmitter(), { invoke: (...args) => { ipcCalls.push(args); return Promise.resolve(); } });
+  let api;
+  vm.runInNewContext(stripTypeScriptTypes(source('electron/preload.ts').replace(/^import .*;\r?\n/gm, '')), {
+    contextBridge: { exposeInMainWorld: (_name, exposed) => { api = exposed; } }, ipcRenderer: ipc,
+  });
+  const notices = [];
+  const unsubscribe = api.representative.onChanged((status) => notices.push(status));
+  for (const status of ['saved', 'failed', 'paused', 'unknown', null, { status: 'paused' }]) ipc.emit('representative:changed', {}, status);
+  assert.deepEqual(notices, ['saved', 'failed', 'paused'], 'The preload bridge accepts only known status values.');
+  unsubscribe();
+  assert.equal(ipc.listenerCount('representative:changed'), 0);
+  await api.ai.cancel();
+  await api.ai.cancel(true);
+  await api.ai.cancel(false);
+  assert.deepEqual(ipcCalls.map((args) => args[0]), ['ai:cancel', 'ai:cancel', 'ai:cancel']);
+  assert.deepEqual(ipcCalls.map((args) => args[1]), [undefined, true, false], 'The preload bridge must not turn cancel-only into a false-mode conversation reset.');
+}
+
+async function testSimulationStopPreservesConversation() {
+  const cancellations = [];
+  const view = testComponentHarness('src/components/PrivateSimulationPanel.tsx', 'PrivateSimulationPanel', {
+    state: { revision: 2, storage: 'encrypted', memories: [], learningMode: 'learn' }, temporary: true,
+    canGenerate: true, onBusyChange() {}, onRefresh: async () => true, onStatusRefresh: async () => {},
+  }, {
+    simulationModes: ['generic', 'confirmed', 'all'],
+    window: { launcher: { ai: { cancel: async (...args) => { cancellations.push(args); } } } },
+  });
+  await view.handlers.stop();
+  assert.deepEqual(cancellations, [[]], 'Stopping a private trial cancels its request without declaring a new conversation or clearing its context guard.');
+  view.unmount();
+}
+
+async function testPrivacyUpdateFailureFeedback() {
+  const chat = source('src/pages/AiChatPage.tsx');
+  const stateNames = [...chat.matchAll(/const \[([^,]+), [^\]]+\] = useState/g)].map((match) => match[1]);
+  const snapshot = { revision: 4, privacyEpoch: 2, learningMode: 'off', cloudConsent: false, memories: [], continuations: [] };
+  const current = { ok: true, state: snapshot, learningPaused: false, temporary: false };
+  function mount(update, recover = async () => current) {
+    const states = new Map();
+    const writes = [];
+    let stateIndex = 0;
+    let reads = 0;
+    const view = testComponentHarness('src/pages/AiChatPage.tsx', 'AiChatPage', {
+      user: { ...user('privacy-error-test'), aiAgent: { modelAssignment: { baseModelId: 'test-model' } } },
+    }, {
+      Error,
+      getAiStatus: async () => ({ configured: true, provider: 'deepseek', connection: 'untested' }),
+      window: { launcher: { representative: {
+        getState: () => ++reads === 1 ? Promise.resolve(current) : recover(),
+        update, onChanged: () => () => {},
+      } } },
+      useState: (value) => {
+        const name = stateNames[stateIndex++];
+        states.set(name, value);
+        return [value, (next) => {
+          const resolved = typeof next === 'function' ? next(states.get(name)) : next;
+          states.set(name, resolved);
+          writes.push({ name, next: resolved });
+        }];
+      },
+    });
+    return { ...view, states, writes, get reads() { return reads; } };
+  }
+  const action = { kind: 'reset', expectedRevision: snapshot.revision };
+
+  const recovered = mount(async () => ({ ok: false, message: 'Isolated settings write failure' }));
+  await new Promise(setImmediate);
+  assert.equal(await recovered.handlers.updatePrivacy(action), false);
+  assert.equal(recovered.states.get('privacy'), snapshot, 'Successful recovery keeps the authoritative privacy snapshot.');
+  assert.equal(recovered.states.get('privacyError'), 'Isolated settings write failure', 'Recovery must not clear the failed mutation message.');
+  recovered.unmount();
+
+  const unreadable = mount(async () => { throw new Error('Isolated settings write failure'); }, async () => {
+    throw new Error('Isolated privacy recovery failure');
+  });
+  await new Promise(setImmediate);
+  assert.equal(await unreadable.handlers.updatePrivacy(action), false);
+  assert.equal(unreadable.states.get('privacy'), null, 'Failed recovery removes the usable snapshot and keeps sending disabled.');
+  assert.match(unreadable.states.get('privacyError'), /Isolated settings write failure/);
+  assert.match(unreadable.states.get('privacyError'), /Isolated privacy recovery failure/, 'Keep both the write failure and the reason recovery failed.');
+  unreadable.unmount();
+
+  const saved = mount(async () => current);
+  await new Promise(setImmediate);
+  assert.equal(await saved.handlers.updatePrivacy(action), true, 'Only a confirmed update reports success to reset confirmation.');
+  assert.equal(saved.states.get('privacyError'), '');
+  saved.unmount();
+
+  const update = deferred();
+  const unmountedUpdate = mount(() => update.promise);
+  await new Promise(setImmediate);
+  const pendingUpdate = unmountedUpdate.handlers.updatePrivacy(action);
+  assert.equal(await unmountedUpdate.handlers.updatePrivacy(action), false, 'Coalesce repeated privacy mutations before a React render.');
+  unmountedUpdate.unmount();
+  const beforeUpdate = unmountedUpdate.writes.length;
+  update.resolve({ ok: false, message: 'Late settings write failure' });
+  assert.equal(await pendingUpdate, false);
+  assert.equal(unmountedUpdate.writes.length, beforeUpdate, 'A late update failure cannot write after unmount.');
+  assert.equal(unmountedUpdate.reads, 1, 'Do not begin recovery for an unmounted page.');
+
+  const recovery = deferred();
+  const unmountedRecovery = mount(async () => ({ ok: false, message: 'Isolated settings write failure' }), () => recovery.promise);
+  await new Promise(setImmediate);
+  const pendingRecovery = unmountedRecovery.handlers.updatePrivacy(action);
+  await new Promise(setImmediate);
+  assert.equal(unmountedRecovery.reads, 2);
+  unmountedRecovery.unmount();
+  const beforeRecovery = unmountedRecovery.writes.length;
+  recovery.resolve(current);
+  assert.equal(await pendingRecovery, false);
+  assert.equal(unmountedRecovery.writes.length, beforeRecovery, 'Late recovery and mutation feedback cannot write after unmount.');
+
+  const panel = source('src/components/RepresentativePanel.tsx');
+  const confirmation = panel.match(/onChange\(\{ kind: 'reset', expectedRevision: state\.revision \}\)\.then\(([\s\S]*?)\); \}\}>确认重置/);
+  assert.ok(confirmation, 'The reset action must wait for the mutation result.');
+  for (const success of [false, true]) {
+    const closed = [];
+    vm.runInNewContext(`(${confirmation[1]})(${success});`, { setConfirmReset: (value) => closed.push(value) });
+    assert.deepEqual(closed, success ? [false] : [], 'A failed reset must not close its confirmation as though it succeeded.');
+  }
+}
+
 (async () => {
   await testMainSessionBoundaries();
+  await testRendererDocumentBoundaries();
   await testGameLaunchSessionBoundaries();
   testOneWayIpcRejections();
   await testInitialHealthProbeCleanup();
   await testRendererLateResponses();
-  console.log('Session invalidation, game launch ownership, companion identity and stale UI response tests passed.');
+  await testLearningPauseFeedback();
+  await testSimulationStopPreservesConversation();
+  await testPrivacyUpdateFailureFeedback();
+  console.log('Session invalidation, renderer navigation, temporary privacy, cancel-only context, game launch ownership and stale UI response tests passed.');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

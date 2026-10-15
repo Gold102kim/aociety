@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AvatarScene } from '../components/AvatarScene';
+import { AvatarScene, type AvatarLoadStatus } from '../components/AvatarScene';
 import { getThemeStyle } from '../theme';
 
 type CompanionState = {
@@ -9,6 +9,7 @@ type CompanionState = {
 };
 
 export function CompanionApp() {
+  const [avatarStatus, setAvatarStatus] = useState<AvatarLoadStatus>('loading');
   const [state, setState] = useState<CompanionState>({
     displayName: 'Echo',
     agentStatus: 'WAITING_FOR_PROFILE',
@@ -35,8 +36,8 @@ export function CompanionApp() {
         <button type="button" aria-label="恢复主界面" title="恢复主界面" onClick={() => window.launcher?.companion.restore()}>↗</button>
         <button type="button" aria-label="退出软件" title="退出软件" onClick={() => window.launcher?.companion.quit()}>×</button>
       </div>
-      <div className="companion-name"><i aria-hidden="true"/>{state.displayName} · {state.agentStatus === 'READY' ? '在线' : '初始化中'}</div>
-      <section className="companion-avatar" aria-label={`${state.displayName} 的桌面虚拟分身`}><div className="companion-glow" aria-hidden="true"/><AvatarScene variant="companion"/></section>
+      <div className="companion-name"><i aria-hidden="true"/>{state.displayName} · {avatarStatus === 'ready' ? '桌面伴生' : avatarStatus === 'error' ? '外观不可用' : '载入外观中'}</div>
+      <section className="companion-avatar" aria-label={`${state.displayName} 的桌面虚拟分身`}><div className="companion-glow" aria-hidden="true"/><AvatarScene variant="companion" onStatusChange={setAvatarStatus}/></section>
       <div className="companion-shadow" aria-hidden="true"/><p>双击恢复平台</p>
     </main>
   );

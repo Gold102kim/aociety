@@ -1,47 +1,54 @@
-/* iOS-inspired glass for the launcher only. No refraction shaders, animated blur or canvas filters. */
+/* Frosted baseline for the launcher. Local lens enhancement lives in liquid-glass.css; no 3D canvas filters. */
 .app.ui-refresh.ui-glass {
-  --glass-filter: blur(22px) saturate(135%);
-  --glass-fill: linear-gradient(145deg, rgba(220,239,255,.15), rgba(38,55,77,.64) 48%, rgba(25,38,58,.74));
-  --glass-border: rgba(223,239,255,.23);
-  --glass-shadow: 0 14px 34px rgba(2,8,20,.24), inset 0 1px 0 rgba(255,255,255,.2), inset 0 -1px 0 rgba(255,255,255,.04);
-  --glass-panel: rgba(21,32,49,.9);
-  --glass-field: rgba(10,19,33,.78);
-  --glass-chrome: rgba(18,29,45,.62);
+  --glass-filter: blur(24px) saturate(135%);
+  --glass-fill: linear-gradient(155deg, rgba(215,235,255,.1), rgba(33,47,65,.62) 45%, rgba(22,34,51,.74));
+  --glass-border: rgba(225,239,255,.13);
+  --glass-shadow: 0 12px 36px rgba(0,5,16,.22), inset 0 1px 0 rgba(255,255,255,.14);
+  --glass-panel: rgba(20,29,43,.94);
+  --glass-field: rgba(10,18,29,.62);
+  --glass-chrome: rgba(31,46,64,.64);
   --glass-nested: rgba(17,30,48,.4);
   --glass-tabs: rgba(19,33,52,.64);
-  --glass-selected: rgba(229,246,255,.13);
-  --glass-message: rgba(32,48,69,.85);
+  --glass-selected: rgba(230,245,255,.11);
+  --glass-message: rgba(38,52,71,.66);
   --glass-composer: rgba(12,22,37,.3);
   --glass-suggestions: rgba(13,29,46,.64);
   --glass-secondary: rgba(239,255,249,.09);
-  --glass-control-shadow: inset 0 1px rgba(255,255,255,.16);
+  --glass-control-shadow: inset 0 1px rgba(255,255,255,.12), 0 2px 6px rgba(0,5,12,.12);
   --glass-action-shadow: 0 7px 18px rgba(0,10,16,.2), inset 0 1px rgba(255,255,255,.35);
   --glass-hover-shadow: 0 18px 40px rgba(2,8,20,.28), inset 0 1px rgba(255,255,255,.3);
   --glass-edge-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 1px 0 0 rgba(230,255,255,.07);
-  --radius-card: 22px;
-  --ui-muted: #b3c1d2;
+  --radius-card: 20px;
+  --ui-muted: #b3c0d2;
+  --ui-text: #f3f6fc;
+  --ui-danger: #f4b9c1;
+  --ease-ui: cubic-bezier(.2,.8,.2,1);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Microsoft YaHei UI", system-ui, sans-serif;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
   position: relative;
   isolation: isolate;
-  background-color: #0c1525;
+  background-color: #0b111c;
   background-image:
-    radial-gradient(ellipse 56% 68% at 84% 12%, rgba(98,165,190,.35), transparent 74%),
-    radial-gradient(ellipse 52% 57% at 29% 95%, rgba(119,97,167,.27), transparent 74%),
-    radial-gradient(ellipse 38% 70% at 4% 40%, rgba(50,140,143,.25), transparent 77%),
-    radial-gradient(ellipse 44% 62% at 80% 80%, var(--accent-soft), transparent 76%);
+    radial-gradient(ellipse 65% 75% at 100% 0%, rgba(75,125,155,.22), transparent 72%),
+    radial-gradient(ellipse 55% 68% at 4% 90%, rgba(99,86,151,.16), transparent 75%),
+    radial-gradient(ellipse 45% 70% at 0% 0%, var(--accent-soft), transparent 76%);
 }
-.ui-glass .titlebar { background: var(--glass-chrome); border-bottom-color: rgba(234,246,255,.13); backdrop-filter: var(--glass-filter); }
+.ui-glass .titlebar { height: 48px; background: var(--glass-chrome); border-bottom: 0; backdrop-filter: var(--glass-filter); }
 .ui-glass .window-controls .appearance-toggle { width: auto; min-width: 76px; height: 28px; margin: 7px 14px 7px 0; padding: 0 11px; display: flex; align-items: center; gap: 7px; color: #dae6f4; background: rgba(235,245,255,.07); border: 1px solid var(--glass-border); border-radius: 999px; font-size: 11px; }
 .ui-glass .appearance-toggle svg { width: 15px; height: 15px; }
 .ui-glass .window-controls .appearance-toggle:hover { background: rgba(235,245,255,.13); }
 .ui-glass .window-controls .appearance-toggle[aria-pressed="true"] { color: var(--accent); border-color: var(--accent-border); }
-.ui-glass .sidebar { margin: 14px 0 14px 14px; padding: 20px 12px 14px; border: 1px solid var(--glass-border); border-radius: 26px; background: var(--glass-fill); backdrop-filter: var(--glass-filter); box-shadow: var(--glass-shadow); }
+.ui-glass .launcher-shell { height: calc(100vh - 48px); grid-template-columns: 220px minmax(0,1fr); min-height: 0; }
+.ui-glass .sidebar { min-height: 0; margin: 12px 0 12px 12px; padding: 20px 10px 12px; border: 0; border-radius: 22px; background: var(--glass-fill); backdrop-filter: var(--glass-filter); box-shadow: var(--glass-shadow); }
 .ui-glass .sidebar-heading { padding-left: 12px; padding-bottom: 22px; }
 .ui-glass .sidebar-heading small { color: #a4b8cc; }
 .ui-glass .sidebar-bottom { border-color: rgba(231,242,255,.13); }
-.ui-glass .nav-item { border: 1px solid transparent; border-radius: 15px; padding-left: 12px; padding-right: 12px; gap: 10px; color: #c0cddd; }
-.ui-glass .nav-item.active { color: var(--accent); border-color: var(--accent-border); background: var(--glass-selected); box-shadow: var(--glass-control-shadow); }
-.ui-glass .nav-item:hover:not(.active) { background: rgba(235,245,255,.08); border-color: rgba(235,245,255,.12); }
-.ui-glass .profile { background: var(--glass-nested); border-color: rgba(234,246,255,.15); border-radius: 17px; gap: 9px; }
+.ui-glass .nav-item { border: 0; border-radius: 12px; padding-left: 12px; padding-right: 12px; gap: 10px; color: #c0cddd; }
+.ui-glass .nav-item.active { color: var(--ui-text); background: var(--glass-selected); box-shadow: var(--glass-control-shadow); }
+.ui-glass .nav-item.active .icon { color: var(--accent); }
+.ui-glass .nav-item:hover:not(.active) { background: rgba(235,245,255,.065); }
+.ui-glass .profile { background: var(--glass-nested); border: 0; border-radius: 14px; gap: 9px; }
 .ui-glass .profile-copy strong { max-width: 96px; }
 .ui-glass .profile:hover { background: rgba(235,245,255,.1); }
 .ui-glass .avatar { border: 1px solid rgba(238,255,255,.23); background: linear-gradient(135deg, var(--accent-soft), rgba(225,251,255,.11)); color: var(--accent); }
@@ -61,20 +68,20 @@
 .ui-glass .quick-card p { color: #c0ccdb; }
 .ui-glass .quick-icon { background: var(--glass-selected); border: 1px solid rgba(222,250,253,.13); border-radius: 13px; box-shadow: var(--glass-control-shadow); }
 .ui-glass :is(.quick-tag,.quick-arrow,.companion-hint) { color: #adbed1; }
-.ui-glass :is(.world-map-card,.world-panel,.world-region-section,.world-metrics article,.social-panel,.social-metrics article,.profile-card,.avatar-info-card,.chat-side-card) { background: var(--glass-fill); border-color: var(--glass-border); box-shadow: var(--glass-shadow); border-radius: 22px; }
+.ui-glass :is(.world-map-card,.world-panel,.world-region-section,.world-metrics article,.social-panel,.social-metrics article,.profile-card,.avatar-info-card,.chat-side-card) { background: var(--glass-panel); border: 0; box-shadow: none; border-radius: 20px; }
 .ui-glass :is(.world-map-card,.avatar-preview-card,.chat-window,.profile-details-card,.social-inbox)::before { display: none; }
-.ui-glass :is(.chat-window,.avatar-preview-card) { background: var(--glass-panel); border-color: var(--glass-border); box-shadow: var(--glass-shadow); border-radius: 24px; backdrop-filter: none; }
+.ui-glass :is(.chat-window,.avatar-preview-card) { background: var(--glass-panel); border: 0; box-shadow: 0 10px 32px rgba(0,5,15,.16); border-radius: 20px; backdrop-filter: none; }
 .ui-glass .avatar-preview-stage { background: radial-gradient(ellipse at 50% 45%, var(--accent-soft), #101c2d 68%); }
 .ui-glass :is(.avatar-q-preview,.avatar-not-created.loaded,.profile-status,.world-server-state.demo,.social-connection) { backdrop-filter: none; background-color: var(--glass-panel); border-radius: 14px; }
 .ui-glass .avatar-preview-stage :is(.avatar-stage-ring,.avatar-q-preview i) { animation: none; }
-.ui-glass .page-tabs { border-radius: 999px; padding: 4px 5px; border-color: var(--glass-border); background: var(--glass-tabs); box-shadow: var(--glass-control-shadow); backdrop-filter: none; }
-.ui-glass .page-tabs button { border-radius: 999px; color: #b6c6d8; }
+.ui-glass .page-tabs { width: fit-content; max-width: 100%; margin-left: 0; margin-right: 0; border-radius: 14px; padding: 4px; border: 0; background: var(--glass-tabs); box-shadow: var(--glass-control-shadow); backdrop-filter: var(--glass-filter); }
+.ui-glass .page-tabs button { border-radius: 10px; color: #b6c6d8; }
 .ui-glass .page-tabs button.active { color: var(--ui-text); background: var(--glass-selected); box-shadow: var(--glass-control-shadow); }
-.ui-glass .chat-agent-bar { background: rgba(242,250,255,.035); border-color: rgba(225,240,255,.12); }
+.ui-glass .chat-agent-bar { background: transparent; border-color: var(--glass-border); }
 .ui-glass .chat-agent-avatar { background: var(--accent-soft); border-color: rgba(233,255,252,.18); }
-.ui-glass .chat-message p { background: var(--glass-message); border-color: rgba(226,241,255,.13); border-radius: 5px 18px 18px; }
+.ui-glass .chat-message p { background: var(--glass-message); border: 0; border-radius: 4px 16px 16px; color: var(--ui-text); }
 .ui-glass .chat-message.user p { background: var(--accent-soft); border-color: var(--accent-border); border-radius: 18px 5px 18px 18px; }
-.ui-glass .chat-composer { background: var(--glass-composer); border-color: rgba(233,245,255,.12); }
+.ui-glass .chat-composer { background: var(--glass-composer); border: 0; border-radius: 20px; backdrop-filter: var(--glass-filter); box-shadow: var(--glass-control-shadow); }
 .ui-glass :is(.chat-composer textarea,.auth-card input,.questionnaire-panel input,.questionnaire-panel select,.profile-supplement-grid input,.profile-supplement-grid select,.social-search-card input) { background: var(--glass-field); border-color: rgba(220,239,255,.23); border-radius: 15px; color: #eef4fc; }
 .ui-glass :is(.chat-composer textarea,.auth-card input,.questionnaire-panel input,.profile-supplement-grid input,.social-search-card input)::placeholder { color: #9eafc3; opacity: 1; }
 .ui-glass .chat-side-card dt { color: #b5c5d7; }
@@ -83,7 +90,7 @@
 .ui-glass .chat-model-status.ready { background: rgba(20,43,38,.85); }
 .ui-glass .toast { border-radius: 18px; border-color: var(--glass-border); background: rgba(31,46,66,.94); box-shadow: var(--glass-shadow); }
 .ui-glass .auth-panel { background: transparent; border-color: rgba(234,245,255,.12); }
-.ui-glass .auth-card { width: min(100%,440px); padding: 32px; background: var(--glass-fill); border: 1px solid var(--glass-border); border-radius: 28px; box-shadow: var(--glass-shadow); }
+.ui-glass .auth-card { width: min(100%,440px); padding: 32px; background: var(--glass-fill); border: 0; border-radius: 24px; box-shadow: var(--glass-shadow); backdrop-filter: var(--glass-filter); }
 .ui-glass .auth-tabs { border: 1px solid var(--glass-border); padding: 4px; border-radius: 999px; background: var(--glass-chrome); }
 .ui-glass .auth-tabs button { padding: 10px; border-radius: 999px; color: #b3c2d3; }
 .ui-glass .auth-tabs button.active { background: var(--glass-selected); box-shadow: var(--glass-control-shadow); }
@@ -93,6 +100,136 @@
 .ui-glass :is(.profile-definition-grid span,.profile-interests > span,.account-card dt,.profile-card-heading small,.logout-card p,.world-panel-heading small,.world-event-list p,.world-event-list time,.world-travel-list p,.world-travel-list small,.world-region-heading p,.social-panel-heading small,.social-feed p,.social-feed time,.social-feed small,.social-search-card > p,.friend-preview-list small,.social-preference-card p) { color: var(--ui-muted); }
 .ui-glass .friend-preview-list .offline { opacity: 1; }
 .ui-glass :is(.questionnaire-panel select,.profile-supplement-grid select) option { background: #172337; color: #eef4fc; }
+
+/* Glass is functional chrome; reading and privacy controls sit on quiet content. */
+.ui-glass :is(h1,h2,h3) { text-wrap: balance; letter-spacing: -.02em; }
+.ui-glass :is(p,small) { text-wrap: pretty; }
+.ui-glass ::selection { color: var(--accent-contrast); background: var(--accent); }
+.ui-glass :is(input,textarea) { caret-color: var(--accent); }
+.ui-glass :is(button,input,select,textarea,summary) { scroll-margin-block: 24px; }
+.ui-glass :is(button,summary) { touch-action: manipulation; }
+.ui-glass :is(button,input,select,textarea,summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.ui-glass .brand-mini { font-size: 12px; letter-spacing: 1.4px; }
+.ui-glass .window-controls > button { display: flex; align-items: center; justify-content: center; min-width: 44px; }
+.ui-glass .window-controls .icon { width: 18px; height: 18px; }
+.ui-glass .window-controls .appearance-toggle { min-height: 34px; height: 34px; margin-block: 7px; }
+.ui-glass .sidebar-heading { padding-bottom: 16px; }
+.ui-glass .nav-group-explore { margin-top: 28px; }
+.ui-glass .nav-group-label { display: block; padding: 0 12px 12px; font-size: 12px; color: var(--ui-muted); }
+.ui-glass .nav-item { font-weight: 500; transition: background-color 120ms ease-out, color 120ms ease-out; }
+.ui-glass .nav-item:active { background: var(--glass-selected); }
+.ui-glass .profile-chevron .icon { width: 16px; height: 16px; }
+.ui-glass .quick-arrow .icon { width: 20px; height: 20px; }
+.ui-glass .toast button { min-width: 40px; min-height: 40px; display: grid; place-items: center; }
+.ui-glass .toast .icon { width: 18px; height: 18px; }
+.ui-glass :is(.town-actions,.home-footer) button .icon { width: 18px; height: 18px; flex-shrink: 0; }
+.ui-glass .town-actions button { display: inline-flex; align-items: center; gap: 8px; }
+.ui-glass :is(.home-content,.world-content,.avatar-content,.social-content,.profile-content) { min-width: 0; padding: 28px 32px 32px; }
+.ui-glass :is(.world-page-header,.avatar-page-header,.social-page-header,.chat-page-header) { border: 0; align-items: center; }
+.ui-glass :is(.world-page-header,.social-page-header) { gap: 16px; flex-wrap: wrap; }
+.ui-glass :is(.world-page-header,.social-page-header,.profile-card-heading,.world-panel-heading,.world-region-heading,.social-panel-heading) > div > span,
+.ui-glass .profile-eyebrow { display: none; }
+.ui-glass .chat-content { padding: 24px 28px; }
+.ui-glass .chat-page-header { margin-bottom: 16px; padding: 0; }
+.ui-glass .chat-page-header h1 { font-size: 28px; line-height: 1.35; }
+.ui-glass .chat-page-header p { font-size: 13px; line-height: 1.7; margin-top: 6px; }
+.ui-glass .chat-page-header button { min-height: 32px; padding: 0; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
+.ui-glass .chat-page-header button .icon { width: 16px; height: 16px; }
+.ui-glass .chat-workspaces { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; margin-bottom: 20px; }
+.ui-glass .chat-workspaces nav { gap: 2px; padding: 4px; border-radius: 15px; background: var(--glass-chrome); box-shadow: var(--glass-control-shadow); backdrop-filter: var(--glass-filter); }
+.ui-glass .chat-workspaces button { min-height: 40px; border: 0; border-radius: 11px; background: transparent; padding: 8px 18px; }
+.ui-glass .chat-workspaces button[aria-pressed="true"] { color: var(--ui-text); background: var(--glass-selected); box-shadow: var(--glass-control-shadow); }
+.ui-glass .chat-workspaces p { max-width: 40ch; margin: 0; font-size: 12px; }
+.ui-glass .chat-layout { gap: 20px; grid-template-columns: minmax(0,1fr) 312px; }
+.ui-glass .chat-agent-bar { padding: 16px 20px; flex-wrap: wrap; }
+.ui-glass .chat-agent-bar strong { font-size: 14px; }
+.ui-glass .chat-agent-bar button { min-height: 40px; padding: 8px 10px; font-size: 12px; }
+.ui-glass .chat-messages { padding: 24px 20px; }
+.ui-glass .chat-message { margin-bottom: 24px; }
+.ui-glass .chat-message > div { max-width: min(86%,68ch); min-width: 0; }
+.ui-glass .chat-message p { font-size: 15px; line-height: 1.8; }
+.ui-glass .chat-message.user p { border: 0; }
+.ui-glass .chat-starters { padding: 4px 0 0 40px; }
+.ui-glass .chat-starters h2 { font-size: 13px; font-weight: 500; color: var(--ui-muted); margin: 0 0 12px; }
+.ui-glass .chat-starter-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.ui-glass .chat-starters button { width: auto; margin: 0; min-height: 40px; padding: 10px 14px; border: 0; border-radius: 12px; color: var(--ui-text); background: var(--glass-selected); }
+.ui-glass .chat-starters button:hover { background: var(--accent-soft); }
+.ui-glass .chat-composer { margin: 0 12px 12px; padding: 12px; }
+.ui-glass .chat-composer textarea { height: 68px; min-height: 68px; padding: 10px 12px; border-radius: 10px; border: 1px solid transparent; background: transparent; font-size: 15px; }
+.ui-glass .chat-composer textarea:focus { border-color: var(--accent-border); box-shadow: none; }
+.ui-glass .chat-composer:focus-within { box-shadow: var(--glass-control-shadow), 0 0 0 1px var(--accent-border); }
+.ui-glass .chat-composer-actions { margin: 8px 0 0; }
+.ui-glass .chat-side-column { gap: 0; padding: 0 16px; border-radius: 20px; background: var(--glass-panel); }
+.ui-glass .chat-side-card { background: transparent; border-radius: 0; padding: 20px 0; border-bottom: 1px solid var(--glass-border); box-shadow: none; }
+.ui-glass .chat-side-card h2 { font-size: 16px; font-weight: 600; margin: 0 0 10px; }
+.ui-glass .representative-heading { margin-bottom: 16px; }
+.ui-glass .representative-mode { font-size: 12px; line-height: 1.6; }
+.ui-glass .representative-panel p { font-size: 12px; line-height: 1.7; }
+.ui-glass .representative-consent { gap: 10px; align-items: flex-start; padding: 0; }
+.ui-glass .representative-consent > span { font-size: 13px; }
+.ui-glass .representative-consent small { color: var(--ui-muted); font-size: 12px; line-height: 1.7; margin-top: 8px; }
+.ui-glass .representative-field { font-size: 13px; }
+.ui-glass .representative-field select { min-height: 44px; border-radius: 10px; }
+.ui-glass .representative-panel .representative-learning-hint { margin-top: 8px; }
+.ui-glass .representative-panel .representative-change-notice { padding: 10px 0; color: var(--ui-muted); }
+.ui-glass .representative-panel :is(details,summary), .ui-glass .chat-connection-details summary { font-size: 13px; }
+.ui-glass .representative-policy-details summary { min-height: 44px; padding: 12px 0; cursor: pointer; }
+.ui-glass .representative-panel button { border-radius: 10px; min-height: 40px; }
+.ui-glass .representative-temporary label { min-height: 44px; }
+.ui-glass .representative-temporary p { margin: 4px 0 0; font-size: 12px; line-height: 1.7; color: var(--ui-muted); }
+.ui-glass .chat-connection-details summary { min-height: 44px; cursor: pointer; color: var(--ui-text); }
+.ui-glass .chat-connection-details summary > span { display: block; margin: 8px 0 0 16px; color: var(--ui-muted); font-size: 12px; }
+.ui-glass .chat-connection-details p { margin-top: 12px; }
+.ui-glass .chat-side-column > .representative-notice { margin-top: 16px; padding: 12px; }
+.ui-glass .chat-side-column .chat-error { grid-row: auto; margin: 12px 0; }
+.app.ui-refresh.ui-glass input[type="checkbox"] { appearance: none; position: relative; width: 42px; height: 26px; min-width: 42px; flex: 0 0 42px; margin: 0; border: 1px solid rgba(255,255,255,.28); border-radius: 999px; background: var(--glass-field); cursor: pointer; transition: background-color 140ms ease-out; }
+.ui-glass input[type="checkbox"]::before { content: ''; position: absolute; width: 20px; height: 20px; inset: 2px auto auto 2px; border-radius: 50%; background: #f3f6fc; box-shadow: 0 2px 4px rgba(0,0,0,.2); transition: transform 160ms var(--ease-ui); }
+.app.ui-refresh.ui-glass input[type="checkbox"]:checked { background: var(--accent); border-color: transparent; }
+.ui-glass input[type="checkbox"]:checked::before { transform: translateX(16px); background: #f3f6fc; box-shadow: inset 0 0 0 1px var(--accent-contrast), 0 2px 4px rgba(0,0,0,.2); }
+.ui-glass input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .55; }
+.ui-glass :is(.primary-button,.play-button,.avatar-chat-button,.chat-composer button) { transition: scale 120ms ease-out, background-color 120ms ease-out, box-shadow 120ms ease-out; }
+.ui-glass :is(.primary-button,.play-button,.avatar-chat-button,.chat-composer button):hover:not(:disabled) { transform: none; }
+.ui-glass :is(.primary-button,.play-button,.avatar-chat-button,.chat-composer button):active:not(:disabled) { scale: .96; }
+.ui-glass .quick-card:hover { transform: none; }
+.ui-glass .auth-shell { height: calc(100vh - 48px); }
+.ui-glass .auth-visual { background: transparent; }
+.ui-glass :is(.auth-visual::after,.orb,.grid-horizon) { display: none; }
+.ui-glass .auth-story h1 { font-weight: 600; letter-spacing: -.025em; line-height: 1.2; }
+.ui-glass .auth-story h1 span { color: var(--ui-text); }
+.ui-glass .auth-story > p { color: var(--ui-muted); }
+.ui-glass .brand-subtitle { font-size: 12px; letter-spacing: 0; }
+@media (max-width: 1200px) {
+  .ui-glass .chat-layout { grid-template-columns: minmax(0,1fr) 280px; gap: 16px; }
+  .ui-glass .chat-content { padding: 20px; }
+}
+@media (max-width: 1100px) {
+  .ui-glass :is(.world-layout,.social-layout,.profile-layout) { grid-template-columns: minmax(0,1fr); }
+  .ui-glass .auth-shell { grid-template-columns: minmax(0,1fr); }
+  .ui-glass .auth-visual { display: none; }
+  .ui-glass .auth-panel { border: 0; padding: 24px; }
+}
+@media (max-width: 1000px) {
+  .ui-glass .chat-layout { grid-template-columns: minmax(0,1fr); }
+  .ui-glass .chat-side-column { overflow-y: visible; }
+  .ui-glass .chat-window { min-height: 540px; }
+}
+@media (max-width: 760px) {
+  .ui-glass .launcher-shell { grid-template-columns: 150px minmax(0,1fr); }
+  .ui-glass .sidebar { margin: 8px 0 8px 8px; padding: 16px 8px 8px; border-radius: 16px; }
+  .ui-glass .nav-item { padding-inline: 8px; gap: 8px; font-size: 13px; }
+  .ui-glass .sidebar-heading { padding-inline: 8px; }
+  .ui-glass .profile { padding: 8px; }
+  .ui-glass .profile-copy small { display: none; }
+  .ui-glass :is(.chat-content,.home-content,.world-content,.avatar-content,.social-content,.profile-content) { padding: 16px; }
+  .ui-glass .chat-page-header h1 { font-size: 24px; }
+  .ui-glass .chat-starters { padding-left: 0; }
+  .ui-glass .chat-starters button { width: 100%; }
+  .ui-glass .chat-messages { padding: 20px 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-glass :is(button,input[type="checkbox"],input[type="checkbox"]::before) { transition: none; }
+  .ui-glass :is(.primary-button,.play-button,.avatar-chat-button,.chat-composer button):active:not(:disabled) { scale: none; }
+}
 
 /* Same foreground/spacing in clear mode; only the material changes. */
 .app.ui-refresh.ui-glass.ui-glass-reduced {
@@ -145,5 +282,11 @@
 @media (forced-colors: active) {
   .app.ui-refresh.ui-glass { --accent: Highlight !important; --accent-hover: Highlight !important; --accent-contrast: HighlightText !important; --ui-text: CanvasText; --ui-muted: CanvasText; --glass-fill: Canvas; --glass-panel: Canvas; --glass-field: Canvas; --glass-border: CanvasText; --glass-filter: none; --glass-shadow: none; background: Canvas; color: CanvasText; }
   .ui-glass :is(.titlebar,.sidebar,.quick-card,.chat-window,.chat-side-card,.avatar-preview-card,.avatar-info-card,.page-tabs,.profile,.auth-card,.chat-message p,.chat-composer textarea) { color: CanvasText; background: Canvas; border-color: CanvasText; box-shadow: none; }
-  .ui-glass :is(.play-button,.primary-button,.avatar-chat-button,.chat-composer button,.nav-item.active) { background: Highlight; color: HighlightText; border: 1px solid Highlight; }
+  .ui-glass :is(.play-button,.primary-button,.avatar-chat-button,.chat-composer button,.nav-item.active) { background: Canvas; color: CanvasText; border: 1px solid CanvasText; }
+  .app.ui-refresh.ui-glass { --glass-chrome: Canvas; --glass-selected: Canvas; --glass-tabs: Canvas; --glass-message: Canvas; --glass-composer: Canvas; --glass-control-shadow: none; }
+  .app.ui-refresh.ui-glass input[type="checkbox"] { appearance: auto; width: 24px; height: 24px; min-width: 24px; flex-basis: 24px; background: Canvas; border-color: CanvasText; }
+  .ui-glass input[type="checkbox"]::before { display: none; }
+  .ui-glass .chat-workspaces button[aria-pressed="true"] { color: CanvasText; background: Canvas; }
+  .ui-glass :is(.nav-item.active,.chat-workspaces button[aria-pressed="true"]) { outline: 2px solid Highlight; outline-offset: -2px; }
+  .ui-glass :is(.play-button,.primary-button,.avatar-chat-button,.chat-composer button):hover:not(:disabled) { color: CanvasText; background: Canvas; }
 }

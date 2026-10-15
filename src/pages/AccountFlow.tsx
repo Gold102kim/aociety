@@ -53,30 +53,29 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: Launch
       <section className="auth-visual" aria-label="EchoVerse 简介">
         <div className="orb orb-one" aria-hidden="true"/><div className="orb orb-two" aria-hidden="true"/><div className="grid-horizon" aria-hidden="true"/>
         <div className="auth-story">
-          <div className="eyebrow">YOUR OTHER SELF IS WAITING</div>
-          <h1>另一个世界，<br/><span>正在记住你。</span></h1>
-          <p>创建你的数字分身。探索、相遇、成长——即使你暂时离开，它的故事也不会停止。</p>
-          <div className="story-stats"><div><strong>24 / 7</strong><span>持续生长的世界</span></div><div><strong>AI NATIVE</strong><span>真正独立的数字分身</span></div></div>
+          <h1>从一次对话，<br/><span>开始认识你。</span></h1>
+          <p>不必填长问卷。先聊一个想法，再由你决定是否让数字代表记住少量偏好。</p>
+          <div className="story-stats"><div><strong>直接开始</strong><span>昵称和账户信息就够了</span></div><div><strong>由你决定</strong><span>随时停止学习或删除记忆</span></div></div>
         </div>
       </section>
 
       <section className="auth-panel">
         <div className="auth-card">
           <div className="brand-large"><span className="brand-mark">E</span><span>ECHO<span>VERSE</span></span></div>
-          <p className="brand-subtitle">DIGITAL LIFE PLATFORM</p>
+          <p className="brand-subtitle">你的数字代表，从对话开始</p>
           <div className="auth-tabs" role="tablist" aria-label="账户操作">
             <button type="button" role="tab" aria-selected={mode === 'login'} disabled={busy} className={mode === 'login' ? 'active' : ''} onClick={() => changeMode('login')}>登录</button>
             <button type="button" role="tab" aria-selected={mode === 'register'} disabled={busy} className={mode === 'register' ? 'active' : ''} onClick={() => changeMode('register')}>创建账户</button>
           </div>
           <form onSubmit={submit} aria-busy={busy}>
-            {mode === 'register' && <label>玩家昵称<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="你希望别人如何称呼你" autoComplete="nickname"/></label>}
-            <label>邮箱地址<input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" type="email" autoComplete="email"/></label>
-            <label>密码<input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="至少 8 位字符" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'}/></label>
+            {mode === 'register' && <label>玩家昵称（必填）<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="你希望别人如何称呼你" autoComplete="nickname" required minLength={2} maxLength={40}/></label>}
+            <label>邮箱地址（必填）<input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" type="email" autoComplete="email" required maxLength={254}/></label>
+            <label>密码（必填）<input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="至少 8 位字符" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required minLength={8} maxLength={128}/></label>
             {mode === 'register' && <label>确认密码<input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="再次输入密码" type="password" autoComplete="new-password"/></label>}
             {message && <div className="form-message" role="alert" aria-live="assertive">{message}</div>}
             <button className="primary-button" disabled={busy}>{busy ? '请稍候…' : mode === 'login' ? '进入平台' : '创建账户并继续'}</button>
           </form>
-          <p className="legal">继续即表示你同意《用户协议》和《隐私政策》</p>
+          <p className="legal">无需填写人格问卷。云端对话会单独征求你的同意。</p>
           <p className="prototype-note">原型阶段：账户数据仅保存在本机，正式版本将接入云端账户服务。</p>
         </div>
       </section>

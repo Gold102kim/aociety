@@ -1,0 +1,54 @@
+/* Local lens material: only the backdrop bends; foreground content remains sharp. */
+.liquid-glass-definitions { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+.ui-glass [data-liquid-glass] {
+  position: relative;
+  isolation: isolate;
+  backdrop-filter: none;
+  background: rgba(20, 33, 49, .48);
+  box-shadow: 0 10px 28px rgba(0, 5, 18, .18), inset 0 1px 0 rgba(241, 250, 255, .22), inset 0 -1px 0 rgba(187, 218, 243, .09);
+}
+.ui-glass [data-liquid-glass]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  backdrop-filter: var(--liquid-filter) saturate(1.15);
+  background: linear-gradient(148deg, rgba(234, 247, 255, .1), rgba(156, 195, 233, .025) 36%, rgba(7, 15, 30, .1));
+}
+.ui-glass [data-liquid-glass]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  padding: 1px;
+  border-radius: inherit;
+  background: radial-gradient(220px circle at var(--liquid-pointer-x, 20%) var(--liquid-pointer-y, 0%), rgba(255, 255, 255, .74), rgba(208, 233, 255, .2) 42%, transparent 78%), linear-gradient(145deg, rgba(235, 249, 255, .23), transparent 44%, rgba(164, 203, 239, .12));
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: .52;
+  transition: opacity 120ms ease-out;
+}
+.ui-glass [data-liquid-glass]:hover::after { opacity: .8; }
+.ui-glass [data-liquid-glass]:focus-within::after { opacity: .9; }
+.ui-glass .sidebar[data-liquid-glass] { background: rgba(24, 40, 57, .48); }
+.ui-glass .chat-composer[data-liquid-glass] { background: rgba(17, 30, 46, .44); }
+.ui-glass .chat-composer[data-liquid-glass]:focus-within { box-shadow: 0 10px 28px rgba(0, 5, 18, .18), inset 0 1px 0 rgba(241, 250, 255, .22), 0 0 0 1px var(--accent-border); }
+.ui-glass :is(.page-tabs,.chat-workspaces nav)[data-liquid-glass] { background: rgba(27, 43, 61, .48); }
+.ui-glass :is(.page-tabs,.chat-workspaces nav) button { transition: scale 120ms ease-out, background-color 120ms ease-out, color 120ms ease-out; }
+.ui-glass :is(.page-tabs,.chat-workspaces nav) button:active:not(:disabled) { scale: .97; }
+
+/* CSS fallback is immediate, even before the effect's observers clean up. */
+.ui-glass-reduced [data-liquid-glass]::before, .ui-glass-reduced [data-liquid-glass]::after { display: none; }
+.ui-glass-reduced [data-liquid-glass] { background: var(--glass-panel); box-shadow: none; }
+@media (prefers-reduced-motion: reduce) {
+  .ui-glass [data-liquid-glass]::after { transition: none; }
+  .ui-glass :is(.page-tabs,.chat-workspaces nav) button { transition: none; }
+  .ui-glass :is(.page-tabs,.chat-workspaces nav) button:active:not(:disabled) { scale: none; }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
+  .ui-glass [data-liquid-glass]::before, .ui-glass [data-liquid-glass]::after { display: none; }
+  .ui-glass [data-liquid-glass] { background: var(--glass-panel); box-shadow: none; }
+}

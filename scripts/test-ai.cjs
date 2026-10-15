@@ -21,14 +21,21 @@ const user = {
 (async function run() {
 const instructions = buildPersonaInstructions(user);
 assert.match(instructions, /专属数字分身 AI/);
-assert.match(instructions, /INFP/);
-assert.match(instructions, /设计师/);
-assert.match(instructions, /游戏/);
+assert.doesNotMatch(instructions, /INFP/);
+assert.doesNotMatch(instructions, /设计师/);
+assert.doesNotMatch(instructions, /游戏/);
+assert.match(buildPersonaInstructions(user, { replyStyle: '简短' }), /简短/);
 assert.match(instructions, /不得虚构长期记忆/);
 assert.doesNotMatch(instructions, /测试姓名/);
 assert.doesNotMatch(instructions, /2000-01-02/);
 assert.doesNotMatch(instructions, /上海/);
 assert.doesNotMatch(instructions, /私人信仰/);
+const privateInstructions = buildPersonaInstructions(user, { replyStyle: '简短' }, 'private_simulation');
+assert.match(privateInstructions, /private-simulation-v1/);
+assert.match(privateInstructions, /不是玩家真实经历或画像证据/);
+assert.match(privateInstructions, /现有信息不足以判断/);
+assert.match(privateInstructions, /不输出人格复刻百分比/);
+assert.doesNotMatch(privateInstructions, /测试姓名|2000-01-02|上海|私人信仰|INFP/);
 
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'echoverse-ai-'));
 const originalFetch = global.fetch;
@@ -87,6 +94,13 @@ try {
   assert.equal(requestedBody.messages[0].role, 'system');
   assert.equal(result.text, '测试回复');
   assert.equal(result.model, 'deepseek-v4-flash');
+  const newUser = { ...user, basicQuestionnaireCompletedAt: undefined, aiAgent: { ...user.aiAgent, status: 'WAITING_FOR_PROFILE' } };
+  assert.equal((await deepseekService.chat(newUser, '新账户直接交流', [])).text, '测试回复');
+  assert.equal(newUser.basicQuestionnaireCompletedAt, undefined);
+  await deepseekService.chat(newUser, '虚构情境，不是本人经历', [], { replyStyle: '简短' }, 'private_simulation');
+  assert.equal(requestedBody.messages.length, 2, 'Private simulation has no conversation history.');
+  assert.match(requestedBody.messages[0].content, /private-simulation-v1/);
+  assert.doesNotMatch(requestedBody.messages[0].content, /测试姓名|2000-01-02|上海|私人信仰|INFP/);
 
   writeConfig({
     provider: 'deepseek',
@@ -170,7 +184,7 @@ try {
   const firstRequest = concurrentService.chat(user, '第一条', []);
   assert.equal(typeof releaseFirstRequest, 'function');
   await assert.rejects(
-    concurrentService.chat(user, '重叠请求', []),
+    concurrentService.chat(user, '重叠请求', [], {}, 'private_simulation'),
     /上一条消息仍在处理中/,
   );
   assert.equal(concurrentFetchCount, 1);
@@ -245,9 +259,10 @@ try {
   };
   const rateLimitedService = new AiChatService(directory, directory, {});
   for (let index = 0; index < 12; index += 1) {
-    await rateLimitedService.chat(user, `消息 ${index}`, []);
+    await rateLimitedService.chat(user, `消息 ${index}`, [], {}, index % 2 ? 'private_simulation' : 'conversation');
   }
   await assert.rejects(rateLimitedService.chat(user, '第十三条', []), /请求过于频繁/);
+  await assert.rejects(rateLimitedService.chat(user, '第十三条模拟', [], {}, 'private_simulation'), /请求过于频繁/);
   assert.equal(rateLimitedFetchCount, 12);
 } finally {
   global.fetch = originalFetch;

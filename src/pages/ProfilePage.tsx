@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { BasicQuestionnaire, LauncherUser, supplementProfile } from '../auth';
+import { BasicQuestionnaire, LauncherUser, supplementProfile, completeQuestionnaire } from '../auth';
 import { Icon, PageTabs } from '../components/LauncherUi';
 import { emptyQuestionnaire, mbtiOptions } from '../profile';
 import { colorOptions } from '../theme';
@@ -39,7 +39,8 @@ export function ProfilePage({ user, onBack, onLogout, onUserUpdated }: { user: L
     setSupplementBusy(true);
     setSupplementMessage('');
     try {
-      const updatedUser = await supplementProfile(supplement);
+      const updatedUser = user.basicQuestionnaireCompletedAt
+        ? await supplementProfile(supplement) : await completeQuestionnaire(supplement);
       if (!mounted.current || requestEpoch.current !== epoch || updatedUser.id !== user.id) return;
       onUserUpdated(updatedUser);
       setSupplement({ ...emptyQuestionnaire, interests: ['', '', ''] });
@@ -88,7 +89,7 @@ export function ProfilePage({ user, onBack, onLogout, onUserUpdated }: { user: L
         </article>
 
         <aside className="profile-side-column">
-          <article className="profile-card account-card"><div className="profile-card-heading compact"><div><span>{section === 'ai' ? 'AI ARCHIVE' : section === 'security' ? 'SECURITY' : 'ACCOUNT'}</span><h2>{section === 'ai' ? 'AI 档案' : section === 'security' ? '账户安全' : '账户信息'}</h2></div></div><dl><div className="account-field"><dt>玩家昵称</dt><dd>{user.displayName}</dd></div><div className="security-field"><dt>邮箱地址</dt><dd>{user.email}</dd></div><div className="account-field"><dt>注册日期</dt><dd>{formatProfileDate(user.createdAt)}</dd></div><div className="security-field"><dt>账户 ID</dt><dd className="account-id">{user.id}</dd></div><div className="ai-field"><dt>账户 AI 档案</dt><dd>{user.aiAgent.status === 'READY' ? '档案已就绪' : '等待个人资料'}</dd></div><div className="ai-field"><dt>AI Agent ID</dt><dd className="account-id">{user.aiAgent.agentId}</dd></div></dl></article>
+          <article className="profile-card account-card"><div className="profile-card-heading compact"><div><span>{section === 'ai' ? 'AI ARCHIVE' : section === 'security' ? 'SECURITY' : 'ACCOUNT'}</span><h2>{section === 'ai' ? 'AI 档案' : section === 'security' ? '账户安全' : '账户信息'}</h2></div></div><dl><div className="account-field"><dt>玩家昵称</dt><dd>{user.displayName}</dd></div><div className="security-field"><dt>邮箱地址</dt><dd>{user.email}</dd></div><div className="account-field"><dt>注册日期</dt><dd>{formatProfileDate(user.createdAt)}</dd></div><div className="security-field"><dt>账户 ID</dt><dd className="account-id">{user.id}</dd></div><div className="ai-field"><dt>旧版问卷</dt><dd>{user.basicQuestionnaireCompletedAt ? '已保留在本机' : '未填写（无需补填）'}</dd></div><div className="ai-field"><dt>数字代表记忆</dt><dd>请在 AI 对话中查看、纠正或删除；旧资料不自动导入。</dd></div><div className="ai-field"><dt>AI Agent ID</dt><dd className="account-id">{user.aiAgent.agentId}</dd></div></dl></article>
           <article className="profile-card logout-card"><div className="logout-icon"><Icon name="user"/></div><div><h3>退出当前账户</h3><p>退出后将返回登录界面。你的个人资料和账户信息会继续保存在本机。</p></div><button type="button" className="logout-button" onClick={() => { requestEpoch.current += 1; onLogout(); }}>退出登录</button></article>
         </aside>
       </div>

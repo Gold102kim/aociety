@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   base: './',
   build: {
+    manifest: true,
     // Three.js is isolated behind a lazy route; keep an explicit ceiling for
     // that optional 3D chunk instead of accepting unbounded bundle growth.
     chunkSizeWarningLimit: 700,

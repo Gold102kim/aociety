@@ -121,6 +121,16 @@ function safeReportedPath(relativePath) {
   return safe;
 }
 
+function scanTextContent(text) {
+  const reasons = [];
+  for (const pattern of secretPatterns) {
+    pattern.expression.lastIndex = 0;
+    if (pattern.expression.test(text)) reasons.push(`possible ${pattern.label}`);
+  }
+  if (personalPath.test(text)) reasons.push('developer-specific absolute user path');
+  return reasons;
+}
+
 function scanRepository(rootInput = defaultRoot) {
   const root = fs.realpathSync(path.resolve(rootInput));
   const gitFiles = gitCandidates(root);
@@ -141,11 +151,7 @@ function scanRepository(rootInput = defaultRoot) {
     if (content.reason) { addFinding(file, content.reason); continue; }
     if (content.binary) continue;
     scannedTextFiles += 1;
-    for (const pattern of secretPatterns) {
-      pattern.expression.lastIndex = 0;
-      if (pattern.expression.test(content.text)) addFinding(file, `possible ${pattern.label}`);
-    }
-    if (personalPath.test(content.text)) addFinding(file, 'developer-specific absolute user path');
+    for (const reason of scanTextContent(content.text)) addFinding(file, reason);
   }
   return { mode: gitFiles ? 'Git publication candidates' : 'source ZIP fallback', scannedTextFiles, findings };
 }
@@ -161,7 +167,7 @@ function run() {
   console.log(`Sensitive material checks passed (${result.mode}; ${result.scannedTextFiles} text files).`);
 }
 
-module.exports = { scanRepository };
+module.exports = { scanRepository, scanTextContent, sensitiveFileReason };
 if (require.main === module) {
   try { run(); } catch {
     // A filesystem/Git error may itself contain sensitive paths or values.
