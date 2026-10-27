@@ -1,10 +1,25 @@
 # 数字代表本机验收包
 
-日期：2026-10-15。应用版本仍为 0.6.0，验收包使用单独名称与时间戳目录，不能仅凭版本号把它与旧的 0.6.0 文件混同。
+更新日期：2026-10-27。当前本机验收包为 0.6.1，实际 Electron 内核为 43.8.1；下文保留第十批 0.6.0 的历史记录。
 
-上传前复核补充：后续源码修复了隐私操作失败提示被恢复读取清除、重置失败仍关闭确认界面的问题。下述第十批 EXE 未重新构建，不包含这一追加修复；其原哈希和历史验收结果保持不变。源码修复与复测见 [源码审查记录](PROJECT_REVIEW_0.6.0.md)。本次 GitHub 上传不含 EXE，不替换 E 盘程序。
+## 当前产物：0.6.1
 
-## 当前产物
+- 目录：`release/representative-local-20261027T111258Z`。
+- 程序：`EchoVerse-Representative-local-0.6.1-x64.exe`，86,263,707 字节。
+- SHA-256：`2BCAC09B1B42A169CD58D815A9C4B8DC55DECE99A20F57AD7F25DD47D698909F`。
+- 构建源码：`6bf37b67d77416ca28453a8389f3ce3e4ca200d6`；实际安装内核和打包内核均探测为 `43.8.1`。
+- 签名：`NotSigned`。仅供本机验收，不是公开发行版。
+- `acceptance-manifest.json`、EXE 校验文件、`representative-smoke.json`、`portable-smoke.json` 和 `screenshots/` 保存在同一目录。
+
+本包已包含隐私操作失败提示与重置确认修复。完整检查、当次依赖审计、29 个 ASAR 应用文件审查、实际打包程序的界面回归、便携 EXE 解压启动退出均通过。实际 IPC 版本冲突验证了失败提示持续可见、数据与确认界面保留、恢复后重试成功。
+
+新内核下重新验证了玻璃折射（边缘平均 RGB 通道差约 5.16、中心差为 0）、指针合帧与清理、清晰/高对比回退、150%/200% 缩放、临时模式及系统加密。测试仅使用隔离账户、模拟模型和运行期几何体；没有付费请求、真实账户修改或 UE 启动。截图与采样不代表跨显卡、实体触控或真实模型质量认证。
+
+本包保留在源码工作区，没有替换 E 盘程序，也没有上传 EXE。正常双击仍使用现有账户目录，手工试用前请阅读下文隔离与备份说明。安全补丁、下载校验及源码 CI 证据见 [0.6.1 安全维护记录](SECURITY_MAINTENANCE_20261027.md)。
+
+## 第十批历史产物：0.6.0
+
+日期：2026-10-15。以下 EXE 未重新构建，不包含后续隐私失败反馈修复；原哈希和历史验收结果保持不变，不能用于证明 0.6.1 的当前安全状态。源码修复见 [源码审查记录](PROJECT_REVIEW_0.6.0.md)。
 
 - 目录：`release/representative-local-20261015T122509Z`（第十批数字代表隐私与会话边界版）
 - 程序：`EchoVerse-Representative-local-0.6.0-x64.exe`
@@ -44,7 +59,7 @@
 7. 学习仍默认关闭。如本人已确认模型配置、云端处理及费用，可以开启学习后发送明确的角色扮演、翻译或引用情境，检查暂停说明。之后的台词不会成为本人偏好。先在输入框留下未发送文字，再清空本次对话，应恢复原学习模式且草稿不变。此步骤会产生本人主动发送的真实模型请求；自动回归使用隔离模拟，不要求手工消费配额来证明机制。
 8. 检查玻璃/清晰切换：玻璃模式下，导航、分段栏和输入区有克制的边缘光；鼠标经过时边缘光随位置变化。滚动、缩放或窗口失焦后，旧的指针位置高光应清理；继续移动鼠标后恢复跟随。平坦背景上折射不明显是正常现象，正文不应扭曲。清晰模式关闭折射、透明与模糊，不丢失任何控件。Tab 定位到“学习范围与保存方式”，用 Enter 展开和收起；文字说明仍保留。欢迎空态的建议只填写输入框，不发送消息。系统高对比模式使用原生 checkbox 和系统颜色。
 9. 检查临时模式：开启后，界面显示“长期记忆已隐藏”，不展示偏好、来源和待续正文；停止生成不应退出临时模式。明确关闭后回读原资料，不把隐藏解释为删除。若要主动刷新，先按需保存草稿；整页刷新结束登录且不恢复聊天，重新登录后原有加密偏好/待续仍在，云端授权保持原选择。仅测试此流程不需要发送模型请求。
-10. 完成后退出程序。未替换 E 盘原软件，没有迁移旧问卷、修改真实账户配置或上传 GitHub。
+10. 完成后退出程序。验收工作未替换 E 盘原软件、迁移旧问卷或修改真实账户配置；未将验收 EXE 上传 GitHub，源码与说明单独同步。
 
 ## 开发者复现
 
@@ -52,16 +67,16 @@
 pnpm dist:representative-local
 ```
 
-该命令先运行全量检查，再生成独立时间戳目录，不覆盖已有验收包。打包禁止自动发布，排除角色模型、账户及密钥，并比较包内文件与当前构建内容。若打包已完成、仅后置审查失败，可在修复审查原因后使用 `node scripts/build-local-acceptance.cjs --finalize <验收目录>`；它不重新打包，也拒绝覆盖已有校验文件。
+该命令先通过高危依赖审计，再运行全量检查并生成独立时间戳目录，不覆盖已有验收包。打包禁止自动发布，排除角色模型、账户及密钥，比较包内文件与当前构建内容，并探测安装目录和打包目录实际 Electron 版本。断网或审计失败不能当作通过。若打包已完成、仅后置审查失败，可在修复审查原因后使用 `node scripts/build-local-acceptance.cjs --finalize <验收目录>`；它不重新打包，也拒绝覆盖已有校验文件。
 
 实际打包程序的完整功能测试需要现有 Playwright 环境。将 `NODE_PATH` 指向工作区提供的 Node 包目录，然后：
 
 ```powershell
-$env:ECHO_REPRESENTATIVE_PACKAGE_DIR = (Resolve-Path 'release/representative-local-20261015T122509Z').Path
+$env:ECHO_REPRESENTATIVE_PACKAGE_DIR = (Resolve-Path 'release/representative-local-20261027T111258Z').Path
 pnpm smoke:representative
 Remove-Item Env:ECHO_REPRESENTATIVE_PACKAGE_DIR
-node scripts/smoke-local-portable.cjs release/representative-local-20261015T122509Z
-node scripts/audit-local-package.cjs release/representative-local-20261015T122509Z
+node scripts/smoke-local-portable.cjs release/representative-local-20261027T111258Z
+node scripts/audit-local-package.cjs release/representative-local-20261027T111258Z
 ```
 
 新构建时替换为新目录。功能测试启动 `win-unpacked/EchoVerseLauncher.exe`，确认 `app.isPackaged`、实际 ASAR 入口和隔离用户目录；仅在测试进程中注入模拟传输，不修改 ASAR，不包含测试脚本或模拟服务。便携测试另行启动实际 EXE，验证解压、打包启动和正常退出，游戏目标被明确设为不存在，不能据此称为游戏联调通过。

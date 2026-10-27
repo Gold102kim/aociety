@@ -31,7 +31,16 @@
 - 补丁后完整 `pnpm audit --audit-level low --json` 实际返回所有级别 0 项。这只表示当时漏洞库中的已知告警，不能解释为软件绝对安全。
 - 旧 `sprintf-js` 告警已由上游于 2026-10-22 [撤回](https://github.com/advisories/GHSA-hp3w-g68c-fv3c)，不是本项目修好了该库；历史审计记录保留，不改写旧结果。
 - `pnpm check` 完整通过，包括类型、隐私/会话、包策略、玻璃及生产构建；首屏 JavaScript 210.1 KiB，预算 225 KiB。`pnpm install --frozen-lockfile --offline` 通过，未重写锁文件。
-- 实际 Electron 二进制仍待下载验证，新包和打包窗口回归尚未通过。GitHub 直连与备用下载尝试未完成时，不回退到旧内核、不跳过 TLS 或官方 SHA-256 校验，不将源码检查当作运行验收。
+- 源码提交 `6bf37b67d77416ca28453a8389f3ce3e4ca200d6` 的 [GitHub CI](https://github.com/Gold102kim/aociety/actions/runs/40492594192) 已完成且成功；本次续作重新确认了状态。
+- 续作已完成 Electron 下载。使用 npmmirror 断点续传和有界分段补齐后，151,385,955 字节 ZIP 的 SHA-256 为 `ce7eedcef94de0d12b9ba54d5244f5a323c00e17b5cdea2ef0e4f440e1a74c4c`，与 Electron 43.8.1 npm 包的官方校验表一致。将已验证 ZIP 放入独立临时缓存，再运行未经修改的官方安装脚本；没有跳过 TLS 或校验，也没有回退旧内核。
+- `pnpm dist:representative-local` 的依赖审计、完整检查、生产构建和打包全部通过。实际安装 EXE 与新包 EXE 均探测为 Electron 43.8.1，29 个 ASAR 应用文件与本次构建一致，未含凭据、账户、受限模型或测试夹具。
+- 实际打包窗口回归通过，包括玻璃像素与交互、清晰/高对比回退、缩放、系统加密、临时模式、真实 IPC 版本冲突后的失败反馈与重试。便携 EXE 的隔离解压、启动及正常退出也通过；不是仅对开发入口做检查。
+
+## 已完成的本机验收包
+
+产物目录为 `release/representative-local-20261027T111258Z`，程序为 `EchoVerse-Representative-local-0.6.1-x64.exe`，大小 86,263,707 字节，SHA-256 为 `2BCAC09B1B42A169CD58D815A9C4B8DC55DECE99A20F57AD7F25DD47D698909F`。实际签名状态为 `NotSigned`，保留为本机验收包，不作为公开发行版。
+
+完整清单、两份 smoke 结果和本次隔离截图保存在产物目录；使用方式、历史包区别及验收限制见 [本机验收说明](LOCAL_ACCEPTANCE.md)。本次没有复制或覆盖 E 盘程序，也没有将 EXE 上传 GitHub。真实模型质量、跨机器图形兼容性、UE 原生编译与外部试用仍未验证。
 
 ## 不变的边界
 
