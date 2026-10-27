@@ -3,7 +3,8 @@ allowBuilds:
   electron-winstaller: false
   esbuild: true
 
-# Security patches verified against official npm metadata (2026-10-14).
+# Security patches verified against official npm metadata (2026-10-14;
+# undici 6 refreshed on 2026-10-27).
 # Normal and targeted compatible-range updates left these vulnerable versions
 # selected; pin only the affected families, without upgrading their major APIs.
 overrides:
@@ -20,4 +21,4 @@ overrides:
   "js-yaml@4": "4.3.2"
   "tar@7": "7.5.21"
   # Node-gyp uses undici 6; retain the normally updated undici 7 family.
-  "undici@6": "6.28.1"
+  "undici@6": "6.29.1"

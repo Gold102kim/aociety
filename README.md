@@ -164,6 +164,7 @@ pnpm configure:local-game
 
 ## 工程文档
 
+- [0.6.1 安全维护与当前验收状态](docs/SECURITY_MAINTENANCE_20261027.md)
 - [架构](docs/ARCHITECTURE.md)
 - [工程审计](docs/ENGINEERING_AUDIT.md)
 - [安全说明](SECURITY.md)

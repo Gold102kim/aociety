@@ -3,12 +3,26 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
 const { createRequire } = require('node:module');
+const { spawnSync } = require('node:child_process');
 const { scanTextContent, sensitiveFileReason } = require('./test-secrets.cjs');
 const builder = createRequire(require.resolve('electron-builder'));
 const asar = createRequire(builder.resolve('app-builder-lib'))('@electron/asar');
 const root = path.resolve(__dirname, '..');
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex').toUpperCase();
 const nativeEntry = (file) => file.replaceAll('/', path.sep);
+
+function verifyElectronRuntime(executable, expectedVersion, probe = spawnSync) {
+  // Run only the version expression, never the application or inherited preloads.
+  const result = probe(executable, ['-p', 'process.versions.electron'], {
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', NODE_OPTIONS: '' },
+    encoding: 'utf8', timeout: 5000, killSignal: 'SIGKILL', maxBuffer: 1024,
+    stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+  });
+  assert.ok(!result.error && result.status === 0 && !result.signal, 'Electron runtime version probe failed or timed out.');
+  const version = String(result.stdout ?? '').trim();
+  assert.ok(version === expectedVersion, 'Electron runtime does not match the locked package version.');
+  return version;
+}
 
 function validatePackageEntry(file, metadata, bytes) {
   assert.ok(file === 'package.json' || file.startsWith('dist/') || file.startsWith('dist-electron/'), 'Unexpected application path.');
@@ -56,10 +70,15 @@ function auditPackage(directory) {
   const main = asar.extractFile(archive, nativeEntry('dist-electron/main.js')).toString('utf8');
   for (const ipc of ['representative:continuation', 'ai:simulate', 'representative:update']) assert.ok(main.includes(ipc));
   assert.equal(fs.existsSync(`${archive}.unpacked`), false, 'Unexpected unpacked application files.');
-  return { version: pkg.version, electron: require('electron/package.json').version, asarSha256: hash(fs.readFileSync(archive)), files: manifest };
+  const electronPackage = require.resolve('electron/package.json');
+  const expectedElectron = require('../package.json').devDependencies.electron;
+  assert.equal(require(electronPackage).version, expectedElectron, 'Installed Electron package does not match the root version pin.');
+  verifyElectronRuntime(path.join(path.dirname(electronPackage), 'dist/electron.exe'), expectedElectron);
+  const electron = verifyElectronRuntime(path.join(directory, 'win-unpacked/EchoVerseLauncher.exe'), expectedElectron);
+  return { version: pkg.version, electron, asarSha256: hash(fs.readFileSync(archive)), files: manifest };
 }
 
-module.exports = { auditPackage, hash, validatePackageEntry };
+module.exports = { auditPackage, hash, validatePackageEntry, verifyElectronRuntime };
 if (require.main === module) {
   const result = auditPackage(path.resolve(process.argv[2] || ''));
   console.log(`ASAR audit passed: ${result.files.length} current-build files, no credentials, local configuration, test fixtures, model binaries or production node_modules.`);

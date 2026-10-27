@@ -13,6 +13,12 @@
 
 All notable launcher changes are recorded here. The project follows semantic versioning for engineering baselines; a version number does not imply production readiness.
 
+## [0.6.1] - 2026-10-27
+
+- 针对新披露告警，更新 Electron 43.8.1、Vite 8.1.6、undici 6.29.1/7.30.1 与 fast-uri 3.1.9，保留同主版本 API。
+- 本地打包先执行高危审计；包审查核对项目锁定版本、已安装 npm 元数据和两个实际 Electron EXE，拒绝旧内核或失败探测。
+- 本轮验收包含此前源码中的隐私操作失败提示与重置确认修复，不改变玻璃外观、画像采集或账户结构。最新验证状态见 `docs/SECURITY_MAINTENANCE_20261027.md`，版本号不代表已完成生产发布。
+
 ## [0.6.0] - 2026-10-14
 
 - 修复登录/退出/切换账户时的异步旧结果、伴生窗口资料残留，以及 AI 取消后占用或误释放新请求槽的问题。

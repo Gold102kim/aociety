@@ -1,6 +1,6 @@
 {
   "name": "echoverse-launcher",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": true,
   "license": "UNLICENSED",
   "author": "EchoVerse Project",
@@ -40,8 +40,8 @@
     "test:package-policy": "node scripts/test-package-policy.cjs",
     "test": "pnpm test:secrets && pnpm test:secret-scanner && pnpm test:auth && pnpm test:ai && pnpm test:representative && pnpm test:simulation && pnpm test:contracts && pnpm test:session && pnpm test:game-integration && pnpm test:assets && pnpm test:asset-policy && pnpm test:package-policy && pnpm test:performance && pnpm test:avatar && pnpm test:ui",
     "check": "pnpm clean && pnpm typecheck && pnpm test && pnpm build:compile",
-    "dist:win": "pnpm check && electron-builder --win portable && node scripts/checksum-release.cjs",
-    "dist:representative-local": "pnpm check && node scripts/build-local-acceptance.cjs"
+    "dist:win": "pnpm audit --audit-level high && pnpm check && electron-builder --win portable && node scripts/checksum-release.cjs",
+    "dist:representative-local": "pnpm audit --audit-level high && pnpm check && node scripts/build-local-acceptance.cjs"
   },
   "dependencies": {},
   "devDependencies": {
@@ -54,13 +54,13 @@
     "ajv-formats": "3.0.1",
     "concurrently": "10.0.3",
     "cross-env": "10.1.0",
-    "electron": "43.5.0",
+    "electron": "43.8.1",
     "electron-builder": "26.15.3",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "three": "0.185.1",
     "typescript": "7.0.2",
-    "vite": "8.1.5",
+    "vite": "8.1.6",
     "wait-on": "9.0.10"
   },
   "build": {
