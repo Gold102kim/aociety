@@ -1,8 +1,26 @@
 # 数字代表本机验收包
 
-更新日期：2026-10-27。当前本机验收包为 0.6.1，实际 Electron 内核为 43.8.1；下文保留第十批 0.6.0 的历史记录。
+更新日期：2026-10-28。当前本机验收包为 0.6.2，实际 Electron 内核为 43.8.1；下文保留 0.6.1 和第十批 0.6.0 的历史记录。
 
-## 当前产物：0.6.1
+## 当前产物：0.6.2
+
+- 目录：`release/representative-local-20261028T104030Z`。
+- 程序：`EchoVerse-Representative-local-0.6.2-x64.exe`，86,264,183 字节。
+- SHA-256：`3DCF9031A5FF661187C6A5F597E14E9482F8206A39A4B157C85D612EFDD114A1`。
+- 实际安装内核与打包内核均为 `43.8.1`；29 个 ASAR 应用文件逐一与本次构建核对通过。
+- 签名：`NotSigned`，仅供本机验收。产物目录保留清单、校验文件、两份 smoke JSON 和隔离截图。
+
+新增日常聊天“停止生成”，保留消息、输入草稿、临时模式与学习暂停；取消未确认或失败时禁发，失败可重试。停止也作废旧隐私读取，并在确认后安全刷新状态，避免旧读取误报会话失效；真实的隐私操作错误不会因此被清掉。
+
+`pnpm dist:representative-local` 的依赖审计、完整检查、生产构建与打包通过，当次无已知依赖告警。真实打包窗口回归、便携 EXE 解压启动退出和最终包审查全部通过。`representative-smoke.json` 的 `chatStop` 记录普通/临时模式、暂停学习、停止待确认禁发、取消失败重试、晚到成功/失败忽略和继续发送；新增 5 次均为隔离模拟请求。截图 `37-chat-stopped.png`、`38-chat-stop-retry.png` 分别记录停止完成和小窗口失败重试。
+
+原有玻璃折射、清晰/高对比回退、150%/200% 缩放、临时隐私、版本冲突、系统加密等回归保留并重新通过；新停止流程额外检查普通窗口与 1120×720 小窗口。没有真实模型调用、账户修改或 UE 启动。没有替换 E 盘程序或上传 EXE；正常双击仍共用现有账户目录，首次试用请按下文备份。
+
+停止不能撤回已发送到云端的数据、已提交的偏好或保证供应商停止计算和计费。真实模型质量、跨设备兼容性及外部发布仍未验收。实现与竞态验证见 [隐私及会话边界](REPRESENTATIVE_PRIVACY_SESSION.md)。
+
+## 历史产物：0.6.1
+
+以下为 2026-10-27 的安全维护包，不包含 0.6.2 新增的日常聊天停止入口与停止读取竞态修复。
 
 - 目录：`release/representative-local-20261027T111258Z`。
 - 程序：`EchoVerse-Representative-local-0.6.1-x64.exe`，86,263,707 字节。
@@ -59,7 +77,8 @@
 7. 学习仍默认关闭。如本人已确认模型配置、云端处理及费用，可以开启学习后发送明确的角色扮演、翻译或引用情境，检查暂停说明。之后的台词不会成为本人偏好。先在输入框留下未发送文字，再清空本次对话，应恢复原学习模式且草稿不变。此步骤会产生本人主动发送的真实模型请求；自动回归使用隔离模拟，不要求手工消费配额来证明机制。
 8. 检查玻璃/清晰切换：玻璃模式下，导航、分段栏和输入区有克制的边缘光；鼠标经过时边缘光随位置变化。滚动、缩放或窗口失焦后，旧的指针位置高光应清理；继续移动鼠标后恢复跟随。平坦背景上折射不明显是正常现象，正文不应扭曲。清晰模式关闭折射、透明与模糊，不丢失任何控件。Tab 定位到“学习范围与保存方式”，用 Enter 展开和收起；文字说明仍保留。欢迎空态的建议只填写输入框，不发送消息。系统高对比模式使用原生 checkbox 和系统颜色。
 9. 检查临时模式：开启后，界面显示“长期记忆已隐藏”，不展示偏好、来源和待续正文；停止生成不应退出临时模式。明确关闭后回读原资料，不把隐藏解释为删除。若要主动刷新，先按需保存草稿；整页刷新结束登录且不恢复聊天，重新登录后原有加密偏好/待续仍在，云端授权保持原选择。仅测试此流程不需要发送模型请求。
-10. 完成后退出程序。验收工作未替换 E 盘原软件、迁移旧问卷或修改真实账户配置；未将验收 EXE 上传 GitHub，源码与说明单独同步。
+10. 日常对话等待回复时，原发送位置显示“停止生成”。停止期间可以继续编辑草稿；确认前禁发，失败后显示“重试停止”。成功后消息、草稿、临时模式和暂停学习状态保留。停止不撤回已经发往供应商的数据；本次自动回归用模拟延迟和故障验证，不要求手工消费配额。
+11. 完成后退出程序。验收工作未替换 E 盘原软件、迁移旧问卷或修改真实账户配置；未将验收 EXE 上传 GitHub，源码与说明单独同步。
 
 ## 开发者复现
 
@@ -72,11 +91,11 @@ pnpm dist:representative-local
 实际打包程序的完整功能测试需要现有 Playwright 环境。将 `NODE_PATH` 指向工作区提供的 Node 包目录，然后：
 
 ```powershell
-$env:ECHO_REPRESENTATIVE_PACKAGE_DIR = (Resolve-Path 'release/representative-local-20261027T111258Z').Path
+$env:ECHO_REPRESENTATIVE_PACKAGE_DIR = (Resolve-Path 'release/representative-local-20261028T104030Z').Path
 pnpm smoke:representative
 Remove-Item Env:ECHO_REPRESENTATIVE_PACKAGE_DIR
-node scripts/smoke-local-portable.cjs release/representative-local-20261027T111258Z
-node scripts/audit-local-package.cjs release/representative-local-20261027T111258Z
+node scripts/smoke-local-portable.cjs release/representative-local-20261028T104030Z
+node scripts/audit-local-package.cjs release/representative-local-20261028T104030Z
 ```
 
 新构建时替换为新目录。功能测试启动 `win-unpacked/EchoVerseLauncher.exe`，确认 `app.isPackaged`、实际 ASAR 入口和隔离用户目录；仅在测试进程中注入模拟传输，不修改 ASAR，不包含测试脚本或模拟服务。便携测试另行启动实际 EXE，验证解压、打包启动和正常退出，游戏目标被明确设为不存在，不能据此称为游戏联调通过。

@@ -42,29 +42,33 @@ export function AiChatPage({ user, onBack, active = true }: { user: LauncherUser
   const [workspace, setWorkspace] = useState<'chat' | 'simulation'>('chat');
   const [simulationKey, setSimulationKey] = useState(0);
   const [simulationBusy, setSimulationBusy] = useState(false);
+  const [stopState, setStopState] = useState<'idle' | 'stopping' | 'blocked'>('idle');
+  const [stopNotice, setStopNotice] = useState('');
+  const stopRequest = useRef<number | null>(null);
 
-  const applyPrivacyResult = (result: RepresentativeResult) => {
+  const applyPrivacyResult = (result: RepresentativeResult, preserveError = false) => {
     if (!result.ok) throw new Error(result.message);
     if (typeof result.temporary !== 'boolean') throw new Error('无法确认当前对话模式，请重试读取设置。');
     setPrivacy(result.state);
     setLearningPaused(result.learningPaused);
     setTemporary(result.temporary);
-    setPrivacyError('');
+    if (!preserveError) setPrivacyError('');
     return result;
   };
 
-  const readPrivacy = async () => {
+  const readPrivacy = async (preserveError = false) => {
     if (!window.launcher?.representative) return false;
     const read = ++privacyRead.current;
     try {
       const result = await window.launcher.representative.getState();
       if (!mounted.current || read !== privacyRead.current) return false;
-      applyPrivacyResult(result);
+      applyPrivacyResult(result, preserveError);
       return true;
     } catch (readError) {
       if (!mounted.current || read !== privacyRead.current) return false;
       setPrivacy(null);
-      setPrivacyError(readError instanceof Error ? readError.message : '无法读取隐私设置，请重试。');
+      const message = readError instanceof Error ? readError.message : '无法读取隐私设置，请重试。';
+      setPrivacyError((current) => preserveError && current ? `${current} ${message}` : message);
       return false;
     }
   };
@@ -108,6 +112,8 @@ export function AiChatPage({ user, onBack, active = true }: { user: LauncherUser
     setConfirmClear(false);
     setSimulationKey((current) => current + 1);
     setSimulationBusy(false);
+    setStopState('idle');
+    setStopNotice('');
     followLatest.current = true;
   };
 
@@ -198,6 +204,7 @@ export function AiChatPage({ user, onBack, active = true }: { user: LauncherUser
     followLatest.current = true;
     setFailedTurn(null);
     setError('');
+    setStopNotice('');
     setBusy(true);
     if (turn.savedContent) setLearningPaused(true);
     try {
@@ -212,6 +219,38 @@ export function AiChatPage({ user, onBack, active = true }: { user: LauncherUser
       if (window.launcher?.ai) void getAiStatus().then((result) => { if (requestEpoch.current === epoch) setStatus(result); }).catch(() => undefined);
     } finally {
       if (requestEpoch.current === epoch) { inFlight.current = false; setBusy(false); }
+    }
+  };
+
+  const stop = async () => {
+    if (!inFlight.current || privacyInFlight.current || stopRequest.current === requestEpoch.current) return;
+    const epoch = ++requestEpoch.current;
+    stopRequest.current = epoch;
+    // Main-process cancellation also expires reads from the old conversation.
+    privacyRead.current += 1;
+    setStopState('stopping');
+    setBusy(true);
+    setFailedTurn(null);
+    setError('');
+    setStopNotice('');
+    try {
+      if (!window.launcher?.ai) throw new Error('桌面连接不可用。');
+      // No mode argument: stopping must preserve temporary chat and learning protection.
+      await window.launcher.ai.cancel();
+      if (!mounted.current || requestEpoch.current !== epoch) return;
+      await readPrivacy(true);
+      if (!mounted.current || requestEpoch.current !== epoch) return;
+      inFlight.current = false;
+      setStopState('idle');
+      setStopNotice('已停止生成。已发送的消息和输入草稿保留；已发送到云端的内容无法撤回。');
+      inputRef.current?.focus();
+    } catch {
+      if (!mounted.current || requestEpoch.current !== epoch) return;
+      setStopState('blocked');
+      setError('无法确认请求已停止，已暂停发送。请重试停止，或清空本次对话。');
+    } finally {
+      if (stopRequest.current === epoch) stopRequest.current = null;
+      if (mounted.current && requestEpoch.current === epoch) setBusy(false);
     }
   };
 
@@ -258,6 +297,7 @@ export function AiChatPage({ user, onBack, active = true }: { user: LauncherUser
   const connectionTitle = browserPreview ? '模型在桌面端连接' : status.connection === 'connected' ? '共享模型服务已连接' : status.connection === 'untested' ? '模型配置已载入' : status.connection === 'failed' ? '共享模型服务连接失败' : '需要配置 API';
   const connectionDescription = browserPreview ? '此预览不读取 API 密钥，也不发送模型请求。请在桌面软件中使用 AI 对话。' : status.connection === 'connected' ? 'DeepSeek 已返回真实回复。仅使用当前模式允许的信息。' : status.connection === 'untested' ? '配置已找到，同意云端处理并发送第一条消息后验证连接。' : status.connection === 'failed' ? status.message || '请检查网络、Base URL、模型名称和 API Key。' : '本地模型服务尚未配置，请联系开发人员。';
   const canSend = Boolean(privacy?.cloudConsent && status.configured && status.provider === 'deepseek' && !privacyBusy);
+  const chatPending = busy || stopState !== 'idle';
   const latestLearnedMemory = learningNotice.startsWith('已记住') ? privacy?.memories.filter((memory) => memory.sourceKind === 'explicit_message').sort((a, b) => a.updatedAt.localeCompare(b.updatedAt)).at(-1) : undefined;
 
   return (
@@ -271,18 +311,19 @@ export function AiChatPage({ user, onBack, active = true }: { user: LauncherUser
             const pane = event.currentTarget;
             followLatest.current = pane.scrollHeight - pane.scrollTop - pane.clientHeight < 64;
           }}>
-            {!temporary && privacy?.continuations.at(-1) && messages.length === 1 && <div className="representative-notice continuity-return"><p>上次留下：{privacy.continuations.at(-1)!.title}</p><button type="button" disabled={privacyBusy || busy || Boolean(input.trim())} onClick={() => { void updateContinuation({ kind: 'resume', id: privacy.continuations.at(-1)!.id, expectedRevision: privacy.revision }); }}>继续上次的话题或草稿</button><p>只放回输入框，不自动发送；有未保存文字时不会覆盖。</p></div>}
+            {!temporary && privacy?.continuations.at(-1) && messages.length === 1 && <div className="representative-notice continuity-return"><p>上次留下：{privacy.continuations.at(-1)!.title}</p><button type="button" disabled={privacyBusy || chatPending || Boolean(input.trim())} onClick={() => { void updateContinuation({ kind: 'resume', id: privacy.continuations.at(-1)!.id, expectedRevision: privacy.revision }); }}>继续上次的话题或草稿</button><p>只放回输入框，不自动发送；有未保存文字时不会覆盖。</p></div>}
             {messages.map((message) => <div key={message.id} className={`chat-message ${message.role}`}><span>{message.role === 'assistant' ? user.displayName.slice(0, 1).toUpperCase() : '你'}</span><div><small>{message.id === 'welcome' ? '使用提示 · 非模型回复' : message.role === 'assistant' ? '数字代表' : user.displayName}</small><p>{message.content}</p></div></div>)}
             {messages.length === 1 && <div className="chat-suggestions chat-starters"><h2>不知道从哪里开始？</h2><div className="chat-starter-actions">{['帮我把一个想法整理清楚', '帮我起草一段不唐突的表达', '我想聊聊最近的事'].map((suggestion) => <button type="button" key={suggestion} disabled={privacyBusy} onClick={() => { restoredDraft.current = false; setInput(suggestion); inputRef.current?.focus(); }}>{suggestion}</button>)}</div></div>}
-            {busy && <div className="chat-message assistant typing" role="status"><span>{user.displayName.slice(0, 1).toUpperCase()}</span><div><small>数字分身</small><p aria-label="正在生成回复"><i/><i/><i/></p></div></div>}
+            {busy && stopState === 'idle' && <div className="chat-message assistant typing" role="status"><span>{user.displayName.slice(0, 1).toUpperCase()}</span><div><small>数字分身</small><p aria-label="正在生成回复"><i/><i/><i/></p></div></div>}
           </div>
-          {error && <div className="chat-error" role="alert" aria-live="assertive"><span>{error}</span>{failedTurn && <button type="button" disabled={busy} onClick={() => { void requestReply(failedTurn); }}>重试上一条</button>}</div>}
+          {error && <div className="chat-error" role="alert" aria-live="assertive"><span>{error}</span>{failedTurn && <button type="button" disabled={chatPending || privacyBusy} onClick={() => { void requestReply(failedTurn); }}>重试上一条</button>}</div>}
+          {(stopNotice || stopState === 'stopping') && <p className="chat-error chat-stop-notice" role="status">{stopState === 'stopping' ? '正在确认停止，输入草稿仍可编辑。' : stopNotice}</p>}
           <form className="chat-composer" onSubmit={submit}><textarea ref={inputRef} aria-label="发送给数字分身的消息" value={input} disabled={privacyBusy} onChange={(event) => { setInput(event.target.value); if (!event.target.value.trim()) restoredDraft.current = false; }} placeholder={canSend ? '今天有什么想分享的？' : '可以先写下想法，同意右侧云端处理后再发送'} maxLength={2000} onKeyDown={(event) => {
             if (isChatSendShortcut({ key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey, isComposing: event.nativeEvent.isComposing || event.keyCode === 229 })) {
               event.preventDefault();
               event.currentTarget.form?.requestSubmit();
             }
-          }}/><div className="chat-composer-actions"><span>{input.length} / 2000 · Ctrl+Enter 发送</span><button type="button" disabled={busy || privacyBusy || !input.trim() || temporary || privacy?.storage !== 'encrypted' || privacy.continuations.length >= 3} onClick={() => setSaveRequest({ id: Date.now(), content: input })}>保存到下次</button><button disabled={busy || !input.trim() || !canSend}>{busy ? '等待回复…' : '发送消息'}</button></div></form>
+          }}/><div className="chat-composer-actions"><span>{input.length} / 2000 · Ctrl+Enter 发送</span><button type="button" disabled={chatPending || privacyBusy || !input.trim() || temporary || privacy?.storage !== 'encrypted' || privacy.continuations.length >= 3} onClick={() => setSaveRequest({ id: Date.now(), content: input })}>保存到下次</button>{chatPending ? <button type="button" disabled={privacyBusy || stopState === 'stopping'} onClick={() => { void stop(); }}>{stopState === 'stopping' ? '正在停止…' : stopState === 'blocked' ? '重试停止' : '停止生成'}</button> : <button disabled={!input.trim() || !canSend}>发送消息</button>}</div></form>
         </article>}
         {workspace === 'simulation' && (privacy ? <PrivateSimulationPanel key={simulationKey} state={privacy} temporary={temporary} canGenerate={canSend} onBusyChange={setSimulationBusy} onRefresh={async () => { await readPrivacy(); }} onStatusRefresh={refreshModelStatus}/> : <p role="status">暂不能安全读取隐私设置。请先重试读取，再进行私密试答。</p>)}
         <aside className="chat-side-column">
@@ -290,7 +331,7 @@ export function AiChatPage({ user, onBack, active = true }: { user: LauncherUser
           {learningNotice && <div className="representative-notice" role="status"><p>{learningNotice}</p>{latestLearnedMemory && <button type="button" disabled={privacyBusy} onClick={() => { void updatePrivacy({ kind: 'forget', id: latestLearnedMemory.id, expectedRevision: privacy!.revision }); }}>不记住这条</button>}</div>}
           <article className="chat-side-card representative-temporary"><label><input type="checkbox" checked={temporary} disabled={privacyBusy || !privacy || browserPreview} onChange={(event) => { void clearConversation(event.target.checked); }}/><span>临时对话</span></label><p>本次对话不使用或新增长期画像。切换时清空当前对话，仍需同意云端处理。整页刷新会结束本次登录，不恢复聊天。</p></article>
           {privacy && <RepresentativePanel state={privacy} busy={privacyBusy} temporary={temporary} paused={learningPaused} canConsent={status.configured && status.provider === 'deepseek'} onChange={updatePrivacy}/>}
-          {privacy && <ContinuityPanel state={privacy} draft={input} busy={privacyBusy || busy || simulationBusy} temporary={temporary} error={continuationError} notice={continuationNotice} saveRequest={saveRequest} onAction={updateContinuation}/>}
+          {privacy && <ContinuityPanel state={privacy} draft={input} busy={privacyBusy || chatPending || simulationBusy} temporary={temporary} error={continuationError} notice={continuationNotice} saveRequest={saveRequest} onAction={updateContinuation}/>}
           {!privacy && !privacyError && <p role="status">{browserPreview ? '浏览器预览不读取账户资料、不保存画像。' : '正在读取隐私设置…'}</p>}
           <details className="chat-side-card chat-config-card chat-connection-details" open={status.connection === 'failed'}><summary>模型连接详情<span>{connectionTitle}</span></summary><p>{connectionDescription}</p></details>
         </aside>

@@ -118,6 +118,7 @@
 .ui-refresh .chat-composer textarea { display: block; height: 76px; min-height: 76px; max-height: 110px; border-radius: 9px; font-size: 14px; padding: 12px; resize: none; }
 .ui-refresh .chat-composer span { font-size: 11px; color: var(--ui-muted); }
 .ui-refresh .chat-error { grid-row: 3; max-height: 98px; overflow: auto; margin: 0 16px 10px; font-size: 12px; border-radius: 8px; }
+.ui-refresh .chat-stop-notice { color: var(--ui-muted); background: transparent; border-color: var(--ui-border); }
 .ui-refresh .chat-side-column { grid-template-columns: 1fr; grid-template-rows: auto auto minmax(max-content,1fr); overflow-y: auto; gap: 12px; }
 .ui-refresh .chat-side-card { padding: 18px; }
 .ui-refresh .chat-side-card > span { font-size: 9px; color: var(--ui-muted); letter-spacing: 1.5px; }

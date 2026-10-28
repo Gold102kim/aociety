@@ -558,7 +558,7 @@ function testComponentHarness(file, componentName, props, extraContext = {}) {
     ...extraContext,
   };
   vm.createContext(context);
-  vm.runInContext(stripTypeScriptTypes(`${prefix}\nreturn { submit: typeof submit === 'undefined' ? (typeof saveSupplement === 'undefined' ? undefined : saveSupplement) : submit, clearConversation: typeof clearConversation === 'undefined' ? undefined : clearConversation, readPrivacy: typeof readPrivacy === 'undefined' ? undefined : readPrivacy, updatePrivacy: typeof updatePrivacy === 'undefined' ? undefined : updatePrivacy, stop: typeof stop === 'undefined' ? undefined : stop }; }\nthis.component = ${componentName};`), context);
+  vm.runInContext(stripTypeScriptTypes(`${prefix}\nreturn { submit: typeof submit === 'undefined' ? (typeof saveSupplement === 'undefined' ? undefined : saveSupplement) : submit, requestReply: typeof requestReply === 'undefined' ? undefined : requestReply, clearConversation: typeof clearConversation === 'undefined' ? undefined : clearConversation, readPrivacy: typeof readPrivacy === 'undefined' ? undefined : readPrivacy, updatePrivacy: typeof updatePrivacy === 'undefined' ? undefined : updatePrivacy, stop: typeof stop === 'undefined' ? undefined : stop }; }\nthis.component = ${componentName};`), context);
   return { handlers: context.component(props), unmount: () => cleanups.forEach((cleanup) => cleanup()), stateWrites };
 }
 
@@ -749,6 +749,279 @@ async function testSimulationStopPreservesConversation() {
   view.unmount();
 }
 
+async function testChatStopLifecycle() {
+  const chat = source('src/pages/AiChatPage.tsx');
+  const stateNames = [...chat.matchAll(/const \[([^,]+), [^\]]+\] = useState/g)].map((match) => match[1]);
+  const refNames = [...chat.matchAll(/const (\w+) = useRef/g)].map((match) => match[1]);
+  const snapshot = { revision: 4, privacyEpoch: 2, learningMode: 'learn', cloudConsent: true, storage: 'encrypted', memories: [], continuations: [] };
+  const turn = { message: { id: 'sent', role: 'user', content: 'Existing sent message' }, history: [], savedContent: true };
+  const nextTurn = { ...turn, message: { ...turn.message, id: 'next', content: 'Next message' } };
+  const flush = () => new Promise(setImmediate);
+  function mount() {
+    const states = new Map();
+    const refs = new Map();
+    const writes = [];
+    const requests = [];
+    const cancellations = [];
+    const deferredPrivacyReads = [];
+    const privacyReads = [];
+    let nextPrivacyFailure = '';
+    let stateIndex = 0;
+    let refIndex = 0;
+    let statusReads = 0;
+    const initial = { messages: [{ id: 'welcome', role: 'assistant', content: 'Welcome' }, turn.message], input: 'Unsent draft', privacy: snapshot, temporary: true, learningPaused: true };
+    const current = { ok: true, state: snapshot, learningPaused: true, temporary: true };
+    const view = testComponentHarness('src/pages/AiChatPage.tsx', 'AiChatPage', {
+      user: { ...user('chat-stop-test'), aiAgent: { modelAssignment: { baseModelId: 'test-model' } } },
+    }, {
+      Error,
+      crypto: { randomUUID: () => 'isolated-chat-id' },
+      getRecentChatHistory: (messages) => messages,
+      getAiStatus: async () => { statusReads += 1; return { configured: true, provider: 'deepseek', connection: 'untested' }; },
+      sendAiMessage: (...args) => { const request = { ...deferred(), args }; requests.push(request); return request.promise; },
+      window: { launcher: {
+        ai: { cancel: (...args) => { const request = { ...deferred(), args }; cancellations.push(request); return request.promise; } },
+        representative: {
+          getState: () => {
+            const pending = deferredPrivacyReads.shift();
+            privacyReads.push(pending);
+            return pending ? pending.promise : Promise.resolve(current);
+          },
+          update: async () => {
+            const message = nextPrivacyFailure;
+            nextPrivacyFailure = '';
+            return message ? { ok: false, message } : current;
+          },
+          onChanged: () => () => {},
+        },
+      } },
+      useRef: (value) => { const name = refNames[refIndex++]; const ref = { current: name === 'restoredDraft' ? true : value }; refs.set(name, ref); return ref; },
+      useState: (value) => {
+        const name = stateNames[stateIndex++];
+        const initialValue = Object.hasOwn(initial, name) ? initial[name] : value;
+        states.set(name, initialValue);
+        return [initialValue, (next) => {
+          const resolved = typeof next === 'function' ? next(states.get(name)) : next;
+          states.set(name, resolved); writes.push({ name, next: resolved });
+        }];
+      },
+    });
+    assert.equal(typeof view.handlers.stop, 'function', 'Daily chat must expose a stop action without clearing the conversation.');
+    return { ...view, states, refs, writes, requests, cancellations, privacyReads,
+      queuePrivacyRead: () => { const pending = deferred(); deferredPrivacyReads.push(pending); return pending; },
+      failPrivacyUpdate: (message) => { nextPrivacyFailure = message; },
+      get statusReads() { return statusReads; } };
+  }
+  const reply = (text) => ({ text, responseId: text, model: 'isolated-model' });
+  const settle = (pending, fails, text) => fails ? pending.reject(new Error(text)) : pending.resolve(reply(text));
+  function preserved(view, messageList) {
+    assert.equal(view.states.get('messages'), messageList, 'Stopping must preserve the displayed conversation.');
+    assert.equal(view.states.get('input'), 'Unsent draft', 'Stopping must preserve unsent text.');
+    assert.equal(view.states.get('temporary'), true, 'Stopping must preserve temporary mode.');
+    assert.equal(view.states.get('learningPaused'), true, 'Stopping must not lift a safety pause.');
+    assert.equal(view.refs.get('restoredDraft').current, true, 'Stopping must preserve restored-draft provenance.');
+    assert.equal(view.states.get('privacy'), snapshot);
+  }
+
+  for (const staleFails of [false, true]) for (const afterAcknowledgement of [false, true]) {
+    const view = mount();
+    await flush();
+    const staleRead = view.queuePrivacyRead();
+    const pendingRead = view.handlers.readPrivacy();
+    const pendingReply = view.handlers.requestReply(turn);
+    const messageList = view.states.get('messages');
+    const pendingStop = view.handlers.stop();
+    if (afterAcknowledgement) { view.cancellations[0].resolve(); await pendingStop; }
+    const beforeStaleRead = view.writes.length;
+    if (staleFails) staleRead.resolve({ ok: false, message: 'Old conversation privacy read expired' });
+    else staleRead.resolve({ ok: true, state: { ...snapshot, memories: [{ source: 'Stale profile' }] }, temporary: false, learningPaused: false });
+    await pendingRead;
+    assert.equal(view.writes.length, beforeStaleRead, 'A privacy read started before stop cannot clear state or restore old mode/learning flags.');
+    preserved(view, messageList);
+    if (!afterAcknowledgement) { view.cancellations[0].resolve(); await pendingStop; }
+    view.requests[0].resolve(reply('Stopped reply'));
+    await pendingReply;
+    view.unmount();
+  }
+
+  for (const refreshFails of [false, true]) {
+    const view = mount();
+    await flush();
+    const mutationError = 'A real privacy update was not saved';
+    view.failPrivacyUpdate(mutationError);
+    assert.equal(await view.handlers.updatePrivacy({ kind: 'mode', mode: 'learn', expectedRevision: snapshot.revision }), false);
+    assert.equal(view.states.get('privacyError'), mutationError);
+    const pendingReply = view.handlers.requestReply(turn);
+    const refresh = view.queuePrivacyRead();
+    const pendingStop = view.handlers.stop();
+    view.cancellations[0].resolve();
+    await flush();
+    assert.equal(view.privacyReads.at(-1), refresh, 'Confirmed cancellation must request the current privacy snapshot.');
+    assert.equal(view.refs.get('inFlight').current, true, 'Send stays blocked until the stop refresh settles.');
+    await view.handlers.requestReply(nextTurn);
+    view.handlers.submit({ preventDefault() {} });
+    assert.equal(view.requests.length, 1);
+    if (refreshFails) refresh.reject(new Error('Current privacy refresh failed'));
+    else refresh.resolve({ ok: true, state: snapshot, learningPaused: true, temporary: true });
+    await pendingStop;
+    assert.match(view.states.get('privacyError'), /A real privacy update was not saved/, 'Stop refresh must preserve a prior genuine privacy mutation failure.');
+    assert.equal(view.states.get('stopState'), 'idle', 'Successful cancellation is distinct from a settings-read failure.');
+    assert.match(view.states.get('stopNotice'), /已停止/);
+    if (refreshFails) {
+      assert.equal(view.states.get('privacy'), null, 'An unreadable current snapshot disables consent-dependent sending on the next render.');
+      assert.match(view.states.get('privacyError'), /Current privacy refresh failed/);
+      assert.equal(await view.handlers.readPrivacy(), true, 'The user can explicitly recover by rereading privacy settings.');
+      assert.equal(view.states.get('privacy'), snapshot);
+      assert.equal(view.states.get('privacyError'), '', 'Explicit retry may dismiss the old errors after successful recovery.');
+    }
+    view.requests[0].resolve(reply('Stopped reply after refresh'));
+    await pendingReply;
+    view.unmount();
+  }
+
+  for (const supersededBy of ['privacy', 'unmount']) for (const refreshFails of [false, true]) {
+    const view = mount();
+    await flush();
+    const pendingReply = view.handlers.requestReply(turn);
+    const refresh = view.queuePrivacyRead();
+    const pendingStop = view.handlers.stop();
+    view.cancellations[0].resolve();
+    await flush();
+    assert.equal(view.privacyReads.at(-1), refresh);
+    let nextReply;
+    if (supersededBy === 'privacy') {
+      await view.handlers.updatePrivacy({ kind: 'mode', mode: 'learn', expectedRevision: snapshot.revision });
+      nextReply = view.handlers.requestReply(nextTurn);
+    } else view.unmount();
+    const beforeSupersededRefresh = view.writes.length;
+    if (refreshFails) refresh.reject(new Error('Superseded stop refresh failed'));
+    else refresh.resolve({ ok: true, state: { ...snapshot, revision: 0 }, temporary: false, learningPaused: false });
+    await pendingStop;
+    view.requests[0].resolve(reply('Stopped reply from prior context'));
+    await pendingReply;
+    assert.equal(view.writes.length, beforeSupersededRefresh, 'A stop refresh cannot write after another privacy operation or unmount.');
+    if (nextReply) {
+      assert.equal(view.states.get('busy'), true, 'A superseded stop refresh cannot end the new request.');
+      view.requests[1].resolve(reply('Current reply after privacy change'));
+      await nextReply;
+      view.unmount();
+    }
+  }
+
+  for (const oldReplyFails of [false, true]) {
+    const view = mount();
+    await flush();
+    const pendingReply = view.handlers.requestReply(turn);
+    const messageList = view.states.get('messages');
+    const pendingStop = view.handlers.stop();
+    await view.handlers.stop();
+    assert.deepEqual(view.cancellations.map(({ args }) => args), [[]], 'Repeated stops must coalesce and must not declare a new conversation mode.');
+    assert.equal(view.states.get('stopState'), 'stopping');
+    await view.handlers.requestReply(nextTurn);
+    view.handlers.submit({ preventDefault() {} });
+    assert.equal(view.requests.length, 1, 'Neither submit nor retry may send before cancellation is confirmed.');
+    preserved(view, messageList);
+    view.cancellations[0].resolve();
+    await pendingStop;
+    assert.equal(view.states.get('stopState'), 'idle');
+    assert.equal(view.states.get('busy'), false);
+    assert.equal(view.refs.get('inFlight').current, false);
+    assert.match(view.states.get('stopNotice'), /已停止/);
+    preserved(view, messageList);
+
+    const nextReply = view.handlers.requestReply(nextTurn);
+    assert.equal(view.requests.length, 2, 'Confirmed cancellation must allow a new explicit request.');
+    assert.equal(view.states.get('stopNotice'), '', 'A new request must clear the old stopped notice.');
+    const writesBeforeLateReply = view.writes.length;
+    const statusBeforeLateReply = view.statusReads;
+    settle(view.requests[0], oldReplyFails, 'Stale stopped reply');
+    await pendingReply;
+    assert.equal(view.writes.length, writesBeforeLateReply, 'A stopped success or failure cannot write into the new request.');
+    assert.equal(view.statusReads, statusBeforeLateReply, 'A stopped failure must not refresh model status.');
+    assert.equal(view.states.get('busy'), true, 'A stopped request cannot end the next request spinner.');
+    view.requests[1].resolve(reply('Current reply'));
+    await nextReply;
+    assert.equal(view.states.get('messages').at(-1).content, 'Current reply');
+    assert.equal(view.states.get('busy'), false);
+    view.unmount();
+  }
+
+  {
+    const view = mount();
+    await flush();
+    const pendingReply = view.handlers.requestReply(turn);
+    const messageList = view.states.get('messages');
+    const pendingStop = view.handlers.stop();
+    view.cancellations[0].reject(new Error('Isolated cancellation failure'));
+    await pendingStop;
+    assert.equal(view.states.get('stopState'), 'blocked');
+    assert.equal(view.states.get('busy'), false);
+    assert.equal(view.refs.get('inFlight').current, true, 'An unconfirmed cancellation must keep the synchronous send guard.');
+    assert.ok(view.states.get('error'), 'An unconfirmed cancellation needs visible failure feedback.');
+    assert.doesNotMatch(view.states.get('stopNotice'), /已停止/, 'Failed cancellation must not claim success.');
+    await view.handlers.requestReply(nextTurn);
+    view.handlers.submit({ preventDefault() {} });
+    assert.equal(view.requests.length, 1, 'Failed cancellation keeps both send and retry blocked.');
+    const beforeLateReply = view.writes.length;
+    view.requests[0].resolve(reply('Unconfirmed stopped reply'));
+    await pendingReply;
+    assert.equal(view.writes.length, beforeLateReply, 'Even before a successful stop retry, old results must stay invalid.');
+    const retriedStop = view.handlers.stop();
+    await view.handlers.stop();
+    assert.equal(view.cancellations.length, 2, 'A failed stop can be retried once without duplicate IPC calls.');
+    view.cancellations[1].resolve();
+    await retriedStop;
+    assert.equal(view.states.get('stopState'), 'idle');
+    assert.equal(view.states.get('error'), '');
+    assert.equal(view.refs.get('inFlight').current, false);
+    preserved(view, messageList);
+    view.unmount();
+  }
+
+  for (const fails of [false, true]) {
+    const view = mount();
+    await flush();
+    const pendingReply = view.handlers.requestReply(turn);
+    const pendingStop = view.handlers.stop();
+    view.unmount();
+    const beforeUnmountedResponse = view.writes.length;
+    settle(view.cancellations[0], fails, 'Late stop acknowledgement');
+    settle(view.requests[0], fails, 'Late chat response');
+    await Promise.all([pendingStop, pendingReply]);
+    assert.equal(view.writes.length, beforeUnmountedResponse, 'Stop and model responses must not write after unmount.');
+  }
+
+  for (const operation of ['privacy', 'clear']) for (const stopFails of [false, true]) {
+    const view = mount();
+    await flush();
+    const pendingReply = view.handlers.requestReply(turn);
+    const pendingStop = view.handlers.stop();
+    const transition = operation === 'privacy'
+      ? view.handlers.updatePrivacy({ kind: 'mode', mode: 'learn', expectedRevision: snapshot.revision })
+      : view.handlers.clearConversation(true);
+    if (operation === 'clear') {
+      assert.deepEqual(view.cancellations[1].args, [true]);
+      view.cancellations[1].resolve();
+    }
+    await transition;
+    assert.equal(view.states.get('stopState'), 'idle', 'A deliberate conversation transition clears the old stop state.');
+    const nextReply = view.handlers.requestReply(nextTurn);
+    assert.equal(view.requests.length, 2);
+    const beforeLateStop = view.writes.length;
+    settle(view.cancellations[0], stopFails, 'Old stop outcome');
+    await pendingStop;
+    settle(view.requests[0], stopFails, 'Old conversation reply');
+    await pendingReply;
+    assert.equal(view.writes.length, beforeLateStop, 'A superseded stop acknowledgement cannot change the next conversation.');
+    assert.equal(view.refs.get('inFlight').current, true);
+    assert.equal(view.states.get('busy'), true);
+    view.requests[1].resolve(reply('Current conversation reply'));
+    await nextReply;
+    assert.equal(view.states.get('messages').at(-1).content, 'Current conversation reply');
+    view.unmount();
+  }
+}
+
 async function testPrivacyUpdateFailureFeedback() {
   const chat = source('src/pages/AiChatPage.tsx');
   const stateNames = [...chat.matchAll(/const \[([^,]+), [^\]]+\] = useState/g)].map((match) => match[1]);
@@ -848,6 +1121,7 @@ async function testPrivacyUpdateFailureFeedback() {
   await testRendererLateResponses();
   await testLearningPauseFeedback();
   await testSimulationStopPreservesConversation();
+  await testChatStopLifecycle();
   await testPrivacyUpdateFailureFeedback();
   console.log('Session invalidation, renderer navigation, temporary privacy, cancel-only context, game launch ownership and stale UI response tests passed.');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

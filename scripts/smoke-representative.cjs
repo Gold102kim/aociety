@@ -9,6 +9,7 @@ const installRepresentativeTransport = require('./fixtures/representative-transp
 const { checkLiquidGlass } = require('./fixtures/liquid-glass-checks.cjs');
 const { checkLiquidGlassInteraction } = require('./fixtures/liquid-glass-interaction-checks.cjs');
 const { checkTemporaryPrivacy } = require('./fixtures/temporary-privacy-checks.cjs');
+const { checkChatStop } = require('./fixtures/chat-stop-checks.cjs');
 const root = path.resolve(__dirname, '..');
 const packageDirectory = process.env.ECHO_REPRESENTATIVE_PACKAGE_DIR ? path.resolve(process.env.ECHO_REPRESENTATIVE_PACKAGE_DIR) : null;
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'echoverse-representative-ui-'));
@@ -476,11 +477,13 @@ async function send(page, text) {
   await expect(page.locator('.chat-error')).toHaveCount(0);
   assert.equal((await state(page)).memories.length, 0, 'Retrying with the recovered revision must complete the isolated reset.');
   console.log('Privacy mutation feedback passed: real revision conflict, persistent failure alert, preserved data and confirmation, successful retry; no added model request.');
+  const chatStop = await checkChatStop({ page, application, capture: (name) => capture(page, name) });
+  console.log(`Daily chat stop validation: ${JSON.stringify(chatStop)}`);
   assert.equal(errors.length, 0, errors.join('\n'));
   if (packageDirectory) {
     const { auditPackage } = require('./audit-local-package.cjs');
     const manifest = auditPackage(packageDirectory);
-    fs.writeFileSync(path.join(packageDirectory, 'representative-smoke.json'), `${JSON.stringify({ passed: true, createdAt: new Date().toISOString(), asarSha256: manifest.asarSha256, liquidGlass, liquidGlassInteraction, temporaryPrivacy,
+    fs.writeFileSync(path.join(packageDirectory, 'representative-smoke.json'), `${JSON.stringify({ passed: true, createdAt: new Date().toISOString(), asarSha256: manifest.asarSha256, liquidGlass, liquidGlassInteraction, temporaryPrivacy, chatStop,
       scope: 'Actual packaged executable and unchanged ASAR; isolated accounts and runtime-only mocks/geometry; glass and clear/forced-color modes, keyboard disclosures, synthesized press at 10% playback, loaded-page screenshots; avatar/privacy/continuations/private trials and pause/recovery; no paid requests, game startup or similarity evaluation.', screenshots: path.basename(screenshots) }, null, 2)}\n`);
     assert.equal(manifest.asarSha256, JSON.parse(fs.readFileSync(path.join(packageDirectory, 'acceptance-manifest.json'), 'utf8')).asarSha256);
   }

@@ -13,6 +13,12 @@
 
 All notable launcher changes are recorded here. The project follows semantic versioning for engineering baselines; a version number does not imply production readiness.
 
+## [0.6.2] - 2026-10-28
+
+- 日常聊天增加“停止生成”，保留已有消息、输入草稿、临时模式与学习暂停；取消确认前禁发，失败后可重试停止。
+- 使用现有无参取消与请求版本守卫，阻止旧回复、旧取消结果覆盖后续对话；不改变画像采集、存储格式或玻璃材质。
+- 新增停止成功、失败重试、重复点击、晚到结果和卸载的确定性回归；实际打包验收状态见 `docs/LOCAL_ACCEPTANCE.md`。
+
 ## [0.6.1] - 2026-10-27
 
 - 针对新披露告警，更新 Electron 43.8.1、Vite 8.1.6、undici 6.29.1/7.30.1 与 fast-uri 3.1.9，保留同主版本 API。
