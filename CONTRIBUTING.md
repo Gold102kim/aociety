@@ -36,6 +36,7 @@ pnpm check
 | `pnpm build` | 清理并生成生产前端与 Electron 代码 |
 | `pnpm check` | 类型检查、测试和生产构建 |
 | `pnpm dist:win` | 完整检查后生成 Windows portable 包 |
+| `python -m pip install -r requirements-test.txt` 后 `python -m pytest -q` | Python 后端测试；离线运行，不需要 API 密钥，测试会阻断外网连接 |
 
 当前项目尚未配置统一 Lint/Format 命令。提交前应遵循现有 TypeScript/React 风格和 `.editorconfig`，并把引入 ESLint/Prettier 作为单独、可审查的工程变更。
 

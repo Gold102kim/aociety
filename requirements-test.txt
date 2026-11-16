@@ -1,0 +1,6 @@
+# Backend test dependencies (CI + local). Keep heavy vision/audio packages out:
+# tests exercise fallback paths and never load MediaPipe/OpenCV/ONNX models.
+-r requirements-resident.txt
+# backend/openclaw_gateway.py imports cryptography at module load (via backend/main.py).
+cryptography>=42.0.0
+pytest>=8.0.0
