@@ -22,3 +22,6 @@ overrides:
   "tar@7": "7.5.21"
   # Node-gyp uses undici 6; retain the normally updated undici 7 family.
   "undici@6": "6.29.1"
+  # Patched dependencies in the wait-on development toolchain.
+  "follow-redirects@1": "1.16.2"
+  "wait-on@9.0.10>joi": "18.3.1"

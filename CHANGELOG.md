@@ -13,6 +13,11 @@
 
 All notable launcher changes are recorded here. The project follows semantic versioning for engineering baselines; a version number does not imply production readiness.
 
+## [0.6.3] - 2026-11-24
+
+- 恢复待续草稿失败时保留当前聊天，刷新设置后可重试。只在恢复成功后开始新对话，草稿仍需本人发送。
+- 更新开发工具链中的 `follow-redirects` 到 1.16.2、`joi` 到 18.3.1，修复两项高危审计告警。
+
 ## [0.6.2] - 2026-10-28
 
 - 日常聊天增加“停止生成”，保留已有消息、输入草稿、临时模式与学习暂停；取消确认前禁发，失败后可重试停止。

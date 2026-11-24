@@ -151,17 +151,17 @@ export function AiChatPage({ user, onBack, active = true }: { user: LauncherUser
     setPrivacyBusy(true);
     setContinuationError('');
     setContinuationNotice('');
-    if (action.kind === 'resume') discardConversation();
     try {
       const response = await window.launcher.representative.continuation(action);
       if (!mounted.current) return false;
       const result = applyPrivacyResult(response);
       if (result.resumed) {
+        discardConversation();
         setWorkspace('chat');
         restoredDraft.current = true;
         setLearningPaused(true);
         setInput(result.resumed.content);
-        setContinuationNotice('已放回输入框，尚未发送。本次对话暂停偏好学习；清空本次对话后恢复原模式。');
+        setContinuationNotice('已放回输入框，尚未发送。已开始新对话并暂停偏好学习，清空本次对话后恢复原模式。');
         inputRef.current?.focus();
       } else setContinuationNotice(action.kind === 'save' ? '已加密保存。下次登录可在这里继续。' : action.kind === 'complete' ? '已完成并删除保存的内容。' : '已移除保存的内容。');
       return true;
@@ -298,6 +298,7 @@ export function AiChatPage({ user, onBack, active = true }: { user: LauncherUser
   const connectionDescription = browserPreview ? '此预览不读取 API 密钥，也不发送模型请求。请在桌面软件中使用 AI 对话。' : status.connection === 'connected' ? 'DeepSeek 已返回真实回复。仅使用当前模式允许的信息。' : status.connection === 'untested' ? '配置已找到，同意云端处理并发送第一条消息后验证连接。' : status.connection === 'failed' ? status.message || '请检查网络、Base URL、模型名称和 API Key。' : '本地模型服务尚未配置，请联系开发人员。';
   const canSend = Boolean(privacy?.cloudConsent && status.configured && status.provider === 'deepseek' && !privacyBusy);
   const chatPending = busy || stopState !== 'idle';
+  const settingsError = privacy ? privacyError : [continuationError, privacyError].filter(Boolean).join(' ');
   const latestLearnedMemory = learningNotice.startsWith('已记住') ? privacy?.memories.filter((memory) => memory.sourceKind === 'explicit_message').sort((a, b) => a.updatedAt.localeCompare(b.updatedAt)).at(-1) : undefined;
 
   return (
@@ -327,7 +328,7 @@ export function AiChatPage({ user, onBack, active = true }: { user: LauncherUser
         </article>}
         {workspace === 'simulation' && (privacy ? <PrivateSimulationPanel key={simulationKey} state={privacy} temporary={temporary} canGenerate={canSend} onBusyChange={setSimulationBusy} onRefresh={async () => { await readPrivacy(); }} onStatusRefresh={refreshModelStatus}/> : <p role="status">暂不能安全读取隐私设置。请先重试读取，再进行私密试答。</p>)}
         <aside className="chat-side-column">
-          {privacyError && <div className="chat-error" role="alert"><span>{privacyError}</span><button type="button" disabled={privacyBusy} onClick={() => { setPrivacyError(''); void readPrivacy(); }}>重试读取设置</button></div>}
+          {settingsError && <div className="chat-error" role="alert"><span>{settingsError}</span>{privacyError && <button type="button" disabled={privacyBusy} onClick={() => { setPrivacyError(''); void readPrivacy(); }}>重试读取设置</button>}</div>}
           {learningNotice && <div className="representative-notice" role="status"><p>{learningNotice}</p>{latestLearnedMemory && <button type="button" disabled={privacyBusy} onClick={() => { void updatePrivacy({ kind: 'forget', id: latestLearnedMemory.id, expectedRevision: privacy!.revision }); }}>不记住这条</button>}</div>}
           <article className="chat-side-card representative-temporary"><label><input type="checkbox" checked={temporary} disabled={privacyBusy || !privacy || browserPreview} onChange={(event) => { void clearConversation(event.target.checked); }}/><span>临时对话</span></label><p>本次对话不使用或新增长期画像。切换时清空当前对话，仍需同意云端处理。整页刷新会结束本次登录，不恢复聊天。</p></article>
           {privacy && <RepresentativePanel state={privacy} busy={privacyBusy} temporary={temporary} paused={learningPaused} canConsent={status.configured && status.provider === 'deepseek'} onChange={updatePrivacy}/>}

@@ -1,8 +1,21 @@
 # 数字代表本机验收包
 
-更新日期：2026-10-28。当前本机验收包为 0.6.2，实际 Electron 内核为 43.8.1；下文保留 0.6.1 和第十批 0.6.0 的历史记录。
+更新日期：2026-11-24。当前本机验收包为 0.6.3，实际 Electron 内核为 43.8.1。下文保留旧版本的验收记录。
 
-## 当前产物：0.6.2
+## 当前产物：0.6.3
+
+- 目录：`release/representative-local-20261124T105459Z`。
+- 程序：`EchoVerse-Representative-local-0.6.3-x64.exe`，86,263,994 字节。
+- SHA-256：`07B9E8F846EF924BDCD026CD628DDF5D86C8DA67E24DA0D5628FD9CB8A2FC595`。
+- 签名：`NotSigned`，仅供本机验收。包审查核对了实际 Electron 43.8.1 和 29 个 ASAR 应用文件。便携 EXE 解压、隔离启动和退出通过。
+
+恢复待续草稿失败时保留当前聊天和输入框。重试成功后，草稿出现在新对话的输入框中，本次偏好学习暂停。恢复动作本身不发起模型请求。
+
+实际打包窗口回归通过。`representative-smoke.json` 的 `draftRestoreConflictRetry` 记录真实 IPC 版本冲突、原聊天保留和恢复重试。日常聊天停止生成、临时模式、玻璃与清晰回退、缩放和系统加密也通过。测试使用隔离账户和模拟请求。
+
+完整检查、生产构建和高危依赖审计通过。已修复开发工具链的 [follow-redirects](https://github.com/advisories/GHSA-mrwp-f3q8-3g9p) 与 [joi](https://github.com/advisories/GHSA-4528-x5fx-h6hg) 高危告警。`minimatch` 的[一项中危告警](https://github.com/advisories/GHSA-g3hv-75wg-m249)仍涉及打包工具依赖，修复要求跨大版本升级。正常双击会使用现有账户目录，手工试用前可按下文备份。
+
+## 历史产物：0.6.2
 
 - 目录：`release/representative-local-20261028T104030Z`。
 - 程序：`EchoVerse-Representative-local-0.6.2-x64.exe`，86,264,183 字节。
@@ -91,11 +104,11 @@ pnpm dist:representative-local
 实际打包程序的完整功能测试需要现有 Playwright 环境。将 `NODE_PATH` 指向工作区提供的 Node 包目录，然后：
 
 ```powershell
-$env:ECHO_REPRESENTATIVE_PACKAGE_DIR = (Resolve-Path 'release/representative-local-20261028T104030Z').Path
+$env:ECHO_REPRESENTATIVE_PACKAGE_DIR = (Resolve-Path 'release/representative-local-20261124T105459Z').Path
 pnpm smoke:representative
 Remove-Item Env:ECHO_REPRESENTATIVE_PACKAGE_DIR
-node scripts/smoke-local-portable.cjs release/representative-local-20261028T104030Z
-node scripts/audit-local-package.cjs release/representative-local-20261028T104030Z
+node scripts/smoke-local-portable.cjs release/representative-local-20261124T105459Z
+node scripts/audit-local-package.cjs release/representative-local-20261124T105459Z
 ```
 
 新构建时替换为新目录。功能测试启动 `win-unpacked/EchoVerseLauncher.exe`，确认 `app.isPackaged`、实际 ASAR 入口和隔离用户目录；仅在测试进程中注入模拟传输，不修改 ASAR，不包含测试脚本或模拟服务。便携测试另行启动实际 EXE，验证解压、打包启动和正常退出，游戏目标被明确设为不存在，不能据此称为游戏联调通过。

@@ -260,12 +260,37 @@ async function send(page, text) {
   await page.getByRole('button', { name: '发送消息', exact: true }).click();
   await expect(page.getByText('这是隔离测试回复，不是真实模型输出。', { exact: true })).toBeVisible();
   assert.equal((await state(page)).memories.length, 0, 'A restored draft is not evidence, including after changing consent/mode.');
+  const history = page.getByRole('log');
+  const messagesBeforeRestore = await history.locator('.chat-message').allTextContents();
+  const requestsBeforeRestore = await application.evaluate(() => global.__representativeRequests.length);
+  // Advance the saved revision without refreshing the renderer's copy.
+  await page.evaluate(async () => {
+    const current = await window.launcher.representative.getState();
+    if (!current.ok) throw new Error(current.message);
+    const updated = await window.launcher.representative.update({ kind: 'mode', mode: current.state.learningMode, expectedRevision: current.state.revision });
+    if (!updated.ok) throw new Error(updated.message);
+  });
+  const restore = page.getByRole('button', { name: '放回输入框', exact: true });
+  await restore.click();
+  await expect(page.locator('.continuity-panel [role="alert"]')).toContainText('内容已有变化');
+  await expect(restore).toBeEnabled();
+  assert.deepEqual(await history.locator('.chat-message').allTextContents(), messagesBeforeRestore, 'A rejected restore must preserve the visible conversation.');
+  await expect(composer).toHaveValue('');
+  await restore.click();
+  await expect(composer).toHaveValue('我喜欢爵士乐');
+  await expect(history.locator('.chat-message')).toHaveCount(1);
+  await expect(page.locator('.continuity-panel [role="alert"]')).toHaveCount(0);
+  assert.equal(await application.evaluate(() => global.__representativeRequests.length), requestsBeforeRestore, 'A rejected restore and successful retry do not contact the model.');
+  assert.equal((await page.evaluate(() => window.launcher.representative.getState())).learningPaused, true);
+  console.log('Draft restore feedback passed: real revision conflict, conversation preserved, explicit retry restored without sending or learning.');
   await page.getByRole('button', { name: '标记完成', exact: true }).click();
   await page.getByRole('button', { name: '完成并移除', exact: true }).click();
   await expect.poll(async () => (await state(page)).continuations.length).toBe(0);
   await page.getByRole('button', { name: '清空本次对话', exact: true }).click();
   await page.getByRole('button', { name: '确认清空', exact: true }).click();
   await expect(page.getByRole('button', { name: '清空本次对话', exact: true })).toBeDisabled();
+  // Clear the restored draft before entering a fresh, personal preference.
+  await composer.clear();
   await send(page, '我喜欢爵士乐');
   await expect.poll(async () => (await state(page)).memories.length).toBe(1);
   await expect(page.getByText('已记住一条明确偏好，可在下方查看、修正或忘记。')).toBeVisible();
@@ -483,7 +508,7 @@ async function send(page, text) {
   if (packageDirectory) {
     const { auditPackage } = require('./audit-local-package.cjs');
     const manifest = auditPackage(packageDirectory);
-    fs.writeFileSync(path.join(packageDirectory, 'representative-smoke.json'), `${JSON.stringify({ passed: true, createdAt: new Date().toISOString(), asarSha256: manifest.asarSha256, liquidGlass, liquidGlassInteraction, temporaryPrivacy, chatStop,
+    fs.writeFileSync(path.join(packageDirectory, 'representative-smoke.json'), `${JSON.stringify({ passed: true, createdAt: new Date().toISOString(), asarSha256: manifest.asarSha256, liquidGlass, liquidGlassInteraction, temporaryPrivacy, chatStop, draftRestoreConflictRetry: true,
       scope: 'Actual packaged executable and unchanged ASAR; isolated accounts and runtime-only mocks/geometry; glass and clear/forced-color modes, keyboard disclosures, synthesized press at 10% playback, loaded-page screenshots; avatar/privacy/continuations/private trials and pause/recovery; no paid requests, game startup or similarity evaluation.', screenshots: path.basename(screenshots) }, null, 2)}\n`);
     assert.equal(manifest.asarSha256, JSON.parse(fs.readFileSync(path.join(packageDirectory, 'acceptance-manifest.json'), 'utf8')).asarSha256);
   }
